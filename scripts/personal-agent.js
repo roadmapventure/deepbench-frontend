@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1010 | scripts/personal-agent.js | AGT-650 -- the mentor call path: twenty strategy kinds and two new
+// slugs (weekly study, mentor review); the Library read ranked by rpc/library_search for the ask (or the capability's
+// default query), falling back to trust order; four new reads -- memory (decisions, approved methods, open commitments,
+// pending facts, the top study/case rows by rpc/strategy_memory_search, 20,000 B), sources, product (version, recent
+// and top-need tickets, product snapshots) and goals; the team reads (market, career, napkin, week) cut to
+// STRATEGY_TEAM_BYTES by question overlap, so every strategy render stays under 150,000 B; per-kind write checks
+// (market check on every offer and roadmap); updates_to_write (whitelisted data keys, one PATCH per row, never a
+// DELETE); and --tick/--untick, the attended confirm of pending facts and proposed methods.
+// Kickoff: docs/kickoffs/v7.0.1010-AGT-650-harry-mentor-call-path.md.
 // DeepBench v7.0.1008 | scripts/personal-agent.js | AGT-648 -- the Library is read by the question first: catalog items ranked by stem overlap with --ask, matches read even outside the capability sections, then trust order
 // DeepBench v7.0.1007 | scripts/personal-agent.js | AGT-647 -- the Library is read by trust: 60 KB text cap, 12,000-character items, posts as one count line, no separate vision read, per-capability team reads
 // DeepBench v7.0.1006 | scripts/personal-agent.js | AGT-644 -- a third record store (strategy_records), the Library read and the strategy write
@@ -133,6 +142,9 @@
 //     marked job; stdout gains `leads: n`.
 //   ... --fetch-postings --agent=jerry
 //   ... --fetch-linkedin-alerts --agent=jerry --out=<path> [--from=<addr>] [--days=<n>] [--json]
+//   ... --tick=<ids> [--untick=<ids>] --agent=<strategy agent>   (AGT-650, attended only; prints
+//       {confirmed, superseded, approved, dropped, library_ids}; exit 2 with the grant INSERT when the
+//       agent holds no confirmed_fact grant)
 //
 // --render   reads the capability's kinds (READ_MAP) plus its `correction` records, assembles, and
 //            prints the header + prompt (to --out when given); stderr `# model: <id>`; --json prints
@@ -208,15 +220,26 @@ export const HUMOR_READ_MAP = {
 // AGT-644. The strategy store's eleven kinds (strategy_records_kind_check, AGT-643) and its OWN read
 // map, never folded into READ_MAP or HUMOR_READ_MAP. `correction` and `grade` are in no list: every
 // one of them is read on every render (the store's correctionKinds below).
+// AGT-650: the nine AGT-649 kinds (strategy_records_kind_check now allows twenty) and the two new slugs.
 export const STRATEGY_KINDS = [
   'brief', 'review', 'readiness', 'offer', 'roadmap', 'acquirer', 'call', 'gap', 'research', 'correction', 'grade',
+  'decision', 'commitment', 'study', 'source', 'method', 'case', 'kpi', 'target', 'fact',
 ];
 export const STRATEGY_READ_MAP = {
   'strategy-daily-brief': ['brief', 'offer', 'acquirer', 'call', 'gap'],
   'strategy-weekly-review': ['offer', 'roadmap', 'acquirer', 'call', 'gap', 'review', 'research'],
   'strategy-readiness-check': ['readiness', 'offer', 'acquirer', 'roadmap'],
   'strategy-library-curate': ['gap'],
-  'strategy-advise': ['offer', 'roadmap', 'acquirer', 'gap', 'research'],
+  'strategy-advise': ['offer', 'roadmap', 'acquirer', 'gap', 'research', 'decision', 'target', 'case'],
+  'strategy-weekly-study': ['source', 'study', 'case', 'research'],
+  'strategy-mentor-review': ['call', 'method', 'source', 'study', 'grade', 'kpi', 'commitment'],
+};
+// AGT-650: the query a slug with no --ask ranks its reads by (kickoff section 4). A slug with neither an
+// ask nor a default reads in trust order, exactly as before.
+export const STRATEGY_DEFAULT_QUERY = {
+  'strategy-daily-brief': 'this week government procurement AI agents acquisitions',
+  'strategy-weekly-review': 'this week government procurement AI agents acquisitions',
+  'strategy-weekly-study': 'selling to government; selling a software business; AI and software product; pricing and packaging; go-to-market; founder and operator lessons',
 };
 // The Library's labels (personal_sources check constraints, AGT-643): eleven sections, seven trust
 // levels, three sensitivities.
@@ -232,6 +255,8 @@ export const LIBRARY_SECTIONS = {
   'strategy-readiness-check': ['value', 'evidence', 'facts', 'approach'],
   'strategy-library-curate': [],
   'strategy-advise': ['value', 'approach', 'facts', 'evidence', 'works'],
+  'strategy-weekly-study': [],
+  'strategy-mentor-review': ['goals', 'value'],
 };
 // A capability that reads the head of every UNSECTIONED item (to label it), and how many characters.
 export const LIBRARY_UNSECTIONED_HEADS = { 'strategy-library-curate': 2000 };
@@ -249,7 +274,8 @@ export const NAPKIN_VERDICT_CHARS = 400;
 // ask, only crowd the cap.
 const CAREER_DOC_KINDS = ['resume', 'cover_letter'];
 export const LIBRARY_TEXT_SKIP_KINDS = Object.fromEntries(['strategy-daily-brief', 'strategy-weekly-review',
-  'strategy-readiness-check', 'strategy-library-curate', 'strategy-advise'].map(c => [c, CAREER_DOC_KINDS]));
+  'strategy-readiness-check', 'strategy-library-curate', 'strategy-advise', 'strategy-weekly-study', 'strategy-mentor-review']
+  .map(c => [c, CAREER_DOC_KINDS]));
 // The capabilities whose answer may carry labels[] for the catalog rows.
 export const LIBRARY_CURATORS = ['strategy-library-curate'];
 // The write check's constants: the one emoji, always last (rule 1); the hard ceiling in code points;
@@ -316,22 +342,36 @@ export const KIND_FILTERS = {
 // and set to null when it comes back empty.
 const HUMOR_EXTRA_READS = ['market', 'career', 'napkin', 'personal_sources', 'week'];
 const STRATEGY_EXTRA_READS = ['library', 'market', 'career', 'napkin', 'week'];
+// AGT-650: every strategy slug but curate also reads `memory` and `product`; the study and the mentor
+// review read `sources`; the mentor review, the advise and the brief read `goals`.
+const MENTOR_READS = ['memory', 'product'];
 export const EXTRA_READS = {
   'career-linkedin-alerts': 'competitors',
   'humor-weekly-draft': HUMOR_EXTRA_READS,
   'humor-topic-scout': HUMOR_EXTRA_READS,
   // AGT-644: every strategy slug reads the Library, the team's stores and the week; the readiness
   // check and the weekly review also read the vision corpus.
-  'strategy-daily-brief': STRATEGY_EXTRA_READS,
+  'strategy-daily-brief': [...STRATEGY_EXTRA_READS, ...MENTOR_READS, 'goals'],
   // AGT-647: no separate 'vision' read -- the vision documents are Library items (AGT-645) -- and each
   // capability reads only the team stores its job needs: the brief and the weekly review see what
   // changed (all five); a readiness check needs the Library and the market; curation needs the Library.
-  'strategy-weekly-review': STRATEGY_EXTRA_READS,
-  'strategy-readiness-check': ['library', 'market'],
+  'strategy-weekly-review': [...STRATEGY_EXTRA_READS, ...MENTOR_READS],
+  'strategy-readiness-check': ['library', 'market', ...MENTOR_READS],
   'strategy-library-curate': ['library'],
   // A question or a draft review: the Library, the market and the idea board; no postings, no week.
-  'strategy-advise': ['library', 'market', 'napkin'],
+  'strategy-advise': ['library', 'market', 'napkin', ...MENTOR_READS, 'goals'],
+  'strategy-weekly-study': ['library', ...MENTOR_READS, 'sources'],
+  'strategy-mentor-review': ['library', ...MENTOR_READS, 'sources', 'goals'],
 };
+// AGT-650: the team reads a strategy render carries are cut to these byte budgets, the rows that share
+// the most stems with the query kept first (newest first on a tie, and with no query), so the memory,
+// product and goals blocks fit inside the 150,000-byte render without raising LIBRARY_BYTES. Measured
+// 2026-11-12 before this change: market 27 KB, career 30 KB, napkin 40 KB, week 18 KB, and the brief and
+// weekly-review renders at 189 KB and 198 KB.
+export const STRATEGY_TEAM_BYTES = { market: 7000, career: 6000, napkin: 8000, week: 5000 };
+export const MEMORY_BYTES = 20000;
+export const MEMORY_SEARCH_LIMIT = 12;
+export const LIBRARY_SEARCH_LIMIT = 30;
 
 // The evidence sources the design named, read-only (git log, files). Paths only -- no remote, no
 // credential. deepbench-personal is the personal-lane clone of dev -- never the shared checkout
@@ -658,6 +698,8 @@ function boardUrl(board, token) {
   return `https://api.ashbyhq.com/posting-api/job-board/${t}`;
 }
 
+const idList = v => String(v ?? '').split(',').map(s => s.trim()).filter(Boolean);
+
 export function parseArgs(argv) {
   const out = { json: false };
   const modes = [];
@@ -678,12 +720,26 @@ export function parseArgs(argv) {
       case 'json': out.json = true; break;
       case 'from': out.from = value; break;
       case 'days': out.days = value; break;
+      // AGT-650: the attended confirm. --tick names the facts to confirm and the methods to approve;
+      // --untick the ones to drop. Comma-separated strategy_records ids.
+      case 'tick': modes.push('tick'); out.tick = idList(value); break;
+      case 'untick': out.untick = idList(value); break;
       default: return { error: `unrecognized flag "--${key}"` };
     }
   }
-  if (modes.length !== 1) return { error: 'exactly one of --render, --write, --fetch-postings, --fetch-linkedin-alerts is required' };
+  if (modes.length !== 1) return { error: 'exactly one of --render, --write, --fetch-postings, --fetch-linkedin-alerts, --tick is required' };
   out.mode = modes[0];
   if (!out.agent) return { error: '--agent=<agents.id> is required' };
+  if (out.untick && out.mode !== 'tick') return { error: '--untick is used only with --tick' };
+  if (out.mode === 'tick') {
+    out.untick = out.untick ?? [];
+    const all = [...out.tick, ...out.untick];
+    if (!all.length) return { error: '--tick=<ids> [--untick=<ids>] names at least one strategy_records id' };
+    const bad = all.find(id => !UUID.test(id));
+    if (bad) return { error: `--tick/--untick id "${bad}" is not a uuid` };
+    if (new Set(all).size !== all.length) return { error: 'an id is named twice across --tick and --untick' };
+    return out;
+  }
   if (out.mode === 'fetch-linkedin-alerts') {
     if (!out.out) return { error: '--out=<path> is required with --fetch-linkedin-alerts' };
     if (out.days !== undefined && !/^\d+$/.test(out.days)) return { error: '--days must be a whole number' };
@@ -741,7 +797,17 @@ function rest() {
     if (!r.ok) throw new Error(`PATCH ${pathAndQuery.split('?')[0]} returned HTTP ${r.status} ${await r.text()}`);
     return r.json();
   }
-  return { root, headers, get, insert, patch };
+  // AGT-650: a read-only Postgres function (library_search, strategy_memory_search), one POST.
+  async function rpc(name, body) {
+    const r = await fetch(`${root}/rest/v1/rpc/${name}`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(`rpc ${name} returned HTTP ${r.status} ${await r.text()}`);
+    return r.json();
+  }
+  return { root, headers, get, insert, patch, rpc };
 }
 
 async function readRecords(db, capability, target) {
@@ -898,20 +964,26 @@ async function readLibrary(db, args) {
 
   const wanted = new Set(LIBRARY_SECTIONS[args.capability] ?? []);
   const headChars = LIBRARY_UNSECTIONED_HEADS[args.capability] ?? 0;
-  // AGT-648: the question decides what is read first. An item whose title, purpose, section or kind
-  // shares at least LIBRARY_MATCH_MIN stems with the ask is read even outside the capability's sections,
-  // and every item is ranked by that overlap before the trust order, so the 60 KB cap keeps what the
-  // question needs (the tryout lost the exit thesis to the cap on an acquisition question).
-  const askStems = stemsOf(args.ask);
-  const scored = catalog.map(c => ({ c, hit: overlap(askStems, stemsOf([c.title, c.purpose, c.section, c.kind].join(' '))) }));
+  // AGT-650: the question decides what is read first, by the Library's own full-text (and, with an
+  // embedding key, vector) ranking -- rpc/library_search -- in place of AGT-648's stem overlap. An item
+  // the search hits is read even outside the capability's sections (only its hit sections, when the hit
+  // is section-level); hits come first by score, then the capability's sections in trust order. No
+  // query, an RPC error or no hit: the trust order alone, as before. Goals-section items are left to
+  // the `goals` block when the slug reads it, so their text never travels twice.
   const skipKinds = new Set(LIBRARY_TEXT_SKIP_KINDS[args.capability] ?? []);
-  const full = relevanceOrder(scored.filter(s => !skipKinds.has(s.c.kind)
-    && ((s.c.section && wanted.has(s.c.section)) || s.hit >= LIBRARY_MATCH_MIN))).map(s => s.c.id);
+  const skipSections = new Set([].concat(EXTRA_READS[args.capability] ?? []).includes('goals') ? ['goals'] : []);
+  const query = strategyQuery(args);
+  const search = query ? await libraryHits(db, query, { agentId: args.agent }) : { hits: [], method: 'trust' };
+  const plan = libraryPlan(catalog, search.hits, { wanted, skipKinds, skipSections });
+  const full = plan.map(p => p.id);
+  const onlySections = new Map(plan.filter(p => p.sections).map(p => [p.id, p.sections]));
   const heads = headChars ? catalog.filter(c => !c.section).map(c => c.id) : [];
   const ids = [...full, ...heads];
-  const parts = ids.length ? await getByIds(db, 'personal_source_sections', 'source_id', ids, 'source_id,ord,heading,body', 'source_id.asc,ord.asc') : [];
+  const parts = ids.length ? await getByIds(db, 'personal_source_sections', 'source_id', ids, 'id,source_id,ord,heading,body', 'source_id.asc,ord.asc') : [];
   const bySource = new Map();
   for (const p of parts) {
+    const keep = onlySections.get(p.source_id);
+    if (keep && !keep.has(p.id)) continue;
     if (!bySource.has(p.source_id)) bySource.set(p.source_id, []);
     bySource.get(p.source_id).push({ heading: p.heading, body: p.body });
   }
@@ -933,7 +1005,200 @@ async function readLibrary(db, args) {
     text.push(item);
   }
   if (capped) console.error(`personal-agent: library text capped at ${LIBRARY_BYTES} bytes`);
-  return { catalog, counts, text, text_bytes: bytes, text_capped: capped };
+  return { catalog, counts, text, text_bytes: bytes, text_capped: capped, ranked_by: search.hits.length ? search.method : 'trust' };
+}
+
+// --- AGT-650: the ranked reads ------------------------------------------------------------------
+//
+// The query a strategy read ranks by: the ask, else the capability's default, else none.
+export function strategyQuery(args) {
+  const q = String(args?.ask ?? '').trim() || STRATEGY_DEFAULT_QUERY[args?.capability] || '';
+  return q || null;
+}
+// websearch_to_tsquery ANDs bare words, so a nine-word question matches almost nothing; the words are
+// joined with `or` and ts_rank_cd ranks by how many of them a passage covers.
+export function searchTerms(text) {
+  const words = [...new Set(String(text ?? '').toLowerCase().match(/[a-z0-9][a-z0-9-]*[a-z0-9]|[a-z0-9]/g) ?? [])]
+    .filter(w => w.length >= 2 && w !== 'or');
+  return words.join(' or ');
+}
+
+// The query embedding, only when OPENAI_API_KEY is set: lib/vector-search.js's embedContent, the call
+// logged through the AI Audit path lib/knowledge-write.js uses (logActivity). Any failure returns null
+// and the search runs full-text only -- an embedding never blocks a render.
+export async function queryEmbedding(text, { agentId = null, feature = 'strategy-ranked-read' } = {}) {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return null;
+  const startTime = Date.now();
+  try {
+    const { embedContent } = await import('../lib/vector-search.js');
+    const { embedding, usage } = await embedContent(String(text).slice(0, 8000), openaiKey);
+    try {
+      const { logActivity } = await import('../lib/activity-log.js');
+      await logActivity({
+        tenantId: TENANT, agentId, aiType: 'retrieval', feature,
+        model: 'text-embedding-3-small', inputTokens: usage?.total_tokens ?? null,
+        latencyMs: Date.now() - startTime, patternsUsed: ['embeddings'],
+      });
+    } catch (e) { console.error(`personal-agent: AI Audit log failed (${e.message}) -- the read continues`); }
+    return Array.isArray(embedding) ? embedding : null;
+  } catch (e) {
+    console.error(`personal-agent: query embedding failed (${e.message}) -- full-text ranking only`);
+    return null;
+  }
+}
+
+// rpc/library_search for the query -> {hits:[{source_id, section_id, score}], method}. An error is
+// reported and returns no hits, so the caller falls back to the trust order.
+export async function libraryHits(db, query, opts = {}) {
+  const terms = searchTerms(query);
+  if (!terms) return { hits: [], method: 'trust' };
+  const embedding = await queryEmbedding(query, opts);
+  const body = { p_query: terms, p_limit: LIBRARY_SEARCH_LIMIT };
+  if (embedding) body.p_embedding = JSON.stringify(embedding);
+  try {
+    const hits = await db.rpc('library_search', body);
+    return { hits: Array.isArray(hits) ? hits : [], method: embedding ? 'full_text+vector' : 'full_text' };
+  } catch (e) {
+    console.error(`personal-agent: library_search failed (${e.message}) -- trust order`);
+    return { hits: [], method: 'trust' };
+  }
+}
+
+// Pure. Which catalog items are read as text, in what order, and (for an item the search reached only
+// through some of its sections) which sections: search hits first by best score, then the capability's
+// own sections in trust order. A skipped kind or section is never text.
+export function libraryPlan(catalog, hits, { wanted = new Set(), skipKinds = new Set(), skipSections = new Set() } = {}) {
+  const byId = new Map(catalog.map(c => [c.id, c]));
+  const eligible = c => c && !skipKinds.has(c.kind) && !(c.section && skipSections.has(c.section));
+  const best = new Map();
+  const whole = new Set();
+  const sections = new Map();
+  for (const h of hits ?? []) {
+    const c = byId.get(h.source_id);
+    if (!eligible(c)) continue;
+    best.set(c.id, Math.max(best.get(c.id) ?? -Infinity, Number(h.score) || 0));
+    if (h.section_id == null) whole.add(c.id);
+    else { if (!sections.has(c.id)) sections.set(c.id, new Set()); sections.get(c.id).add(h.section_id); }
+  }
+  const trustRank = new Map(trustOrder(catalog).map((c, i) => [c.id, i]));
+  const hitIds = [...best.keys()].sort((a, b) => best.get(b) - best.get(a) || trustRank.get(a) - trustRank.get(b));
+  const inWanted = c => Boolean(c.section && wanted.has(c.section));
+  const plan = hitIds.map(id => ({ id, sections: whole.has(id) || inWanted(byId.get(id)) ? null : sections.get(id) }));
+  const seen = new Set(hitIds);
+  for (const c of trustOrder(catalog.filter(c => eligible(c) && inWanted(c) && !seen.has(c.id)))) plan.push({ id: c.id, sections: null });
+  return plan;
+}
+
+// Pure. A team read cut to `bytes`: rows sharing the most stems with the query first, newest first on
+// a tie (every team read arrives oldest first). An object's array fields share the budget in proportion
+// to their size; its other fields stay whole.
+export function rankTrim(value, query, bytes) {
+  if (value == null) return value;
+  const stems = stemsOf(query);
+  const size = v => Buffer.byteLength(JSON.stringify(v), 'utf8');
+  const trimArray = (rows, budget) => {
+    const ranked = rows.map((row, i) => ({ row, i, hit: stems.size ? overlap(stems, stemsOf(JSON.stringify(row))) : 0 }))
+      .sort((a, b) => b.hit - a.hit || b.i - a.i);
+    const kept = [];
+    let used = 2;
+    for (const r of ranked) {
+      const s = size(r.row) + 1;
+      if (used + s > budget) continue;
+      used += s;
+      kept.push(r.row);
+    }
+    return kept;
+  };
+  if (Array.isArray(value)) return size(value) <= bytes ? value : trimArray(value, bytes);
+  if (typeof value !== 'object' || size(value) <= bytes) return value;
+  const arrays = Object.entries(value).filter(([, v]) => Array.isArray(v));
+  const fixed = size(Object.fromEntries(Object.entries(value).filter(([, v]) => !Array.isArray(v))));
+  const total = arrays.reduce((n, [, v]) => n + size(v), 0) || 1;
+  const room = Math.max(0, bytes - fixed);
+  const out = { ...value };
+  for (const [k, v] of arrays) out[k] = trimArray(v, Math.floor(room * size(v) / total));
+  return out;
+}
+
+const MEMORY_FIELDS = 'id,kind,title,body,data,created_at';
+const memoryItem = row => ({ id: row.id, kind: row.kind, title: row.title, body: row.body ?? null, data: row.data ?? {}, date: row.created_at });
+
+// `memory`: every decision, every approved method, every open commitment, every pending fact (newest
+// first), then the top MEMORY_SEARCH_LIMIT study/case rows for the query, capped at MEMORY_BYTES.
+async function readMemory(db, args) {
+  const standing = await db.get(`strategy_records?or=(kind.eq.decision,and(kind.eq.method,data->>status.eq.approved),` +
+    `and(kind.eq.commitment,data->>status.eq.open),and(kind.eq.fact,data->>status.eq.pending))` +
+    `&select=${MEMORY_FIELDS}&order=created_at.desc,id.asc`);
+  const order = ['decision', 'commitment', 'method', 'fact'];
+  standing.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+  let studied = [];
+  const query = strategyQuery(args);
+  if (query) {
+    const terms = searchTerms(query);
+    const embedding = terms ? await queryEmbedding(query, { agentId: args.agent }) : null;
+    try {
+      const body = { p_query: terms, p_kinds: ['study', 'case'], p_limit: MEMORY_SEARCH_LIMIT };
+      if (embedding) body.p_embedding = JSON.stringify(embedding);
+      const hits = terms ? await db.rpc('strategy_memory_search', body) : [];
+      const ids = (Array.isArray(hits) ? hits : []).map(h => h.id);
+      const rows = ids.length ? await getByIds(db, 'strategy_records', 'id', ids, MEMORY_FIELDS, 'id.asc') : [];
+      const rank = new Map(ids.map((id, i) => [id, i]));
+      studied = rows.sort((a, b) => rank.get(a.id) - rank.get(b.id));
+    } catch (e) {
+      console.error(`personal-agent: strategy_memory_search failed (${e.message}) -- memory carries no study/case rows`);
+    }
+  }
+  const items = [];
+  let bytes = 2;
+  let capped = false;
+  for (const row of [...standing, ...studied]) {
+    const item = memoryItem(row);
+    const s = Buffer.byteLength(JSON.stringify(item), 'utf8') + 1;
+    if (bytes + s > MEMORY_BYTES) { capped = true; continue; }
+    bytes += s;
+    items.push(item);
+  }
+  if (capped) console.error(`personal-agent: memory capped at ${MEMORY_BYTES} bytes`);
+  return items.length ? items : null;
+}
+
+// `sources`: the active source registry, one line each.
+async function readSources(db) {
+  const rows = await db.get('strategy_records?kind=eq.source&data->>status=eq.active&select=id,title,data&order=title.asc,id.asc');
+  return rows.map(row => ({ id: row.id, title: row.title, url: row.data?.url ?? null, topics: row.data?.topics ?? [], score: row.data?.score ?? 0, uses: row.data?.uses ?? 0 }));
+}
+
+// `product`: the CURRENT product -- the version on dev, what shipped in the last 30 days, what is open
+// with the highest need, and the Library's product snapshots.
+export const PRODUCT_TICKETS = 25;
+async function readProduct(db) {
+  const v = (await db.get('dev_version_counter?select=major,minor,patch&limit=1'))[0];
+  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const shipped = await db.get(`backlog_items?status=in.(done,delivered)&updated_at=gte.${since}` +
+    `&select=backlog_id,title,status&order=updated_at.desc,backlog_id.asc&limit=${PRODUCT_TICKETS}`);
+  const open = await db.get(`backlog_items?status=eq.open&select=backlog_id,title,status` +
+    `&order=need_score.desc.nullslast,backlog_id.asc&limit=${PRODUCT_TICKETS}`);
+  const snaps = await db.get('personal_sources?kind=eq.product_snapshot&status=eq.current&select=id,title,body,doc_date&order=doc_date.desc.nullslast,id.asc');
+  return {
+    version: v ? `${v.major}.${v.minor}.${v.patch}` : null,
+    shipped_30_days: shipped,
+    open_by_need: open,
+    snapshots: snaps.map(row => ({ id: row.id, title: row.title, doc_date: row.doc_date, text: cutItem(row.body) })),
+  };
+}
+
+// `goals`: the Library's goals section (text) and the latest kpi per data.metric.
+async function readGoals(db) {
+  const items = await db.get('personal_sources?section=eq.goals&status=eq.current&select=id,title,body,trust,doc_date&order=id.asc');
+  const kpis = await db.get('strategy_records?kind=eq.kpi&select=id,title,data,created_at&order=created_at.desc,id.asc');
+  const latest = new Map();
+  for (const k of kpis) { const m = k.data?.metric; if (m != null && !latest.has(m)) latest.set(m, { id: k.id, title: k.title, ...k.data }); }
+  if (!items.length && !latest.size) return null;
+  return {
+    items: trustOrder(items).map(row => ({ id: row.id, title: row.title, text: cutItem(row.body) })),
+    kpis: [...latest.values()],
+  };
 }
 
 // AGT-647. Pure helpers, exported for the test.
@@ -953,6 +1218,9 @@ export function trustOrder(items) {
   return [...items].sort((a, b) => rank(a.trust) - rank(b.trust)
     || String(b.doc_date ?? '').localeCompare(String(a.doc_date ?? '')) || String(a.id).localeCompare(String(b.id)));
 }
+// AGT-650: the Library is no longer read by stem overlap (rpc/library_search ranks it). stemsOf and
+// overlap stay as rankTrim's team-read ranking; LIBRARY_MATCH_MIN and relevanceOrder stay only because
+// a GUARD (agt-644 arm F) pins them.
 // AGT-648. Word stems for matching an ask to a catalog line: lowercase words of 4+ letters, cut to
 // their first 5 characters ("acquirer"/"acquisition" -> "acqui", "buyers" -> "buyer"), stop words out.
 const MATCH_STOP = new Set(['what', 'which', 'would', 'should', 'could', 'with', 'from', 'that', 'this', 'into', 'most',
@@ -1019,6 +1287,11 @@ const EXTRA_READERS = {
   week: readWeekShips,
   library: readLibrary,
   vision: readVision,
+  // AGT-650
+  memory: readMemory,
+  sources: readSources,
+  product: readProduct,
+  goals: readGoals,
 };
 
 async function render(args) {
@@ -1039,8 +1312,11 @@ async function render(args) {
   // for them and the key is null rather than missing when the read returns nothing.
   // AGT-543: a slug's extra reads are one key or a list of keys, each read by EXTRA_READERS.
   const extra = {};
+  // AGT-650: a strategy render's team reads are cut to STRATEGY_TEAM_BYTES, ranked by the query.
+  const teamBytes = Object.prototype.hasOwnProperty.call(STRATEGY_READ_MAP, args.capability) ? STRATEGY_TEAM_BYTES : {};
   for (const key of [].concat(EXTRA_READS[args.capability] ?? [])) {
-    const value = await EXTRA_READERS[key](db, args);
+    let value = await EXTRA_READERS[key](db, args);
+    if (teamBytes[key]) value = rankTrim(value, strategyQuery(args), teamBytes[key]);
     extra[key] = value == null || (Array.isArray(value) && !value.length) ? null : value;
   }
   const task_context = {
@@ -1222,6 +1498,15 @@ export function validateStrategyAnswer(answer) {
     if (item.kind === 'offer' && d.proposed_price !== undefined && d.proposed_price !== null && !nonEmpty(d.price_basis)) {
       errors.push(`records_to_write[${i}] (offer) proposes a price with no data.price_basis`);
     }
+    // AGT-650: the per-kind rules.
+    for (const e of strategyRecordErrors(item.kind, d, { body: item.body })) errors.push(`records_to_write[${i}] (${item.kind}) ${e}`);
+  }
+  // AGT-650: updates_to_write -- {id, kind, set:{...}} patches ONLY the whitelisted data keys of its kind.
+  if (answer.updates_to_write !== undefined) {
+    if (!Array.isArray(answer.updates_to_write)) errors.push('updates_to_write must be an array');
+    for (const [i, u] of (Array.isArray(answer.updates_to_write) ? answer.updates_to_write : []).entries()) {
+      for (const e of updateErrors(u)) errors.push(`updates_to_write[${i}] ${e}`);
+    }
   }
   if (answer.labels !== undefined) {
     if (!Array.isArray(answer.labels)) errors.push('labels must be an array');
@@ -1237,6 +1522,126 @@ export function validateStrategyAnswer(answer) {
     }
   }
   return { ok: errors.length === 0, errors };
+}
+
+// AGT-650. Pure: one record's per-kind rules -> a list of error phrases (empty = ok). `update: true` is a
+// merged row under an updates_to_write patch: the creation-only rules (a method is born proposed, a
+// fact is born pending) do not apply, and a fact may become `expired`.
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const hasValue = v => v !== undefined && v !== null && !(typeof v === 'string' && !v.trim());
+export const STUDY_BODY_CHARS = 1500;
+export function strategyRecordErrors(kind, data, { body = null, update = false } = {}) {
+  const d = isPlainObject(data) ? data : {};
+  const e = [];
+  const need = (key, why = '') => { if (!hasValue(d[key])) e.push(`needs data.${key}${why}`); };
+  const oneOf = (key, values) => { if (!values.includes(d[key])) e.push(`data.${key} must be one of ${values.join('|')} (got ${JSON.stringify(d[key])})`); };
+  switch (kind) {
+    case 'study':
+      need('url');
+      if (!(Number.isInteger(d.topic) && d.topic >= 1 && d.topic <= 6)) e.push(`data.topic must be a whole number 1..6 (got ${JSON.stringify(d.topic)})`);
+      if (body != null && String(body).length > STUDY_BODY_CHARS) e.push(`body is ${String(body).length} characters, over ${STUDY_BODY_CHARS}`);
+      break;
+    case 'source':
+      need('url');
+      oneOf('status', ['active', 'retired']);
+      break;
+    case 'case':
+      need('url');
+      break;
+    case 'commitment':
+      if (!(typeof d.due === 'string' && DAY.test(d.due))) e.push(`data.due must be YYYY-MM-DD (got ${JSON.stringify(d.due)})`);
+      oneOf('status', ['open', 'done', 'dropped']);
+      if (d.status === 'done') need('evidence', ' -- a done commitment carries its evidence');
+      break;
+    case 'decision':
+      need('decided_on');
+      need('reason');
+      break;
+    case 'method':
+      if (!update && d.status !== 'proposed') e.push(`data.status must be "proposed" -- only --tick approves a method (got ${JSON.stringify(d.status)})`);
+      break;
+    case 'fact':
+      need('statement');
+      if (!update && d.status !== 'pending') e.push(`data.status must be "pending" -- only --tick confirms a fact (got ${JSON.stringify(d.status)})`);
+      break;
+    case 'kpi':
+      need('metric');
+      need('value');
+      need('as_of');
+      oneOf('basis', ['measured', 'john']);
+      break;
+    case 'target':
+      need('company');
+      oneOf('type', ['acquirer', 'partner', 'buyer']);
+      break;
+    case 'call':
+      if (hasValue(d.outcome)) need('scored_on', ' -- an outcome is scored on a date');
+      if (d.test !== undefined) {
+        oneOf('test', ['segment', 'message', 'feature']);
+        need('hypothesis', ' -- a customer test states its hypothesis');
+        need('measure', ' -- a customer test states its measure');
+      }
+      break;
+    case 'offer': case 'roadmap':
+      e.push(...marketCheckErrors(d.market_check));
+      if (d.patent !== undefined) e.push(...patentErrors(d.patent));
+      break;
+    default: break;
+  }
+  return e;
+}
+
+// The principal's standing mandate (2026-11-12): never recreate what the market already uses widely.
+const SHIPS = ['yes', 'partial', 'no'];
+const VERDICTS = ['white_space', 'parity', 'crowded'];
+export function marketCheckErrors(mc) {
+  if (!isPlainObject(mc)) return ['needs data.market_check {competitors, verdict, checked_on} -- every offer and roadmap is checked against the market'];
+  const e = [];
+  if (!Array.isArray(mc.competitors)) e.push('data.market_check.competitors must be an array');
+  else {
+    for (const [j, c] of mc.competitors.entries()) {
+      if (!isPlainObject(c) || !hasValue(c.name) || !hasValue(c.url) || !SHIPS.includes(c.ships)) {
+        e.push(`data.market_check.competitors[${j}] needs name, url and ships ${SHIPS.join('|')}`);
+      }
+    }
+    if (!mc.competitors.length && !hasValue(mc.searched)) e.push('data.market_check names no competitor and no data.market_check.searched (what was searched)');
+  }
+  if (!VERDICTS.includes(mc.verdict)) e.push(`data.market_check.verdict must be one of ${VERDICTS.join('|')} (got ${JSON.stringify(mc.verdict)})`);
+  if (!hasValue(mc.checked_on)) e.push('needs data.market_check.checked_on');
+  if (mc.verdict === 'crowded' && !hasValue(mc.differentiator)) e.push('a crowded market_check needs data.market_check.differentiator');
+  return e;
+}
+export function patentErrors(p) {
+  if (!isPlainObject(p)) return ['data.patent must be an object {candidate, why, prior_art}'];
+  const e = [];
+  if (p.candidate !== true) e.push('data.patent.candidate must be true');
+  if (!hasValue(p.why)) e.push('data.patent needs why');
+  if (!Array.isArray(p.prior_art) || !p.prior_art.length || !p.prior_art.every(u => hasValue(u))) {
+    e.push('data.patent is a candidate with no prior-art search (data.patent.prior_art: [url, ...])');
+  }
+  return e;
+}
+
+// The data keys an updates_to_write patch may set, by kind; anything else is refused.
+export const UPDATE_KEYS = {
+  commitment: ['status', 'evidence'],
+  source: ['score', 'uses', 'status', 'retired_reason'],
+  call: ['outcome', 'scored_on'],
+  fact: ['status'],
+};
+export const FACT_EXPIRE_DAYS = 14;
+export function updateErrors(u) {
+  if (!isPlainObject(u)) return ['is not an object'];
+  const e = [];
+  if (typeof u.id !== 'string' || !UUID.test(u.id)) e.push('id is not a uuid');
+  const keys = UPDATE_KEYS[u.kind];
+  if (!keys) e.push(`kind "${u.kind}" cannot be updated (only ${Object.keys(UPDATE_KEYS).join(', ')})`);
+  if (!isPlainObject(u.set) || !Object.keys(u.set).length) e.push('set must be a non-empty object');
+  else if (keys) {
+    for (const k of Object.keys(u.set)) if (!keys.includes(k)) e.push(`set.${k} is not an updatable key of ${u.kind} (only ${keys.join(', ')})`);
+    if (u.kind === 'fact' && u.set.status !== 'expired') e.push('a fact update may only set status "expired"');
+  }
+  return e;
 }
 
 // The only catalog columns a label may set; status follows superseded_by and is never set alone.
@@ -1260,6 +1665,17 @@ async function writeStrategy(args, answer) {
     return stop(`answer refused, nothing written: labels[] are written only by ${LIBRARY_CURATORS.join(', ')}`);
   }
   const db = rest();
+  // AGT-650: every update is checked against its live row BEFORE anything is written -- the kind must
+  // match, a fact expires only after FACT_EXPIRE_DAYS, and the merged data must pass its kind's rules.
+  const updates = Array.isArray(answer.updates_to_write) ? answer.updates_to_write : [];
+  let patches = [];
+  if (updates.length) {
+    let live;
+    try { live = await getByIds(db, 'strategy_records', 'id', updates.map(u => u.id), 'id,kind,data,created_at', 'id.asc'); } catch (e) { return stop(e.message); }
+    const plan = planUpdates(updates, live, Date.now());
+    if (plan.errors.length) return stop(`answer refused, nothing written: ${plan.errors.join('; ')}`);
+    patches = plan.patches;
+  }
   const source = `${args.capability} ${new Date().toISOString().slice(0, 10)}`;
   const session_name = args.sessionName || null;
   const rows = answer.records_to_write.map(item => ({
@@ -1275,7 +1691,107 @@ async function writeStrategy(args, answer) {
       patched += (await db.patch(`personal_sources?id=eq.${encodeURIComponent(l.source_id)}`, labelPatch(l, new Date().toISOString()))).length;
     } catch (e) { return stop(e.message); }
   }
-  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), labels_patched: patched }) + '\n');
+  let updated = 0;
+  for (const p of patches) {
+    try { updated += (await db.patch(`strategy_records?id=eq.${encodeURIComponent(p.id)}`, { data: p.data })).length; } catch (e) { return stop(e.message); }
+  }
+  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), labels_patched: patched, updated }) + '\n');
+}
+
+// AGT-650. Pure: updates_to_write against the live rows -> {errors, patches:[{id, data}]}, one merged
+// data object per row (never a DELETE, never a column other than data).
+export function planUpdates(updates, liveRows, now) {
+  const errors = [];
+  const patches = [];
+  const byId = new Map((liveRows ?? []).map(row => [row.id, row]));
+  for (const [i, u] of updates.entries()) {
+    const row = byId.get(u.id);
+    if (!row) { errors.push(`updates_to_write[${i}] id ${u.id} is not a strategy_records row`); continue; }
+    if (row.kind !== u.kind) { errors.push(`updates_to_write[${i}] names kind ${u.kind} but row ${u.id} is a ${row.kind}`); continue; }
+    if (u.kind === 'fact' && now - Date.parse(row.created_at) < FACT_EXPIRE_DAYS * 86400000) {
+      errors.push(`updates_to_write[${i}] expires fact ${u.id} before ${FACT_EXPIRE_DAYS} days`);
+      continue;
+    }
+    const data = { ...(row.data ?? {}), ...u.set };
+    const bad = strategyRecordErrors(u.kind, data, { update: true });
+    if (bad.length) { errors.push(`updates_to_write[${i}] (${u.kind}) ${bad.join('; ')}`); continue; }
+    patches.push({ id: u.id, data });
+  }
+  return { errors, patches };
+}
+
+// --- AGT-650: --tick / --untick, the attended confirm -------------------------------------------
+//
+// A ticked `fact` becomes a Library row (confirmed_fact, section facts, trust john_confirmed), the
+// catalog rows it names in data.conflicts are superseded by it, and the fact is marked confirmed; a
+// ticked `method` is approved; an unticked fact or method is dropped. The agent must hold a
+// confirmed_fact grant, else the one INSERT the seed owner runs is printed and nothing is written.
+export const TICK_KINDS = ['fact', 'method'];
+export function planTick(rows, tickIds, untickIds, { agent, today }) {
+  const errors = [];
+  const byId = new Map((rows ?? []).map(row => [row.id, row]));
+  const facts = [];
+  const methods = [];
+  const drops = [];
+  for (const [ids, ticked] of [[tickIds, true], [untickIds, false]]) {
+    for (const id of ids) {
+      const row = byId.get(id);
+      if (!row) { errors.push(`${id} is not a strategy_records row`); continue; }
+      if (!TICK_KINDS.includes(row.kind)) { errors.push(`${id} is a ${row.kind}; only ${TICK_KINDS.join(' and ')} rows are ticked`); continue; }
+      const want = row.kind === 'fact' ? 'pending' : 'proposed';
+      if (row.data?.status !== want) { errors.push(`${id} (${row.kind}) is ${JSON.stringify(row.data?.status)}, not ${want}`); continue; }
+      if (!ticked) { drops.push({ id, data: { ...row.data, status: 'dropped' } }); continue; }
+      if (row.kind === 'method') { methods.push({ id, data: { ...row.data, status: 'approved', approved_on: today } }); continue; }
+      const statement = row.data?.statement;
+      if (!hasValue(statement)) { errors.push(`${id} (fact) has no data.statement`); continue; }
+      const conflicts = Array.isArray(row.data?.conflicts) ? row.data.conflicts : [];
+      const badConflict = conflicts.find(c => typeof c !== 'string' || !UUID.test(c));
+      if (badConflict !== undefined) { errors.push(`${id} (fact) data.conflicts carries a non-uuid ${JSON.stringify(badConflict)}`); continue; }
+      const sensitivity = row.data?.sensitivity ?? 'personal_private';
+      if (!LIBRARY_SENSITIVITY.includes(sensitivity)) { errors.push(`${id} (fact) data.sensitivity "${sensitivity}" is not one of the three`); continue; }
+      facts.push({
+        id, data: row.data, conflicts,
+        library: {
+          kind: 'confirmed_fact', section: 'facts', trust: 'john_confirmed', sensitivity,
+          title: String(statement).slice(0, 200), body: String(statement), doc_date: today, origin: `${agent}-tick`,
+        },
+      });
+    }
+  }
+  return { errors, facts, methods, drops };
+}
+
+export function grantInsertSql(agent) {
+  return `INSERT INTO public.personal_source_grants (agent_id, kind) VALUES ('${String(agent).replace(/'/g, "''")}', 'confirmed_fact') ON CONFLICT DO NOTHING;`;
+}
+
+async function tick(args) {
+  const stop = message => { console.error(`personal-agent: ${message}`); process.exitCode = 2; };
+  const db = rest();
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const grants = await db.get(`personal_source_grants?agent_id=eq.${encodeURIComponent(args.agent)}&kind=eq.confirmed_fact&select=kind`);
+    if (!grants.length) return stop(`--agent=${args.agent} holds no confirmed_fact grant; nothing written. The seed owner runs:\n${grantInsertSql(args.agent)}`);
+    const ids = [...args.tick, ...args.untick];
+    const rows = await getByIds(db, 'strategy_records', 'id', ids, 'id,kind,data', 'id.asc');
+    const plan = planTick(rows, args.tick, args.untick, { agent: args.agent, today });
+    if (plan.errors.length) return stop(`tick refused, nothing written: ${plan.errors.join('; ')}`);
+    const out = { confirmed: 0, superseded: 0, approved: 0, dropped: 0, library_ids: [] };
+    for (const f of plan.facts) {
+      const [lib] = await db.insert('personal_sources', [f.library]);
+      out.library_ids.push(lib.id);
+      if (f.conflicts.length) {
+        const at = new Date().toISOString();
+        out.superseded += (await db.patch(`personal_sources?id=in.(${f.conflicts.map(encodeURIComponent).join(',')})`,
+          { status: 'superseded', superseded_by: lib.id, updated_at: at })).length;
+      }
+      out.confirmed += (await db.patch(`strategy_records?id=eq.${encodeURIComponent(f.id)}`,
+        { data: { ...f.data, status: 'confirmed', library_id: lib.id } })).length;
+    }
+    for (const m of plan.methods) out.approved += (await db.patch(`strategy_records?id=eq.${encodeURIComponent(m.id)}`, { data: m.data })).length;
+    for (const d of plan.drops) out.dropped += (await db.patch(`strategy_records?id=eq.${encodeURIComponent(d.id)}`, { data: d.data })).length;
+    process.stdout.write(JSON.stringify(out) + '\n');
+  } catch (e) { return stop(e.message); }
 }
 
 async function fetchPostings() {
@@ -1506,6 +2022,7 @@ async function main() {
   if (args.mode === 'render') return render(args);
   if (args.mode === 'write') return write(args);
   if (args.mode === 'fetch-linkedin-alerts') return fetchLinkedinAlerts(args);
+  if (args.mode === 'tick') return tick(args);
   return fetchPostings();
 }
 

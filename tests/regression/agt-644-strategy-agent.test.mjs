@@ -34,6 +34,7 @@ import {
   LIBRARY_BYTES, LIBRARY_ITEM_CHARS, LIBRARY_COUNT_ONLY_KINDS, NAPKIN_VERDICT_CHARS, collapseCatalog, trustOrder, cutItem,
   LIBRARY_MATCH_MIN, LIBRARY_TEXT_SKIP_KINDS, stemsOf, overlap, relevanceOrder,
 } from "../../scripts/personal-agent.js";
+// AGT-650 (v7.0.1010): arm A pins the twenty kinds and the seven slugs; arm B's offer controls carry the market check.
 // AGT-648 (v7.0.1008): arm F pins question-matched reading and the runbook's outside-research step.
 // AGT-647 (v7.0.1007): arm E pins the trust-ordered, capped Library read; arm D's ceiling drops to 150000.
 
@@ -43,6 +44,8 @@ const RUNBOOK = path.join(ROOT, "docs", "runbooks", "strategy-agent.md");
 const lf = t => String(t).replace(/\r\n/g, "\n");
 
 const SLUGS = ["strategy-advise", "strategy-daily-brief", "strategy-library-curate", "strategy-readiness-check", "strategy-weekly-review"];
+const ALL_SLUGS = [...SLUGS, "strategy-mentor-review", "strategy-weekly-study"].sort(); // AGT-650
+const MC = { competitors: [], searched: "agt-644 control", verdict: "white_space", checked_on: "2026-11-12" }; // AGT-650 market check
 const STEP0 = "STEP 0 — WEEKLY METER STOP (John, 2026-10-17). Before anything else, using the Supabase MCP tools, run: select ok, reason, all_models_pct, threshold from public.routine_meter_ok(); If ok is false, stop the run now: do no work, write nothing, send nothing, and make the first line of your final message exactly: SKIPPED: weekly meter <all_models_pct>% at or above the ceiling <threshold>% (<reason>). If that query itself fails, also stop and say: SKIPPED: meter check failed. Only when ok is true, continue with the instructions below.";
 const MARKERS = {
   daily: ["<!-- HARRY-DAILY-BRIEF-PROMPT-BEGIN -->", "<!-- HARRY-DAILY-BRIEF-PROMPT-END -->"],
@@ -99,12 +102,13 @@ async function run() {
 
   try {
     await arm("A maps", async () => {
-      assert.deepEqual(STRATEGY_KINDS, ["brief", "review", "readiness", "offer", "roadmap", "acquirer", "call", "gap", "research", "correction", "grade"]);
-      assert.deepEqual(Object.keys(STRATEGY_READ_MAP).sort(), SLUGS);
+      assert.deepEqual(STRATEGY_KINDS, ["brief", "review", "readiness", "offer", "roadmap", "acquirer", "call", "gap", "research", "correction", "grade",
+        "decision", "commitment", "study", "source", "method", "case", "kpi", "target", "fact"]);
+      assert.deepEqual(Object.keys(STRATEGY_READ_MAP).sort(), ALL_SLUGS);
       for (const [slug, kinds] of Object.entries(STRATEGY_READ_MAP)) {
         for (const k of kinds) assert.ok(STRATEGY_KINDS.includes(k), `${slug} reads ${k}, not a strategy kind`);
       }
-      assert.deepEqual(Object.keys(LIBRARY_SECTIONS).sort(), SLUGS, "LIBRARY_SECTIONS covers the five slugs");
+      assert.deepEqual(Object.keys(LIBRARY_SECTIONS).sort(), ALL_SLUGS, "LIBRARY_SECTIONS covers the seven slugs");
       for (const s of SLUGS) assert.ok([].concat(EXTRA_READS[s]).includes("library"), `${s} reads the library`);
 
       assert.deepEqual(READ_MAP, PINNED_READ_MAP, "READ_MAP is unchanged");
@@ -137,9 +141,9 @@ async function run() {
       refused({ records_to_write: [{ kind: "brief", title: "  ", data: {} }] }, /has no title/, "an empty title");
       ok({ records_to_write: [{ kind: "brief", title: "t", data: {} }] }, "control: the same record with a title");
 
-      refused({ records_to_write: [{ kind: "offer", title: "an offer", data: { proposed_price: 5000 } }] }, /price_basis/, "an offer with proposed_price and no price_basis");
-      ok({ records_to_write: [{ kind: "offer", title: "an offer", data: { proposed_price: 5000, price_basis: "comparables" } }] }, "control: the same offer with a price_basis");
-      ok({ records_to_write: [{ kind: "offer", title: "an offer", data: {} }] }, "control: an offer with no proposed price needs no basis");
+      refused({ records_to_write: [{ kind: "offer", title: "an offer", data: { proposed_price: 5000, market_check: MC } }] }, /price_basis/, "an offer with proposed_price and no price_basis");
+      ok({ records_to_write: [{ kind: "offer", title: "an offer", data: { proposed_price: 5000, price_basis: "comparables", market_check: MC } }] }, "control: the same offer with a price_basis");
+      ok({ records_to_write: [{ kind: "offer", title: "an offer", data: { market_check: MC } }] }, "control: an offer with no proposed price needs no basis");
 
       const label = { source_id: "00000000-0000-4000-8000-000000000001", section: "value", trust: "extracted", sensitivity: "reusable" };
       const curate = l => ({ records_to_write: [], labels: [l] });
