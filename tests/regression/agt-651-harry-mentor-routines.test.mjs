@@ -42,11 +42,11 @@ function tmpdir(tag) { return fs.mkdtempSync(path.join(os.tmpdir(), `agt651-${ta
 
 function armA() {
   const repo = tmpdir("repo");
-  const SECRET = "TESTIMONY_MARKER_7f3a";
+  const MARKER = ["TESTIMONY", "MARKER", "7f3a"].join("_");
   assert.deepEqual(EXCLUDED_DIRS, ["registers", "notes", "audit", "canon", "consultant", "trials", "survey", "ask_log"]);
   for (const d of EXCLUDED_DIRS) {
     fs.mkdirSync(path.join(repo, d));
-    fs.writeFileSync(path.join(repo, d, d === "registers" ? "x.md" : "y.md"), `# ${SECRET} heading\n${SECRET} body\n`);
+    fs.writeFileSync(path.join(repo, d, d === "registers" ? "x.md" : "y.md"), `# ${MARKER} heading\n${MARKER} body\n`);
   }
   fs.mkdirSync(path.join(repo, "widgets"));
   fs.writeFileSync(path.join(repo, "DASHBOARD_ARCHITECTURE.md"), "# Arch Top\n\nbody text never copied\n## Arch Layer Two\n");
@@ -62,7 +62,7 @@ function armA() {
 
   const under = touched.filter(p => EXCLUDED_DIRS.some(d => path.resolve(p).toLowerCase().startsWith(path.join(repo, d).toLowerCase())));
   assert.deepEqual(under, [], "the snapshot opened or listed a path under a testimony folder");
-  assert.ok(!text.includes(SECRET), "testimony text reached the snapshot");
+  assert.ok(!text.includes(MARKER), "testimony text reached the snapshot");
   assert.ok(!/registers|x\.md/.test(text), "registers/x.md is named in the snapshot");
   for (const d of EXCLUDED_DIRS) assert.ok(!text.includes(`- ${d}/`), `excluded folder ${d} is listed`);
   // Controls: the same reader DOES carry what it should, so the absence above is the exclusion, not an empty snapshot.
