@@ -1,1 +1,0 @@
-design-harry-mentor-1112 — design + build of Harry (SC-01) as a mentor: memory loop, study agenda, reading, source registry, mentor traits, current product-state reading, two-draft blend; then the principal's goals interview.

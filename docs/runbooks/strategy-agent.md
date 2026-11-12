@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.1011 | hire 2026-11-12: four routines created and switched on (their ids stay out of this public file; the routine list holds them); each block gained the npm ci line the scripts need -->
 <!-- DeepBench v7.0.1011 | docs/runbooks/strategy-agent.md | AGT-651 -- the mentor routines: study / mentor review / tick in the ask table, step 1c two-draft blend, step 6b session-end tick list, the standing mandate, the proof measures, the fourth routine harry-weekly-study and readiness step 1b, the Desk's new section order with Waiting on you, and (f) the Library sync. -->
 <!-- DeepBench v7.0.1008 | runbooks/strategy-agent.md | AGT-648 -- step 1b: an outside-research sub-agent before every render (findings passed as --input-file), and the Library read by the ask first. -->
 <!-- DeepBench v7.0.1006 | docs/runbooks/strategy-agent.md | AGT-644 -- the strategy consultant's call path: the ask table, the sequence, the tryout, the three routine prompt blocks the cloud routines copy (ARCHITECTURE.md 19v) and the Strategy Desk page contract. METHOD ONLY: no personal fact, no client, customer, prospect or product name, no price, no routine id and no model id live in this file -- the repo is public; the Library, the menu, the briefs and the grades live in the private stores. -->
@@ -85,8 +86,8 @@ Four cloud routines, each run without the principal. This file is the SOURCE and
 | sources | this repository, branch `dev` | same | same | same | one clone; the records live only in the private stores |
 | connectors | Supabase MCP (`mcp__Supabase__*`) and `WebFetch`, nothing else | same | same | same | the records and the secrets by name; the outside reading the design names |
 | notifications | off, except the one urgent-brief alert (section (e)) | off | off | off | the Strategy Desk is the record |
-| enabled | `false` — the principal's switch alone, at the hire | same | same | same | the principal's switch alone |
-| routine id | not yet created | not yet created | not yet created | not yet created | filled only when the attended session creates the routine, never a placeholder |
+| enabled | `true` — switched on at the principal's hire word 2026-11-12 (decision recorded by design-harry-mentor-1112) | `true` | `true` | `true` | the principal's switch alone |
+| routine id | created at the hire, 2026-11-12 | same | same | same | filled only when the attended session creates the routine, never a placeholder |
 | prompt | the block between `<!-- HARRY-DAILY-BRIEF-PROMPT-BEGIN -->` / `<!-- HARRY-DAILY-BRIEF-PROMPT-END -->` below, byte-identical | the block between `<!-- HARRY-WEEKLY-REVIEW-PROMPT-BEGIN -->` / `<!-- HARRY-WEEKLY-REVIEW-PROMPT-END -->` below, byte-identical | the block between `<!-- HARRY-READINESS-CHECK-PROMPT-BEGIN -->` / `<!-- HARRY-READINESS-CHECK-PROMPT-END -->` below, byte-identical | the block between `<!-- HARRY-WEEKLY-STUDY-PROMPT-BEGIN -->` / `<!-- HARRY-WEEKLY-STUDY-PROMPT-END -->` below, byte-identical | the file is the source, the routine the copy |
 
 Update rule, as personal-agent.md (e): edit the block → suite → commit → on the principal's word update the routine with the WHOLE configuration read from a fresh get, then read back its model and allowed tools.
@@ -95,6 +96,8 @@ Update rule, as personal-agent.md (e): edit the block → suite → commit → o
 
 <!-- HARRY-DAILY-BRIEF-PROMPT-BEGIN -->
 STEP 0 — WEEKLY METER STOP (John, 2026-10-17). Before anything else, using the Supabase MCP tools, run: select ok, reason, all_models_pct, threshold from public.routine_meter_ok(); If ok is false, stop the run now: do no work, write nothing, send nothing, and make the first line of your final message exactly: SKIPPED: weekly meter <all_models_pct>% at or above the ceiling <threshold>% (<reason>). If that query itself fails, also stop and say: SKIPPED: meter check failed. Only when ok is true, continue with the instructions below.
+
+Before anything else, in the clone run: npm ci --no-audit --no-fund --ignore-scripts (the scripts need their packages; this is a no-op if they are already installed).
 
 HARRY DAILY BRIEF — WEEKDAYS 6:30 AM CENTRAL · trigger: scheduled, or manual "Run now". The canonical copy of this prompt is docs/runbooks/strategy-agent.md: if the two differ, follow the runbook — it is the complete playbook and outranks this summary.
 
@@ -116,6 +119,8 @@ This run advises and records alone. No mail, no message to anyone; nothing is pu
 <!-- HARRY-WEEKLY-REVIEW-PROMPT-BEGIN -->
 STEP 0 — WEEKLY METER STOP (John, 2026-10-17). Before anything else, using the Supabase MCP tools, run: select ok, reason, all_models_pct, threshold from public.routine_meter_ok(); If ok is false, stop the run now: do no work, write nothing, send nothing, and make the first line of your final message exactly: SKIPPED: weekly meter <all_models_pct>% at or above the ceiling <threshold>% (<reason>). If that query itself fails, also stop and say: SKIPPED: meter check failed. Only when ok is true, continue with the instructions below.
 
+Before anything else, in the clone run: npm ci --no-audit --no-fund --ignore-scripts (the scripts need their packages; this is a no-op if they are already installed).
+
 HARRY WEEKLY REVIEW — MONDAY 7:00 AM CENTRAL · trigger: scheduled, or manual "Run now". The canonical copy of this prompt is docs/runbooks/strategy-agent.md: if the two differ, follow the runbook — it is the complete playbook and outranks this summary.
 
 You are one run of the strategy consultant (agent id harry, lane personal). The repository clone is beside you: work there from origin/dev, never main. Supabase MCP tools are attached; read SUPABASE_URL and SUPABASE_SERVICE_KEY by NAME from public.runner_secrets and export them inline on the one command that needs them. Never print a secret, never write one to a file. Read docs/runbooks/strategy-agent.md from the clone and follow section (b), with the steps below.
@@ -136,6 +141,8 @@ This run advises and records alone. No push notification, no mail, no message to
 <!-- HARRY-READINESS-CHECK-PROMPT-BEGIN -->
 STEP 0 — WEEKLY METER STOP (John, 2026-10-17). Before anything else, using the Supabase MCP tools, run: select ok, reason, all_models_pct, threshold from public.routine_meter_ok(); If ok is false, stop the run now: do no work, write nothing, send nothing, and make the first line of your final message exactly: SKIPPED: weekly meter <all_models_pct>% at or above the ceiling <threshold>% (<reason>). If that query itself fails, also stop and say: SKIPPED: meter check failed. Only when ok is true, continue with the instructions below.
 
+Before anything else, in the clone run: npm ci --no-audit --no-fund --ignore-scripts (the scripts need their packages; this is a no-op if they are already installed).
+
 HARRY READINESS CHECK — THE 1ST OF THE MONTH 7:30 AM CENTRAL · trigger: scheduled, or manual "Run now". The canonical copy of this prompt is docs/runbooks/strategy-agent.md: if the two differ, follow the runbook — it is the complete playbook and outranks this summary.
 
 You are one run of the strategy consultant (agent id harry, lane personal). The repository clone is beside you: work there from origin/dev, never main. Supabase MCP tools are attached; read SUPABASE_URL and SUPABASE_SERVICE_KEY by NAME from public.runner_secrets and export them inline on the one command that needs them. Never print a secret, never write one to a file. Read docs/runbooks/strategy-agent.md from the clone and follow section (b), with the steps below.
@@ -153,6 +160,8 @@ This run advises and records alone. No push notification, no mail, no message to
 
 <!-- HARRY-WEEKLY-STUDY-PROMPT-BEGIN -->
 STEP 0 — WEEKLY METER STOP (John, 2026-10-17). Before anything else, using the Supabase MCP tools, run: select ok, reason, all_models_pct, threshold from public.routine_meter_ok(); If ok is false, stop the run now: do no work, write nothing, send nothing, and make the first line of your final message exactly: SKIPPED: weekly meter <all_models_pct>% at or above the ceiling <threshold>% (<reason>). If that query itself fails, also stop and say: SKIPPED: meter check failed. Only when ok is true, continue with the instructions below.
+
+Before anything else, in the clone run: npm ci --no-audit --no-fund --ignore-scripts (the scripts need their packages; this is a no-op if they are already installed).
 
 HARRY WEEKLY STUDY — SATURDAY 7:00 AM CENTRAL · trigger: scheduled, or manual "Run now". The canonical copy of this prompt is docs/runbooks/strategy-agent.md: if the two differ, follow the runbook — it is the complete playbook and outranks this summary.
 
