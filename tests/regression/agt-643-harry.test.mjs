@@ -168,12 +168,14 @@ async function partE_live() {
   results.push("live-harry-hw01-personal-inactive");
 
   const asgn = (await rest(`agent_capability_assignments?agent_id=eq.${SELF_ID}&select=capability_slug`)).map(r => r.capability_slug).sort();
-  assert.deepStrictEqual(asgn, ["strategy-advise", "strategy-daily-brief", "strategy-library-curate", "strategy-readiness-check", "strategy-weekly-review"], `harry's assignments: ${JSON.stringify(asgn)}`);
+  // AGT-649 (v7.0.1009): two mentor capabilities join the five -- 7 assignments.
+  assert.deepStrictEqual(asgn, ["strategy-advise", "strategy-daily-brief", "strategy-library-curate", "strategy-mentor-review", "strategy-readiness-check", "strategy-weekly-review", "strategy-weekly-study"], `harry's assignments: ${JSON.stringify(asgn)}`);
   results.push("live-harry-two-assignments");
 
   const links = await rest(`capability_skill_profiles?capability_slug=like.strategy-*&select=capability_slug,skill_profile_slug`);
-  assert.strictEqual(links.length, 30, `strategy-* capability_skill_profiles links: expected 30, got ${links.length}`);
-  results.push("live-strategy-links-30");
+  // AGT-649 (v7.0.1009): 30 + sc-mentor on the five (5) + 8 links on each of the two new capabilities (16) = 51.
+  assert.strictEqual(links.length, 51, `strategy-* capability_skill_profiles links: expected 51, got ${links.length}`);
+  results.push("live-strategy-links-51");
 
   const pins = (await rest(`agent_skill_pins?agent_id=eq.${SELF_ID}&select=skill_profile_slug`)).map(r => r.skill_profile_slug);
   assert.deepStrictEqual(pins, [NS], `harry's pins: ${JSON.stringify(pins)} (expected exactly the north star)`);
