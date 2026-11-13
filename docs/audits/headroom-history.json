@@ -1,0 +1,34 @@
+{
+  "entries": [
+    {
+      "week": "2026-W44",
+      "location": "governance/runner-cycle.md",
+      "bytes": 380920,
+      "bar": 380980
+    },
+    {
+      "week": "2026-W46",
+      "location": "governance/bd-knowledge-patterns",
+      "bytes": 13305,
+      "bar": 24576
+    },
+    {
+      "week": "2026-W46",
+      "location": "governance/dm-knowledge-patterns",
+      "bytes": 10863,
+      "bar": 24576
+    },
+    {
+      "week": "2026-W46",
+      "location": "governance/ds-knowledge-patterns",
+      "bytes": 19416,
+      "bar": 24576
+    },
+    {
+      "week": "2026-W46",
+      "location": "governance/runner-cycle.md",
+      "bytes": 380973,
+      "bar": 380980
+    }
+  ]
+}

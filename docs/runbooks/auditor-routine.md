@@ -61,7 +61,7 @@ node scripts/audit-cluster.js --build --statements=$S/s.json --week=$W --out-dir
 node scripts/audit-cluster.js --run --dir=$S/c --session-name=$N
 node scripts/audit-cluster.js --collect --dir=$S/c --statements=$S/s.json --week=$W --out=$S/cluster.json
 node scripts/audit-board.js --out=$S/board.json
-node scripts/audit-headroom.js --out=$S/headroom.json
+node scripts/audit-headroom.js --out=$S/headroom.json --record
 node tests/regression/run-all.js > $S/suite.txt
 node scripts/audit-suite-reds.js --suite=$S/suite.txt --week=$W --out=$S/suite.json
 ```
@@ -130,7 +130,7 @@ A `pass` homes the ticket with her score (`Homed: <ID> -> <slug>`); a `not-neede
 **Step 5 — report and record.**
 ```
 node scripts/audit-ledger.js --report=$W --write
-node scripts/tail-push.js --cycle-id=$N --files=docs/audits/$W-candidates.json,docs/audits/$W.md --message="auditor $W — <F> found, <T> tickets filed"
+node scripts/tail-push.js --cycle-id=$N --files=docs/audits/$W-candidates.json,docs/audits/$W.md,docs/audits/headroom-history.json --message="auditor $W — <F> found, <T> tickets filed"
 ```
 Never main. An attended run commits in its own session's commit.
 

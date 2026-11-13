@@ -1,13 +1,15 @@
-// DeepBench v7.0.897 | tests/regression/agt-466-governance-headroom.test.mjs | AGT-466
+// DeepBench v7.0.1023 | tests/regression/agt-466-governance-headroom.test.mjs | AGT-466 -- growth
+// from a tracked history, and the sensor runs in a fresh clone.
 //
-// FEATURE: AGT-466 -- scripts/audit-headroom.js, the Auditor's weekly headroom, growth and pin
-// sensor over the governance surfaces that carry a byte bar, and the two auditor-routine.md lines
-// that run it and merge its file.
-// Kickoff: docs/kickoffs/v7.0.897-AGT-466-governance-headroom-sensor.md §5 tasks 1-3.
+// FEATURE: AGT-466 -- scripts/audit-headroom.js, the Auditor's weekly headroom, growth, sensor-gap
+// and pin sensor over the governance surfaces that carry a byte bar, and the two
+// auditor-routine.md lines that run it with --record and carry its history file onto dev.
+// Kickoff: docs/kickoffs/v7.0.1023-AGT-466-headroom-history.md §5 tasks 1-4.
 //
-// DISCRIMINATING BY CONSTRUCTION: every arm imports scripts/audit-headroom.js, which does not
-// exist on the tree before this change -- the import throws and the whole file is red, so a no-op
-// cannot pass this test (kickoff §6 QA 1).
+// DISCRIMINATING BY CONSTRUCTION: arms F and G import the four history functions and
+// checkSensorGap, none of which exist on the tree before this change -- the import throws and the
+// whole file is red -- and arm E walks the sensor's own import closure, which before this change
+// is 34 files deep and reaches `@vercel/functions` (kickoff §6 QA 1). A no-op cannot pass.
 //
 // FIXTURES ONLY. Each arm hands the pure checks a snapshot it built itself; nothing here reads the
 // database and nothing asserts on the live tree's own byte counts. The live run at the end is
@@ -31,6 +33,18 @@
 //      own last line; exiting 0 is none; with no credentials the rows child is SKIPPED AND NAMED
 //      rather than counted green, and with credentials it actually runs (two findings, two
 //      locations), which is what proves the gate opens as well as closes.
+//   D  ROUTINE -- step 1 runs the sensor WITH --record, and step 5's tail-push carries the history
+//      file onto dev: a file rewritten every week that nobody commits is a memory that resets.
+//   E  FRESH CLONE -- every specifier reached from the sensor is a Node builtin or a relative
+//      script, and the closure stays small. The Auditor's $S clone has no node_modules, which is
+//      how 2026-W46's run died importing @vercel/functions for one page-size constant while the
+//      merge skipped the missing file in silence.
+//   F  HISTORY -- the four pure functions over the tracked file: an earlier week reads back, THIS
+//      week is not its own baseline, a second record in one week REPLACES rather than duplicating,
+//      and a document carrying no `entries` array throws instead of reading as an empty history.
+//   G  GAP -- the sensor grades its own memory. A newest recorded week older than last week is ONE
+//      finding naming all three weeks; a current history, an empty one, and a caller that passed
+//      no week are each silent -- the three ways this check must NOT fire.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -38,10 +52,12 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { isBuiltin } from "node:module";
 import { selfRun } from "./_lib/self-run.js";
 import {
-  CHECK_SLUGS, FOUND_BY, WARN_FRACTION, WEEKS_AHEAD, SURFACES, PINS, RUNNER_CYCLE_REL,
-  checkHeadroom, checkPinDrift, runChecks, evidenceText, freeOf, prevFromRows, lastLine,
+  CHECK_SLUGS, FOUND_BY, WARN_FRACTION, WEEKS_AHEAD, SURFACES, PINS, RUNNER_CYCLE_REL, HISTORY_REL,
+  checkHeadroom, checkPinDrift, checkSensorGap, runChecks, evidenceText, freeOf, lastLine,
+  readHistory, prevFromHistory, recordHistory, prevWeekOf,
 } from "../../scripts/audit-headroom.js";
 import { ROW_BYTE_CAP, ROLE_NAMES, ROLES } from "../../scripts/render-role-patterns.js";
 import { fingerprint, toRow, FINDING_TYPES } from "../../scripts/audit-ledger.js";
@@ -80,7 +96,7 @@ export default async function run() {
 
   // --- A. one home per bar ----------------------------------------------------------------------
   await arm("A one home", async () => {
-    assert.deepEqual(CHECK_SLUGS, ["config-headroom", "config-pin-drift"]);
+    assert.deepEqual(CHECK_SLUGS, ["config-headroom", "config-pin-drift", "config-sensor-gap"]);
     assert.equal(FOUND_BY, "auditor:headroom-checks");
     assert.equal(SURFACES.length, 1 + ROLE_NAMES.length, `one runbook surface plus one per role (${ROLE_NAMES.length})`);
 
@@ -161,21 +177,9 @@ export default async function run() {
     assert.deepEqual(all.map(f => f.locations[0].location),
       ["governance/runner-cycle.md", "governance/ds-knowledge-patterns"], "only the two that fire");
 
-    // The evidence line is the shape the growth read parses back out of the ledger.
+    // The evidence line is the shape the summary prints and arm F's history feeds.
     assert.equal(evidenceText(growing),
       "bytes=20000 bar=24576 free=4576 pct_used=81.38 prev_week=2026-W42 prev_bytes=18800 delta=+1200");
-    assert.deepEqual(
-      prevFromRows([{ iso_week: "2026-W41", locations: [{ location: growing.location, text: evidenceText(growing) }] }],
-        growing.location, "2026-W43"),
-      { prev_week: "2026-W41", prev_bytes: 20000 }, "a prior week's own evidence line reads back");
-    assert.deepEqual(
-      prevFromRows([{ iso_week: "2026-W43", locations: [{ location: growing.location, text: evidenceText(growing) }] }],
-        growing.location, "2026-W43"),
-      { prev_week: null, prev_bytes: null }, "THIS week is not an earlier week -- a row cannot be its own baseline");
-    assert.deepEqual(
-      prevFromRows([{ iso_week: "2026-W41", locations: [{ location: "governance/somewhere-else", text: evidenceText(growing) }] }],
-        growing.location, "2026-W43"),
-      { prev_week: null, prev_bytes: null }, "another surface's bytes are not this surface's baseline");
 
     for (const f of [...hit, ...grew, ...pair, ...all]) roundTrip(f);
   });
@@ -234,7 +238,8 @@ export default async function run() {
     const md = fs.readFileSync(path.join(ROOT, ROUTINE_REL), "utf8").replace(/\r\n/g, "\n");
     const step1 = md.split("\n").filter(l => l.startsWith("node scripts/audit-headroom.js"));
     assert.equal(step1.length, 1, `step 1 runs the sensor exactly once (got ${step1.length})`);
-    assert.equal(step1[0], "node scripts/audit-headroom.js --out=$S/headroom.json");
+    assert.equal(step1[0], "node scripts/audit-headroom.js --out=$S/headroom.json --record",
+      "step 1 RECORDS as well as reporting -- without --record the history never gains a week");
     const ins = md.split("\n").find(l => l.includes('INS="$S/cluster.json'));
     assert.ok(ins, "the step 3 merge line is still found by its INS= list");
     assert.ok(ins.includes("$S/board.json $S/headroom.json "),
@@ -242,6 +247,129 @@ export default async function run() {
     // A collected file nobody merges is a file nobody reads: the two edits are one change.
     assert.equal((md.match(/\$S\/headroom\.json/g) ?? []).length, 2,
       "the file is written in step 1 and merged in step 3 -- exactly those two homes");
+
+    // The history is rewritten every week, so the routine has to COMMIT it: a growth memory that
+    // nobody pushes is reset to empty by the next fresh clone, which is the whole defect here.
+    assert.equal(HISTORY_REL, "docs/audits/headroom-history.json");
+    assert.ok(fs.existsSync(path.join(ROOT, HISTORY_REL)), `${HISTORY_REL} is tracked in the tree`);
+    const push = md.split("\n").filter(l => l.includes("node scripts/tail-push.js"));
+    assert.equal(push.length, 1, `exactly one tail-push line (got ${push.length})`);
+    assert.ok(push[0].includes(`--files=docs/audits/$W-candidates.json,docs/audits/$W.md,${HISTORY_REL}`),
+      `the tail-push carries the history file onto dev: ${push[0]}`);
+  });
+
+  // --- E. the sensor runs in a fresh clone --------------------------------------------------------
+  await arm("E fresh clone", async () => {
+    // Static `import`/`export ... from` specifiers, walked through every relative one. A quote
+    // cannot appear before `from` in an import clause, so [^'"] safely spans a multi-line one.
+    const SPEC = /^[ \t]*(?:import|export)\b[^'"]*?\bfrom\s*['"]([^'"]+)['"]/gm;
+    const seen = new Set(), external = [], queue = [SCRIPT];
+    while (queue.length) {
+      const file = queue.shift();
+      if (seen.has(file)) continue;
+      seen.add(file);
+      const src = fs.readFileSync(file, "utf8");
+      for (const m of src.matchAll(SPEC)) {
+        const spec = m[1];
+        if (spec.startsWith(".")) queue.push(path.resolve(path.dirname(file), spec));
+        else if (!isBuiltin(spec)) external.push(`${path.relative(ROOT, file)} -> ${spec}`);
+      }
+    }
+    assert.deepEqual(external, [],
+      `the Auditor's clone has no node_modules, so every non-relative specifier must be a Node ` +
+      `builtin: ${external.join("; ")}`);
+    assert.ok(seen.size <= 6,
+      `the sensor's module closure must stay small (got ${seen.size}): ` +
+      [...seen].map(f => path.relative(ROOT, f)).join(", "));
+    // Teeth: the walker does find a package when there is one, and does follow relative hops.
+    assert.ok(seen.size > 1, "control: the walk followed at least one relative import");
+    assert.ok(!isBuiltin("@vercel/functions"), "control: the package that killed W46 is not a builtin");
+  });
+
+  // --- F. the tracked history ---------------------------------------------------------------------
+  await arm("F history", async () => {
+    const RC = "governance/runner-cycle.md";
+    const H = [{ week: "2026-W44", location: RC, bytes: 380920, bar: 380980 }];
+
+    assert.deepEqual(prevFromHistory(H, RC, "2026-W46"), { prev_week: "2026-W44", prev_bytes: 380920 },
+      "an earlier week's recorded bytes are this week's baseline");
+    assert.deepEqual(prevFromHistory(H, RC, "2026-W44"), { prev_week: null, prev_bytes: null },
+      "THIS week is not an earlier week -- an entry cannot be its own baseline");
+    assert.deepEqual(prevFromHistory(H, "governance/somewhere-else", "2026-W46"),
+      { prev_week: null, prev_bytes: null }, "another surface's bytes are not this surface's baseline");
+
+    const two = [{ location: RC, bytes: 380973, bar: 380980 },
+      { location: "governance/bd-knowledge-patterns", bytes: 13305, bar: ROW_BYTE_CAP }];
+    const rec = recordHistory(H, two, "2026-W46");
+    assert.equal(rec.length, 3, `one carried entry plus two measured (got ${rec.length})`);
+    assert.deepEqual(rec.map(e => `${e.week} ${e.location}`),
+      ["2026-W44 " + RC, "2026-W46 governance/bd-knowledge-patterns", "2026-W46 " + RC],
+      "sorted by week, then location");
+    assert.deepEqual(rec[2], { week: "2026-W46", location: RC, bytes: 380973, bar: 380980 });
+
+    // A second record in the SAME week replaces that surface's entry -- it never appends a second.
+    const again = recordHistory(rec, [{ location: RC, bytes: 380000, bar: 380980 }], "2026-W46");
+    assert.equal(again.length, 3, `re-recording one surface replaces, never duplicates (got ${again.length})`);
+    assert.equal(again.find(e => e.week === "2026-W46" && e.location === RC).bytes, 380000,
+      "the replaced entry carries the NEW bytes");
+    assert.equal(again.filter(e => e.week === "2026-W44").length, 1, "an earlier week is never dropped");
+    assert.ok(again.some(e => e.location === "governance/bd-knowledge-patterns"),
+      "a surface this run did not measure keeps its entry");
+
+    assert.deepEqual(readHistory(null), [], "no file yet is an empty history, not an error");
+    assert.deepEqual(readHistory(undefined), []);
+    assert.deepEqual(readHistory(JSON.stringify({ entries: H })), H, "a document round-trips");
+    assert.throws(() => readHistory("{}"), /entries/,
+      "a document with no entries array is REFUSED -- reading it as empty would erase the memory");
+    assert.throws(() => readHistory("not json"), "an unparseable file is refused, never an empty history");
+
+    // The file on the tree is that shape, and it is what the live run below reads.
+    const live = readHistory(fs.readFileSync(path.join(ROOT, HISTORY_REL), "utf8"));
+    assert.ok(live.length >= 1, `${HISTORY_REL} carries at least the seeded week (got ${live.length})`);
+    for (const e of live) {
+      assert.match(e.week, /^\d{4}-W\d{2}$/, `every entry carries an iso week: ${JSON.stringify(e)}`);
+      assert.equal(typeof e.bytes, "number");
+      assert.equal(typeof e.bar, "number");
+      assert.ok(SURFACES.some(s => s.location === e.location) || e.location === RC,
+        `every entry names a surface: ${e.location}`);
+    }
+  });
+
+  // --- G. the gap in the sensor's own memory ------------------------------------------------------
+  await arm("G gap", async () => {
+    assert.equal(prevWeekOf("2026-11-13T12:00:00Z"), "2026-W45", "seven days before W46 is W45");
+    const H = [{ week: "2026-W44", location: "governance/runner-cycle.md", bytes: 380920, bar: 380980 }];
+
+    const gap = checkSensorGap({ entries: H }, { week: "2026-W46", prevWeek: "2026-W45" });
+    assert.equal(gap.length, 1, `exactly one config-sensor-gap (got ${gap.length})`);
+    assert.equal(gap[0].check_slug, "config-sensor-gap");
+    assert.equal(gap[0].kind, "other");
+    assert.equal(gap[0].finding_type, "gap");
+    assert.equal(gap[0].locations[0].location, "governance/headroom-sensor");
+    assert.equal(gap[0].locations[0].text, "last_recorded=2026-W44 expected=2026-W45 this_week=2026-W46",
+      "the evidence names all three weeks -- what was recorded, what was owed, and when we asked");
+    roundTrip(gap[0]);
+
+    // The three ways it must NOT fire.
+    assert.deepEqual(checkSensorGap({ entries: H }, { week: "2026-W45", prevWeek: "2026-W44" }), [],
+      "a history recorded LAST week is current, not a gap");
+    assert.deepEqual(checkSensorGap({ entries: [] }, { week: "2026-W46", prevWeek: "2026-W45" }), [],
+      "an empty history is a first run -- there is no week it failed to record");
+    assert.deepEqual(checkSensorGap({ entries: H }, { prevWeek: "2026-W45" }), [],
+      "with no week asked about there is nothing to compare");
+
+    // The newest week wins, not the last one in the array.
+    const mixed = [...H, { week: "2026-W45", location: "governance/bd-knowledge-patterns", bytes: 1, bar: 2 },
+      { week: "2026-W43", location: "governance/ds-knowledge-patterns", bytes: 1, bar: 2 }];
+    assert.deepEqual(checkSensorGap({ entries: mixed }, { week: "2026-W46", prevWeek: "2026-W45" }), [],
+      "the GREATEST week is what counts, whatever order the entries are in");
+
+    // runChecks orders headroom, then the gap, then the pins -- one document, one order.
+    const tight = { location: "governance/runner-cycle.md", bytes: 380920, bar: 380980, strict: true, prev_week: null, prev_bytes: null };
+    const composed = runChecks({ surfaces: [tight], entries: H },
+      { week: "2026-W46", prevWeek: "2026-W45", hasCreds: false, spawn: () => ({ status: 1, stdout: "", stderr: "stale\n" }) });
+    assert.deepEqual(composed.findings.map(f => f.check_slug),
+      ["config-headroom", "config-sensor-gap", "config-pin-drift"]);
   });
 
   // --- the live run: REPORTED, never asserted ---------------------------------------------------

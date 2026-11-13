@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1023 | scripts/audit-headroom.js | AGT-466 -- growth from a tracked history; runs in a fresh clone
 // DeepBench v7.0.897 | scripts/audit-headroom.js | AGT-466
 //
 // THE WEEKLY HEADROOM, GROWTH AND PIN SENSOR. The governance surfaces that carry a byte bar had no
@@ -10,16 +11,20 @@
 //
 // THREE QUESTIONS, ASKED DETERMINISTICALLY (pattern:9 -- no model call anywhere in this file):
 //
-//   config-headroom   a surface is NEARLY FULL (its free bytes are under WARN_FRACTION of its own
-//                     bar) or is OUTGROWING its room (it grew since an earlier week, and at that
-//                     rate the free bytes do not last WEEKS_AHEAD more weeks). One finding per
-//                     surface, never one per rule, so a surface that is both tight AND growing is
-//                     one row with both reasons named in its resolution.
-//   config-pin-drift  a rendered governance artifact no longer matches its source: the cycle card
-//                     against `runner-cycle.md` (`render-cycle-card.js`), and the three role
-//                     pattern rows against `JOHN-DECISION-PATTERNS.md`
-//                     (`render-role-patterns.js --check-rows`). Each child's non-zero exit is ONE
-//                     finding carrying that child's own last line as the evidence.
+//   config-headroom    a surface is NEARLY FULL (its free bytes are under WARN_FRACTION of its own
+//                      bar) or is OUTGROWING its room (it grew since an earlier week, and at that
+//                      rate the free bytes do not last WEEKS_AHEAD more weeks). One finding per
+//                      surface, never one per rule, so a surface that is both tight AND growing is
+//                      one row with both reasons named in its resolution.
+//   config-sensor-gap  the history itself has a hole: the newest week this sensor recorded is
+//                      OLDER than last week, so a week went by with nobody measuring. One finding,
+//                      naming the three weeks, because a growth series with a hole in it reports a
+//                      surface that has been growing for a month as brand new.
+//   config-pin-drift   a rendered governance artifact no longer matches its source: the cycle card
+//                      against `runner-cycle.md` (`render-cycle-card.js`), and the three role
+//                      pattern rows against `JOHN-DECISION-PATTERNS.md`
+//                      (`render-role-patterns.js --check-rows`). Each child's non-zero exit is ONE
+//                      finding carrying that child's own last line as the evidence.
 //
 // THE BARS ARE BORROWED, NEVER RE-DECIDED. `ROW_BYTE_CAP` is imported from the script that enforces
 // it. The runner-cycle bar is `agt-138`'s ratchet, 380,980, and NOT `SES-336`'s 381,000 ceiling:
@@ -32,24 +37,38 @@
 // bar`, so `free = bar - bytes`. Getting this off by one is how a sensor says "1 B free" about a
 // surface that is already over.
 //
-// GROWTH IS A MEASUREMENT OR IT IS `none`. `prev_bytes` comes from the newest `audit_findings` row
-// this check already filed for the SAME location in an EARLIER iso week, parsed back out of its own
-// evidence line. With no credentials the three growth fields read `none` and the summary says
-// `growth: not-run (no credentials)` -- never `delta=0`, which would claim a measurement nobody
-// made and would make a growing surface look flat.
+// GROWTH IS A MEASUREMENT OR IT IS `none`. `prev_bytes` comes from the newest entry this sensor
+// itself recorded for the SAME location in an EARLIER iso week, read from the tracked file
+// `docs/audits/headroom-history.json`. It is NOT read back out of `audit_findings`: a row only
+// exists there for a week a surface was ALREADY alarming, so a roomy surface never has an earlier
+// week to compare and its growth is invisible until the week it is already in trouble (measured
+// 2026-11-13: ONE row filed in three weeks, 1 of 4 surfaces comparable). With no earlier entry the
+// three growth fields read `none` -- never `delta=0`, which would claim a measurement nobody made
+// and would make a growing surface look flat.
+//
+// IT RUNS IN A FRESH CLONE. Every specifier reached from this file is a Node builtin or a relative
+// script that is itself builtin-only, which is what lets the Auditor's `$S` clone -- no
+// `node_modules` in it -- run step 1 at all. 2026-W46's run died importing `@vercel/functions`,
+// reached only through `audit-board.js` for one page-size constant, and the merge skipped the
+// missing file silently (`SES-429`, `AGT-374`). Arm E of this file's test walks the specifiers.
 //
 // Usage:
-//   node scripts/audit-headroom.js --out=$S/headroom.json
-//   node scripts/audit-headroom.js                       (the same document, on stdout)
+//   node scripts/audit-headroom.js --out=$S/headroom.json --record
+//   node scripts/audit-headroom.js --out=$S/headroom.json  (the same document, nothing recorded)
+//   node scripts/audit-headroom.js                         (the same document, on stdout)
 //
 // Exit codes:
 //   0  the run completed. FINDINGS ARE THE OUTPUT, NOT AN ERROR -- a non-zero exit here would make
 //      the Auditor's step 1 abort on the very thing it is there to collect.
-//   2  a bad argument, an unreadable surface, or a REST read that did not come back.
+//   2  a bad argument, an unreadable surface, or a history file that is there but unreadable.
 //
-// Env (process.env only -- never hardcoded, never printed): SUPABASE_URL, SUPABASE_SERVICE_KEY.
+// Env (process.env only -- never hardcoded, never printed): SUPABASE_URL, SUPABASE_SERVICE_KEY, read
+// for one purpose only -- whether the rows pin child can run. Nothing here reads or writes the
+// database.
 //
-// READ-ONLY BY CONSTRUCTION: every REST call below is a GET, there is no --apply, and both pin
+// ONE TRACKED FILE, WRITTEN ONLY UNDER `--record`. There is no REST call and no database write on
+// any path in this file. The single thing it ever writes is `docs/audits/headroom-history.json`,
+// and only when `--record` is passed; without that flag every path here is a read, and both pin
 // children are themselves read-only checks. Ingest is scripts/audit-ledger.js, which reads the
 // --out file unchanged; the routine that runs this is docs/runbooks/auditor-routine.md step 1.
 
@@ -58,13 +77,15 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { isoWeek } from "./audit-ledger.js";
-import { PAGE_ROWS } from "./audit-board.js";
 import { ROW_BYTE_CAP, ROLE_NAMES, ROLES, render, readDoc } from "./render-role-patterns.js";
 
-export const CHECK_SLUGS = Object.freeze(["config-headroom", "config-pin-drift"]);
+export const CHECK_SLUGS = Object.freeze(["config-headroom", "config-pin-drift", "config-sensor-gap"]);
 export const FOUND_BY = "auditor:headroom-checks";
 export const WARN_FRACTION = 0.05;
 export const WEEKS_AHEAD = 4;
+
+/** The growth memory: one tracked file, committed, read by every run and written only by --record. */
+export const HISTORY_REL = "docs/audits/headroom-history.json";
 
 // `agt-138-researcher-routine.test.mjs`'s one-way ratchet, which asserts `bytes < PRE_CHANGE_BYTES`
 // -- the binding bar on this surface, tighter than SES-336's 381,000 ceiling. The test asserts this
@@ -88,12 +109,18 @@ export const SURFACES = Object.freeze([
 export const RULES = Object.freeze({
   "config-headroom": "A governance surface under a byte bar must keep measurable room under it: a bar discovered by the build that trips it is a stop with no warning in front of it.",
   "config-pin-drift": "A rendered governance artifact must match the source it is rendered from; a pin that no longer matches is a copy claiming to be a view.",
+  "config-sensor-gap": "The weekly sensor must leave a record every week: a growth series with a hole in it reports a surface that has been growing for a month as brand new.",
 });
-export const KINDS = Object.freeze({ "config-headroom": "other", "config-pin-drift": "contradiction" });
-export const TYPES = Object.freeze({ "config-headroom": "gap", "config-pin-drift": "defect" });
+export const KINDS = Object.freeze({
+  "config-headroom": "other", "config-pin-drift": "contradiction", "config-sensor-gap": "other",
+});
+export const TYPES = Object.freeze({
+  "config-headroom": "gap", "config-pin-drift": "defect", "config-sensor-gap": "gap",
+});
 export const RESOLUTIONS = Object.freeze({
   "config-headroom": "Cut bytes from the surface, or move a section to its own home -- never raise the bar.",
   "config-pin-drift": "Re-render the artifact from its source in its own ticket, with the before-image an agent-row write owes, then re-run this child.",
+  "config-sensor-gap": "Read why the Auditor did not run, or did not reach --record, in the missing week and file that cause; the series resumes on the next --record and the skipped weeks stay permanently absent.",
 });
 
 function finding(slug, location, text, fact, resolution) {
@@ -108,10 +135,55 @@ function finding(slug, location, text, fact, resolution) {
   };
 }
 
-// --- the measured surface and its evidence line ------------------------------------------------
-// A measured entry is {location, bar, strict, bytes, prev_week, prev_bytes}. Every size on this
-// path is Buffer.byteLength(s, "utf8") -- `.length` counts UTF-16 units and would under-report
-// every em dash in the register, which is the whole content of these surfaces.
+// --- the tracked history -----------------------------------------------------------------------
+// Four pure functions over HISTORY_REL's `entries`, each {week, location, bytes, bar}. The file is
+// the whole growth memory: no credentials, no REST, and a fresh clone carries it in the checkout.
+
+/** Pure. The entries of a history document; `null`/`undefined` is an empty history, not an error. */
+export function readHistory(text) {
+  if (text == null) return [];
+  const doc = JSON.parse(text);
+  if (!Array.isArray(doc?.entries)) {
+    throw new Error(`audit-headroom: ${HISTORY_REL} carries no \`entries\` array`);
+  }
+  return doc.entries;
+}
+
+/** Pure. The newest EARLIER week this sensor recorded for `location`, or two nulls. */
+export function prevFromHistory(entries, location, week) {
+  let best = null;
+  for (const e of entries ?? []) {
+    if (!e || e.location !== location) continue;
+    if (typeof e.week !== "string" || !(e.week < week)) continue;
+    if (best === null || e.week > best.week) best = e;
+  }
+  return best === null ? { prev_week: null, prev_bytes: null } : { prev_week: best.week, prev_bytes: best.bytes };
+}
+
+/**
+ * Pure. This week's measurement written in: every entry for a measured location at THIS week is
+ * dropped first, so a second --record in one week replaces rather than duplicating (QA 3).
+ */
+export function recordHistory(entries, surfaces, week) {
+  const measured = new Set((surfaces ?? []).map(s => s.location));
+  const kept = (entries ?? []).filter(e => !(e?.week === week && measured.has(e?.location)));
+  const added = (surfaces ?? []).map(s => ({ week, location: s.location, bytes: s.bytes, bar: s.bar }));
+  return [...kept, ...added].sort((a, b) =>
+    a.week < b.week ? -1 : a.week > b.week ? 1
+      : a.location < b.location ? -1 : a.location > b.location ? 1 : 0);
+}
+
+/** Pure. The iso week seven days before `nowIso` -- the week a weekly sensor should have recorded. */
+export function prevWeekOf(nowIso) {
+  return isoWeek(new Date(Date.parse(nowIso) - 7 * 86400000));
+}
+
+// --- check 1: headroom and growth --------------------------------------------------------------
+//
+// ONE FINDING PER SURFACE, and the resolution NAMES WHICH RULE FIRED. A row that only said "this
+// surface is a finding" cannot be acted on and cannot be graded: the discriminator arm of
+// agt-466-governance-headroom.test.mjs reads these clauses to prove the growth rule fires on its
+// own, on a surface with plenty of absolute room.
 
 export function freeOf(e) {
   return e.strict ? e.bar - e.bytes - 1 : e.bar - e.bytes;
@@ -125,33 +197,13 @@ export function deltaOf(e) {
   return e.prev_bytes == null ? null : e.bytes - e.prev_bytes;
 }
 
-/** Pure. The one evidence shape both the growth read and the test parse. */
+/** Pure. The one evidence shape the summary and the test both read. */
 export function evidenceText(e) {
   const d = deltaOf(e);
   return `bytes=${e.bytes} bar=${e.bar} free=${freeOf(e)} pct_used=${pctUsed(e)} ` +
     `prev_week=${e.prev_week ?? "none"} prev_bytes=${e.prev_bytes ?? "none"} ` +
     `delta=${d == null ? "none" : d >= 0 ? `+${d}` : String(d)}`;
 }
-
-/** Pure. The newest earlier-week bytes this check already filed for `location`, or two nulls. */
-export function prevFromRows(rows, location, week) {
-  for (const r of rows ?? []) {
-    if (typeof r?.iso_week !== "string" || !(r.iso_week < week)) continue;
-    const loc = Array.isArray(r.locations) ? r.locations[0] : null;
-    if (!loc || loc.location !== location) continue;
-    const m = /(?:^|\s)bytes=(\d+)(?:\s|$)/.exec(String(loc.text ?? ""));
-    if (!m) continue;
-    return { prev_week: r.iso_week, prev_bytes: Number(m[1]) };
-  }
-  return { prev_week: null, prev_bytes: null };
-}
-
-// --- check 1: headroom and growth --------------------------------------------------------------
-//
-// ONE FINDING PER SURFACE, and the resolution NAMES WHICH RULE FIRED. A row that only said "this
-// surface is a finding" cannot be acted on and cannot be graded: the discriminator arm of
-// agt-466-governance-headroom.test.mjs reads these clauses to prove the growth rule fires on its
-// own, on a surface with plenty of absolute room.
 
 export function checkHeadroom(snap, ctx) {
   const warnFraction = ctx?.warnFraction ?? WARN_FRACTION;
@@ -178,7 +230,33 @@ export function checkHeadroom(snap, ctx) {
   return out;
 }
 
-// --- check 2: the pins -------------------------------------------------------------------------
+// --- check 2: the gap in the sensor's own memory ------------------------------------------------
+//
+// THE SENSOR GRADES ITSELF. Every other check here measures a surface; this one measures whether
+// the measuring happened. It is deterministic and needs nothing but the entries as read: the
+// newest week in the file, against the week before this one. An empty history is a first run, not
+// a gap -- there is no week it failed to record.
+
+export function checkSensorGap(snap, ctx) {
+  const week = ctx?.week;
+  const entries = snap?.entries ?? [];
+  if (!week || !entries.length) return [];
+  let last = null;
+  for (const e of entries) {
+    if (typeof e?.week !== "string") continue;
+    if (last === null || e.week > last) last = e.week;
+  }
+  if (last === null || !(last < ctx?.prevWeek)) return [];
+  return [finding(
+    "config-sensor-gap",
+    "governance/headroom-sensor",
+    `last_recorded=${last} expected=${ctx.prevWeek} this_week=${week}`,
+    `${RULES["config-sensor-gap"]} The newest week in ${HISTORY_REL} is ${last}, and last week was ${ctx.prevWeek}.`,
+    RESOLUTIONS["config-sensor-gap"],
+  )];
+}
+
+// --- check 3: the pins -------------------------------------------------------------------------
 //
 // The cycle-card child runs ALWAYS -- it compares two committed files and needs nothing but the
 // tree. The rows child needs credentials, and with none it is SKIPPED AND NAMED, never counted
@@ -237,11 +315,12 @@ export function checkPinDrift(snap, ctx) {
 
 export function runChecks(snap, ctx) {
   const headroom = checkHeadroom(snap, ctx);
+  const gap = checkSensorGap(snap, ctx);
   const pins = checkPinDrift(snap, ctx);
-  return { findings: [...headroom, ...pins.findings], skipped: pins.skipped, ran: pins.ran };
+  return { findings: [...headroom, ...gap, ...pins.findings], skipped: pins.skipped, ran: pins.ran };
 }
 
-// --- the CLI half (measurement, one ordered read, one file) ------------------------------------
+// --- the CLI half (measurement, one tracked read, one file) ------------------------------------
 
 function fail(message) {
   process.stderr.write(`audit-headroom: ${message}\n`);
@@ -260,45 +339,17 @@ export function measureSurfaces(io) {
   }));
 }
 
-async function get(base, key, q, extraHeaders) {
-  let res;
-  try {
-    res = await fetch(`${base.replace(/\/+$/, "")}/rest/v1/${q}`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}`, ...(extraHeaders ?? {}) },
-    });
-  } catch (e) {
-    fail(`could not reach the Supabase REST endpoint: ${e.message}`);
-  }
-  const body = await res.text().catch(() => "");
-  if (!res.ok) fail(`Supabase REST returned HTTP ${res.status} ${res.statusText}: ${body}`);
-  try { return JSON.parse(body); } catch (e) { fail(`Supabase REST returned a body that is not JSON: ${e.message}`); }
-}
-
-// ONE ordered Range-paged read for the whole growth half. PAGE_ROWS is imported rather than retyped
-// because the page size is PostgREST's own max-rows, not a judgement this file gets to make, and an
-// unordered page boundary is free to repeat or skip a row (AGT-166).
-export const GROWTH_QUERY =
-  "audit_findings?select=iso_week,locations&check_slug=eq.config-headroom&order=iso_week.desc,id.desc";
-
-async function readGrowthRows(base, key, ceiling = 20000) {
-  const rows = [];
-  for (let from = 0; ; from += PAGE_ROWS) {
-    const page = await get(base, key, GROWTH_QUERY, { "Range-Unit": "items", Range: `${from}-${from + PAGE_ROWS - 1}` });
-    if (!Array.isArray(page)) fail("the audit_findings growth read came back non-array");
-    rows.push(...page);
-    if (page.length < PAGE_ROWS) return rows;
-    if (rows.length >= ceiling) fail(`the audit_findings growth read reached its ceiling of ${ceiling} rows and the last page was still full`);
-  }
-}
-
 async function main() {
   const argv = process.argv.slice(2);
-  for (const a of argv) if (!/^--out=.+/.test(a)) fail(`unknown argument ${a} (only --out=<json>; this script is read-only)`);
+  for (const a of argv) {
+    if (!/^--out=.+/.test(a) && a !== "--record") {
+      fail(`unknown argument ${a} (only --out=<json> and --record)`);
+    }
+  }
   const outArg = argv.find(a => a.startsWith("--out="))?.slice(6);
+  const record = argv.includes("--record");
 
-  const base = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
-  const hasCreds = Boolean(base && key);
+  const hasCreds = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY);
 
   let surfaces;
   try {
@@ -311,22 +362,32 @@ async function main() {
     fail(`a surface could not be measured: ${e.message}`);
   }
 
-  let growth = "not-run (no credentials)";
-  if (hasCreds) {
-    const rows = await readGrowthRows(base, key);
-    for (const e of surfaces) Object.assign(e, prevFromRows(rows, e.location, isoWeek(new Date().toISOString())));
-    const withPrev = surfaces.filter(e => e.prev_bytes != null).length;
-    growth = `${rows.length} prior config-headroom row(s) read; ${withPrev} of ${surfaces.length} surface(s) have an earlier week to compare`;
+  // The history AS READ -- the checks grade the memory this run inherited, never the one it is
+  // about to write, or --record would erase the very gap config-sensor-gap exists to file.
+  const historyPath = path.join(REPO, HISTORY_REL);
+  let entries = [];
+  try {
+    entries = readHistory(fs.existsSync(historyPath) ? fs.readFileSync(historyPath, "utf8") : null);
+  } catch (e) {
+    fail(`${HISTORY_REL} is present but could not be read: ${e.message}`);
   }
 
+  const now = new Date().toISOString();
+  const week = isoWeek(now);
+  const prevWeek = prevWeekOf(now);
+  for (const e of surfaces) Object.assign(e, prevFromHistory(entries, e.location, week));
+  const withPrev = surfaces.filter(e => e.prev_bytes != null).length;
+  const growth = `history ${entries.length} entries; ${withPrev} of ${surfaces.length} surface(s) have an earlier week`;
+
   const ctx = {
-    now: new Date().toISOString(),
+    now,
+    week,
+    prevWeek,
     hasCreds,
     spawn: argvOf => spawnSync(process.execPath, [path.join(REPO, argvOf[0]), ...argvOf.slice(1)],
       { cwd: REPO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }),
   };
-  const { findings, skipped, ran } = runChecks({ surfaces }, ctx);
-  const week = isoWeek(ctx.now);
+  const { findings, skipped, ran } = runChecks({ surfaces, entries }, ctx);
   const doc = { week, found_by: FOUND_BY, findings };
 
   const lines = [`audit-headroom: ${week} · ${findings.length} findings · ${surfaces.length} surfaces · growth: ${growth}`];
@@ -336,6 +397,11 @@ async function main() {
   }
   lines.push(`  pin children run: ${ran.join(", ") || "none"}`);
   for (const s of skipped) lines.push(`  SKIPPED, not green: ${s}`);
+  if (record) {
+    const next = recordHistory(entries, surfaces, week);
+    fs.writeFileSync(historyPath, JSON.stringify({ entries: next }, null, 2) + "\n", "utf8");
+    lines.push(`  recorded ${surfaces.length} surface(s) at ${week} into ${HISTORY_REL} (${next.length} entries)`);
+  }
   if (outArg) {
     fs.writeFileSync(path.resolve(outArg), JSON.stringify(doc, null, 2) + "\n", "utf8");
     lines.push(`  wrote ${outArg}`);
