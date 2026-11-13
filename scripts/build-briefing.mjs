@@ -721,7 +721,7 @@ splice("+bdRow('Drain members still open'", `+'</table>'\n    +'<p class="tnote"
 // over a rolling 30 DELIVERIES; a time window would make the rate move when nothing shipped.
 const SV_WINDOW = 30;
 const svVerdicts = await sel('runner_verdicts?select=verdict,auto_done_eligible,backlog_id,created_at&order=created_at.desc&limit=500');
-const svTaps = await sel('runner_items?select=backlog_id,decision,decided_at&kind=eq.ship&decision=not.is.null&order=decided_at.desc&limit=500');
+const svTaps = await sel('runner_items?select=backlog_id,decision,decided_at&kind=eq.ship&decision=in.(accept,rework,reverse)&order=decided_at.desc&limit=500');
 if (!svVerdicts.length) die('§16: runner_verdicts is empty — refusing to publish a scoreboard over the template\'s sample rows');
 const svPct = (n, of) => (of ? (100 * n / of).toFixed(1) : '0.0');
 const sv30 = svVerdicts.slice(0, SV_WINDOW);

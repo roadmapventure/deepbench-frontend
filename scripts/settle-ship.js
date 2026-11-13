@@ -107,6 +107,7 @@ import { fileURLToPath } from "url";
 // the same crossing scripts/agent-log.js already makes for logActivity(); the module is pure at the
 // point this file touches it (no network, no disk, no process.env in resolveCycleCost()).
 import { resolveCycleCost, SUBSCRIPTION_LANES } from "../lib/activity-log.js";
+import { retireStaleShipCards } from "./retire-ship-cards.js";
 
 // ---------------------------------------------------------------------------------------------
 // The pure half. Nothing below this block reads the network, the disk, or process.env, so
@@ -1390,6 +1391,19 @@ async function main() {
 
   // 5 -- AGT-454: John's directive closes with the ticket that carried it. `delivered` only.
   await closeDirectives({ base, key, cycleId, ticket, row, status: plan.patch.status, kickoffPath: kickoffArg });
+
+  // 6 -- AGT-459: the stale ship cards close as receipts. NON-FATAL BY CONSTRUCTION, and that is
+  // the whole reason it is wrapped here rather than left to throw: v7.0.889's version of this
+  // sweep was called fatally and a housekeeping failure could take the close-out's exit code --
+  // and with it the settle this script exists to make -- down with it. A sweep that cannot run
+  // SAYS SO on stdout and the cycle carries on; the cards stay undecided until the next settle.
+  try {
+    const swept = await retireStaleShipCards({ base, key, cycleId, apply: true });
+    if (swept.skipped) console.log(`  ship cards: ${swept.skipped}`);
+    console.log(`  ship cards: stale ${swept.stale}, retired ${swept.retired}, decision ${swept.decision ?? "none"}`);
+  } catch (e) {
+    console.log(`  ship cards: sweep NOT RUN — ${e && e.message ? e.message : e}`);
+  }
 
   process.exit(0);
 }
