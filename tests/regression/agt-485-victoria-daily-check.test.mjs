@@ -1,3 +1,4 @@
+// DeepBench v7.0.1020 | tests/regression/agt-485-victoria-daily-check.test.mjs | AGT-666 -- arm D pins the verdict's 4-arg signature (the 3-arg overload is dropped); arm B's expected reason gains the fourth arm `new_waiting` (after the three old ones), read from `detail.new_waiting`. AGT-666's own guard (agt-666-victoria-new-waiting.test.mjs) drives the fourth arm and re-derives it.
 // DeepBench v7.0.971 | tests/regression/agt-485-victoria-daily-check.test.mjs | AGT-613 -- arm D pins step 2's grade-in-place rule and the verdict's 3-arg signature; arm A drives the third arm `ungraded_in_active` (after the two old ones); arm B checks `detail.ungraded_active` is `victoria_intake_lists()`'s executing rows; arm F re-derives those rows from the raw board; arm G drives `victoria_active_probe()` (un-grade one ticket of a running project, rolled back) so arm 3 is proven wired on a board that holds none.
 // DeepBench v7.0.860 | tests/regression/agt-485-victoria-daily-check.test.mjs | AGT-485 -- the ONE
 // DAILY CHECK: John's ten has a single home and a single daily reader, and this guard drives that
@@ -118,10 +119,10 @@ async function run() {
     + "(d.38, step 0) and `SKIPPED: at floor` (step 1). A stop with no line written is a run nobody can audit.");
   // AGT-613 (John, decision 087d79ae): she grades in the active projects too -- IN PLACE. The block
   // must send her to the active projects victoria_intake_lists() returns and forbid a move there; the
-  // v7.0.948 wording that kept her out of them must be gone, and the verdict is named by its 3-arg
-  // signature (the 2-arg overload is dropped).
-  assert.ok(block.includes("public.victoria_daily_verdict(jsonb, integer, integer)"),
-    "the block must name the verdict as public.victoria_daily_verdict(jsonb, integer, integer) -- AGT-613 dropped the 2-arg overload.");
+  // v7.0.948 wording that kept her out of them must be gone, and the verdict is named by its 4-arg
+  // signature (AGT-613 dropped the 2-arg overload, AGT-666 the 3-arg one).
+  assert.ok(block.includes("public.victoria_daily_verdict(jsonb, integer, integer, integer)"),
+    "the block must name the verdict as public.victoria_daily_verdict(jsonb, integer, integer, integer) -- AGT-666 dropped the 3-arg overload.");
   assert.ok(!block.includes("never the active projects themselves"),
     "the block still says the lists are 'never the active projects themselves' -- AGT-613 sends her to every "
     + "active project victoria_intake_lists() returns, to grade its ungraded tickets in place.");
@@ -242,7 +243,9 @@ async function run() {
     + `${activeSum} -- arm 3 must read that function, not restate it (AGT-613).`);
   const expectedReason = sensor.some(s => s.countable < 10) ? "project_below_floor"
     : (detail.fives > 0 ? "five_outside_projects"
-      : (detail.ungraded_active > 0 ? "ungraded_in_active" : "at_floor"));
+      : (detail.ungraded_active > 0 ? "ungraded_in_active"
+        // AGT-666: the fourth arm, after the three old ones.
+        : (detail.new_waiting > 0 ? "new_waiting" : "at_floor")));
   assert.strictEqual(row.reason, expectedReason,
     `the reader answered ${row.reason} over counts ${JSON.stringify(sensor.map(s => s.countable))} and `
     + `${detail.fives} loose five(s) -- the verdict's own arms say ${expectedReason}.`);

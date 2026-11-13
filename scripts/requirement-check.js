@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1020 | scripts/requirement-check.js | AGT-666 -- `--prepare-list --new-only`: the list door keeps only the tickets `public.victoria_new_waiting()` names for THIS slug (John, decision 572d2b06: she grades new waiting tickets; the window lives in that function, never here). Read once over `rpc/victoria_new_waiting`; `newOnlyFilter()` (pure, exported, also used by ticket-validation.js) is the whole filter. On an executing project's list the flag is a usage refusal (exit 2) -- the arm is waiting lists only; nothing left after the filter is exit 1. Without the flag the door is unchanged.
 // DeepBench v7.0.982 | scripts/requirement-check.js | AGT-521 -- both doors carry the charters: --prepare reads victoria_charter_state() too (decision 17).
 // DeepBench v7.0.973 | scripts/requirement-check.js | AGT-615 -- A RUNNING PROJECT'S LIST OFFERS ONLY UNGRADED TICKETS. John 2026-11-06 (decision 58934bfb): "why would victoria grade a ticket already graded? that was supposed to already be in her list of not to do". `listOffer()` (pure, exported) is the whole offer rule: `--rescore` offers every ticket (AGT-431); an executing project's list offers only ungraded tickets with a standing validation (a graded one is already home -- no move, no re-grade -- so a turn on it bought only a `hold`; tooling offered 29 for 1-3 ungraded); a waiting list is unchanged. `LIST_EXECUTING_NOTE` drops its `hold` clause.
 // DeepBench v7.0.971 | scripts/requirement-check.js | AGT-613 -- A RUNNING PROJECT'S LIST IS GRADED IN PLACE. John's rule (decision 087d79ae, 2026-11-06): she grades in the active projects too, not only in the staging area. `prepareList()` reads the list project's `status` and the context carries `list_executing` (plus `list_note`, the constant `LIST_EXECUTING_NOTE`, only when true); the OFFER is unchanged (a graded 3+ ticket there is still offered and answered `hold`), so AGT-487 and AGT-431 read the list as before. `validateListVerdict()` V9: on an executing project's list a `move` is refused and a placement `home` (any answer that is not a park) is refused -- the ticket is already home, so a grade is a `pass` with home null; a `no-fit` must name where it waits (a parked home or a new project), because a stamp alone would leave it ungraded inside a running project, which is the stall AGT-608/609/610 sat in. V6's parent-home rule does not apply on such a list (the ticket is not leaving). Parks (P1-P5) are unchanged, so a 0 may still be parked out of a running project as `RESCORE_NOTE` already says.
@@ -307,6 +308,19 @@ export function listOffer(tickets, { rescore = false, executing = false } = {}) 
   if (rescore) return all;
   if (executing) return all.filter(t => !t.needs_validation && !t.graded);
   return all.filter(t => !t.needs_validation && (!t.graded || Number(t.need_score) >= 3 || t.parent_home !== null));
+}
+
+// AGT-666: `--new-only`. The rpc whose rows ARE "a new waiting ticket nobody has graded" -- its one
+// home, window included (decision 572d2b06). Neither door restates a predicate or a number of it.
+export const NEW_WAITING_RPC = "victoria_new_waiting";
+
+// Pure: keep only the tickets the rpc names FOR THIS SLUG. A row of another list never admits a
+// ticket here, and a ticket the rpc does not name is dropped. Order of `tickets` is kept.
+export function newOnlyFilter(tickets, rows, slug) {
+  const ids = new Set((Array.isArray(rows) ? rows : [])
+    .filter(r => r && String(r.slug) === String(slug))
+    .map(r => String(r.backlog_id)));
+  return (Array.isArray(tickets) ? tickets : []).filter(t => t && ids.has(String(t.backlog_id)));
 }
 
 export const LIST_EXECUTING_NOTE = "This list is an ACTIVE (executing) project's own list: every ticket on it is already home. " +
@@ -1029,6 +1043,13 @@ async function prepareList(args) {
   const projects = await get(`projects?slug=eq.${enc(project)}&select=id,slug,name,status&limit=1`);
   const proj = Array.isArray(projects) ? projects[0] : null;
   if (!proj) die(1, `requirement-check: no projects row reads slug ${project}`);
+  // AGT-666: `--new-only` is the waiting-list arm. An executing project's list is arm 3's (AGT-613),
+  // so the flag there is a usage error, refused before any further read.
+  const newOnly = args["new-only"] === true;
+  if (newOnly && proj.status === "executing") {
+    die(2, `requirement-check --prepare-list: --new-only is for a waiting list; ${project} is an executing ` +
+      "project (its ungraded tickets are offered without the flag)");
+  }
 
   // 1b. AGT-486: THE CHARTERS AND THE FINGERPRINT, in ONE call, before anything else is read. The
   //     function owns the whole answer -- which projects are active, what each is for, the md5 of
@@ -1085,6 +1106,21 @@ async function prepareList(args) {
     die(1, `requirement-check: every open or partial ticket of ${project} already holds a live ` +
       `${FIT_STAMP_KIND} at charter fingerprint ${fingerprint} — there is nothing left to read, and ` +
       "a charter edit is what offers them again");
+  }
+  // AGT-666: `--new-only` -- ONE read of `victoria_new_waiting()`, and only this slug's rows count.
+  if (newOnly) {
+    const nw = await rest(base, key, "POST", `rpc/${NEW_WAITING_RPC}`, {});
+    if (!nw.ok) {
+      die(1, `requirement-check: POST rpc/${NEW_WAITING_RPC} -> HTTP ${nw.status} ${nw.text.slice(0, 400)}`);
+    }
+    const before = tickets.length;
+    tickets = newOnlyFilter(tickets, nw.json, project);
+    console.error(`requirement-check: --new-only kept ${tickets.length} of ${before} ticket(s) -- the ones ` +
+      `${NEW_WAITING_RPC}() names for ${project}`);
+    if (tickets.length === 0) {
+      die(1, `requirement-check --prepare-list --new-only: ${project} holds no new waiting ticket that ` +
+        `${NEW_WAITING_RPC}() names — there is nothing new to grade on this list`);
+    }
   }
 
   // 3b. AGT-489: WHICH GRADES STAND, AND WHICH TICKETS A PARENT LIFTS. Two rpcs, read ONCE for the
@@ -1232,6 +1268,8 @@ async function prepareList(args) {
       graded: tickets.filter(t => t.graded === true).length, held_back: heldBack,
       // AGT-493: how many of the list's tickets are waiting on the architect's validation door.
       needs_validation: unvalidated,
+      // AGT-666: present only when the flag was passed, so a run without it prints what it did.
+      ...(newOnly ? { new_only: true } : {}),
     },
   });
   die(3, `requirement-check --prepare-list: ${project} — ${tickets.length} ticket(s) against ` +
@@ -1622,7 +1660,7 @@ async function main() {
   if (args.apply) return apply(args);
   if (args["apply-list"]) return applyList(args);
   if (args["rescore-report"]) return rescoreReport(args);
-  die(2, "usage: requirement-check.js --prepare --ticket=<ID> --source=<who:table:id> [--home=<slug>] [--out=<path>] [--json] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>) | --prepare-list --project=<slug> [--epic=<uuid>] [--rescore] [--out=<path>] [--json] | --rescore-report --cycle-id=<uuid> | --apply-list=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>)");
+  die(2, "usage: requirement-check.js --prepare --ticket=<ID> --source=<who:table:id> [--home=<slug>] [--out=<path>] [--json] | --dry-run=<answer.json> --context=<prepare.json> | --apply=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>) | --prepare-list --project=<slug> [--epic=<uuid>] [--rescore] [--new-only] [--out=<path>] [--json] | --rescore-report --cycle-id=<uuid> | --apply-list=<answer.json> --context=<prepare.json> (--cycle-id=<uuid> | --session-name=<name>)");
 }
 
 // Importing this module for its exports must never run the CLI (SES-45).

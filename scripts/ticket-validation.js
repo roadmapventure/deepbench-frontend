@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1020 | scripts/ticket-validation.js | AGT-666 -- `--prepare --new-only`: the validation door keeps only the list's tickets `public.victoria_new_waiting()` names for THIS slug (decision 572d2b06), read once and filtered by requirement-check.js's `newOnlyFilter()` -- one home for the filter and none here for the window. An executing list refuses the flag (exit 2); a list with no new waiting ticket is exit 1; new tickets none of which needs validation is the existing exit 0. Without the flag the door is unchanged.
 // DeepBench v7.0.950 | scripts/ticket-validation.js | the intent is read from capabilities.default_intent_slug and PASSED -- assemblePrompt() drops every Intent Skill when intent_slug is null, so the validation turn had no output contract (found by the 2026-11-03 Victoria POC).
 // DeepBench v7.0.870 | scripts/ticket-validation.js | AGT-493 -- THE VALIDATION DOOR. A ticket filed
 // more than 14 days ago is handed to the Governance Architect's `validate-ticket` capability before
@@ -27,6 +28,7 @@
 //
 // USAGE (credentials by NAME from public.runner_secrets, exported inline, never printed):
 //   node scripts/ticket-validation.js --prepare --list=<slug> [--limit=N] [--out=<path>] [--json]
+//   node scripts/ticket-validation.js --prepare --list=<slug> --new-only [...]   # AGT-666
 //   node scripts/ticket-validation.js --dry-run=<answer.json> --context=<prepare.json>
 //   node scripts/ticket-validation.js --apply=<answer.json> --context=<prepare.json> \
 //        (--cycle-id=<uuid> | --session-name=<name>)
@@ -36,6 +38,8 @@ import path from "path";
 import { pathToFileURL } from "url";
 import { assemblePrompt } from "../api/prompt/db-assembly.js";
 import { renderAssembly, resolveJudgmentModel, resolveIntentSlug } from "./agent-prompt.js";
+// AGT-666: the `--new-only` filter and its rpc have ONE home, the list door's file.
+import { newOnlyFilter, NEW_WAITING_RPC } from "./requirement-check.js";
 
 // --- pure half (imported by tests/regression/agt-493-ticket-validation.test.mjs; no network) ------
 
@@ -252,6 +256,11 @@ async function prepare(args) {
   const projects = await get(`projects?slug=eq.${enc(list)}&select=id,slug,name,status&limit=1`);
   const proj = Array.isArray(projects) ? projects[0] : null;
   if (!proj) die(1, `ticket-validation: no projects row reads slug ${list}`);
+  // AGT-666: `--new-only` is the waiting-list arm; on an executing project's list it is a usage error.
+  const newOnly = args["new-only"] === true;
+  if (newOnly && proj.status === "executing") {
+    die(2, `ticket-validation --prepare: --new-only is for a waiting list; ${list} is an executing project`);
+  }
 
   const eps = await get(`epics?project_id=eq.${enc(proj.id)}&select=id&order=id.asc`);
   const epicIds = (Array.isArray(eps) ? eps : []).map(r => r.id);
@@ -263,6 +272,24 @@ async function prepare(args) {
     "need_source,need_score,filed_at&order=backlog_id.asc&limit=1000");
   if (!Array.isArray(listed)) die(1, `ticket-validation: ${list} returned no readable ticket rows`);
 
+  // 1b. AGT-666: `--new-only` -- ONE read of `victoria_new_waiting()`, only this slug's rows count.
+  //     No new waiting ticket on the list at all is a refusal (exit 1); new tickets of which none
+  //     needs validation is still the clean exit 0 below.
+  let source = listed;
+  if (newOnly) {
+    const nw = await rest(base, key, "POST", `rpc/${NEW_WAITING_RPC}`, {});
+    if (!nw.ok) {
+      die(1, `ticket-validation: POST rpc/${NEW_WAITING_RPC} -> HTTP ${nw.status} ${nw.text.slice(0, 400)}`);
+    }
+    source = newOnlyFilter(listed, nw.json, list);
+    console.error(`ticket-validation: --new-only kept ${source.length} of ${listed.length} ticket(s) -- the ones ` +
+      `${NEW_WAITING_RPC}() names for ${list}`);
+    if (source.length === 0) {
+      die(1, `ticket-validation --prepare --new-only: ${list} holds no new waiting ticket that ` +
+        `${NEW_WAITING_RPC}() names — there is nothing new to validate on this list`);
+    }
+  }
+
   // 2. THE SENSOR, once. Everything it does not name is a ticket no validation is owed on -- too
   //    young, already validated inside the standing window, or john-named (which the move door
   //    refuses whatever a validation says, so a turn on one buys nothing).
@@ -271,7 +298,7 @@ async function prepare(args) {
     die(1, `ticket-validation: POST rpc/needs_validation -> HTTP ${needsRpc.status} ${needsRpc.text.slice(0, 400)}`);
   }
   const needs = new Set((Array.isArray(needsRpc.json) ? needsRpc.json : []).map(r => String(r?.backlog_id)));
-  let tickets = listed.filter(t => needs.has(String(t.backlog_id)));
+  let tickets = source.filter(t => needs.has(String(t.backlog_id)));
 
   // 3. And which of them already hold a grade -- the fact that tells the turn what a `revised`
   //    answer costs. One read for the whole board, as the list door makes it.
@@ -407,7 +434,7 @@ async function main() {
   if (args.prepare) return prepare(args);
   if (typeof args["dry-run"] === "string") return dryRun(args);
   if (typeof args.apply === "string") return apply(args);
-  die(2, "ticket-validation: one of --prepare --list=<slug> / --dry-run=<answer.json> / " +
+  die(2, "ticket-validation: one of --prepare --list=<slug> [--new-only] / --dry-run=<answer.json> / " +
     "--apply=<answer.json> (both with --context=<prepare.json>)");
 }
 
