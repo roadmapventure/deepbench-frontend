@@ -51,11 +51,11 @@ Before the `security-weekly-review` render, the run reads the outside world with
 
 ## (d) The tryout (AGT-657)
 
-While `agents.is_active` is false, every run is the tryout and runs attended. The tryout is blind, three questions (design §1 Q6), against plain Claude:
+While `agents.is_active` is false, every run is the tryout and runs attended. The tryout is blind, three questions (design §1 Q6, approved by the principal 2026-11-12), against plain Claude:
 
-1. Is the company ready for a government client's security review today, and what would a reviewer hit first?
-2. How does the platform's AI use of client data stay compliant, and where can it safely go further?
-3. What would an acquirer's security team flag, and what does each fix cost?
+1. A county CIO asks: "Does your AI train on our data, and who can see it?" Answer with proof from the company's actual setup.
+2. Name the top five things a buyer's security team will flag first in the architecture, each with its fix and its cost.
+3. Label the data stores public or private and find a real mismatch, named by table, not described as an idea.
 
 Both sides are handed the SAME inventory and the same security records: the `security-advise` render with the question as `--ask`. The advisor answers through the sequence above; plain Claude gets the same inventory and records with no Skill rows. The two answers are shown to the principal unlabeled, in an order he cannot infer. He scores each 1 to 10 with a phrase; each score is a `grade` record (section (a)). He is hired if he wins two of the three. The hire is the principal's word alone, and so is switching the routines on.
 
