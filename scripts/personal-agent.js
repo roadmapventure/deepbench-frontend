@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1015 | scripts/personal-agent.js | AGT-655 -- a fourth record store (security_records): SECURITY_READ_MAP over the twelve security kinds, every correction and grade on every render, the newest collector inventory (and, for the exposure scan, the one before it) as facts with per-section byte caps, validateSecurityAnswer() (gap/document/classification rules, no private-scan detector hit anywhere), writeSecurity() (one insert, an optional findings ingest file for audit-ledger.js, never a DELETE or PATCH), and the strategy store's `security` read of the scorecard and open blockers on its advise and readiness slugs.
+// Kickoff: docs/kickoffs/v7.0.1015-AGT-655-trenton-call-path.md.
 // DeepBench v7.0.1010 | scripts/personal-agent.js | AGT-650 -- the mentor call path: twenty strategy kinds and two new
 // slugs (weekly study, mentor review); the Library read ranked by rpc/library_search for the ask (or the capability's
 // default query), falling back to trust order; four new reads -- memory (decisions, approved methods, open commitments,
@@ -137,7 +139,7 @@
 //     --render --agent=jerry --capability=career-resume-review [--target=pe-saas] [--ask=<text>]
 //     [--input-file=<path>] [--out=<path>] [--json]
 //   ... --write --agent=jerry --capability=career-resume-review --answer=<json | path to .json>
-//     [--session-name=<n>]
+//     [--session-name=<n>] [--findings-out=<path>]   (AGT-655: security slugs only; needs --session-name)
 //     ... and, when the answer's jobs[] marks a posting competitor, one market_leads row per
 //     marked job; stdout gains `leads: n`.
 //   ... --fetch-postings --agent=jerry
@@ -177,6 +179,8 @@ import { assemblePrompt } from '../api/prompt/db-assembly.js';
 import { renderAssembly, resolveJudgmentModel } from './agent-prompt.js';
 import { overBudget, recordHead } from './agent-prompt.js';
 import { readMail } from '../lib/imap-readonly.js';
+// AGT-655: the repo's own secret detectors, so a security answer can never carry a secret value.
+import { scanText } from './audit-private-scan.js';
 
 // Same tenant agent-prompt.js measured: every agent_configs / assignment row carries 'global'.
 const TENANT = 'global';
@@ -234,6 +238,26 @@ export const STRATEGY_READ_MAP = {
   'strategy-weekly-study': ['source', 'study', 'case', 'research'],
   'strategy-mentor-review': ['call', 'method', 'source', 'study', 'grade', 'kpi', 'commitment'],
 };
+// AGT-655. The security store's twelve kinds (security_records_kind_check, AGT-653) and its OWN read
+// map, never folded into another. `correction` and `grade` are in no list: every one of them is read on
+// every render (the store's correctionKinds). `inventory` is in no list either: the newest collector
+// snapshot reaches the prompt as its own extra read (EXTRA_READS below), as facts, never as a head.
+export const SECURITY_KINDS = [
+  'inventory', 'classification', 'gap', 'scorecard', 'decision', 'digest', 'source', 'document', 'alert', 'call', 'correction', 'grade',
+];
+export const SECURITY_READ_MAP = {
+  'security-exposure-scan': ['alert', 'gap'],
+  'security-weekly-review': ['gap', 'classification', 'decision', 'source', 'scorecard', 'digest'],
+  'security-deep-check': ['gap', 'classification', 'decision', 'scorecard'],
+  'security-document-draft': ['document', 'classification', 'gap', 'decision'],
+  'security-advise': ['gap', 'classification', 'decision', 'scorecard', 'document'],
+};
+// One inventory section's byte cap; past it the section keeps its scalars (its counts) and drops its
+// arrays, marked truncated. The whole inventory stays under INVENTORY_TOTAL_BYTES.
+export const INVENTORY_SECTION_BYTES = 40000;
+export const INVENTORY_TOTAL_BYTES = 150000;
+// The slugs whose answer carries the same-day `urgent` flag --write reports.
+export const SECURITY_URGENT_SLUGS = ['security-exposure-scan'];
 // AGT-650: the query a slug with no --ask ranks its reads by (kickoff section 4). A slug with neither an
 // ask nor a default reads in trust order, exactly as before.
 export const STRATEGY_DEFAULT_QUERY = {
@@ -356,12 +380,21 @@ export const EXTRA_READS = {
   // capability reads only the team stores its job needs: the brief and the weekly review see what
   // changed (all five); a readiness check needs the Library and the market; curation needs the Library.
   'strategy-weekly-review': [...STRATEGY_EXTRA_READS, ...MENTOR_READS],
-  'strategy-readiness-check': ['library', 'market', ...MENTOR_READS],
+  // AGT-655: the readiness check and the advise also read `security` -- the security store's newest
+  // scorecard and its open blockers (shared data; the reader names a table, never an agent).
+  'strategy-readiness-check': ['library', 'market', ...MENTOR_READS, 'security'],
   'strategy-library-curate': ['library'],
   // A question or a draft review: the Library, the market and the idea board; no postings, no week.
-  'strategy-advise': ['library', 'market', 'napkin', ...MENTOR_READS, 'goals'],
+  'strategy-advise': ['library', 'market', 'napkin', ...MENTOR_READS, 'goals', 'security'],
   'strategy-weekly-study': ['library', ...MENTOR_READS, 'sources'],
   'strategy-mentor-review': ['library', ...MENTOR_READS, 'sources', 'goals'],
+  // AGT-655: every security slug reads the newest collector inventory; the exposure scan also reads the
+  // one before it, so a change since the last scan is a fact, not a model's recollection.
+  'security-exposure-scan': ['inventory', 'inventory_previous'],
+  'security-weekly-review': ['inventory'],
+  'security-deep-check': ['inventory'],
+  'security-document-draft': ['inventory'],
+  'security-advise': ['inventory'],
 };
 // AGT-650: the team reads a strategy render carries are cut to these byte budgets, the rows that share
 // the most stems with the query kept first (newest first on a tie, and with no query), so the memory,
@@ -389,6 +422,7 @@ const BOARDS = ['greenhouse', 'lever', 'ashby'];
 const RECORD_FIELDS = 'id,kind,title,body,data,target_row,source,created_at';
 const HUMOR_FIELDS = 'id,kind,title,body,data,source,created_at';
 const STRATEGY_FIELDS = 'id,kind,title,body,data,source,created_at';
+const SECURITY_FIELDS = 'id,kind,title,body,data,source,created_at';
 
 // AGT-543. Which store a capability reads, decided by WHICH MAP holds its slug -- data, never an
 // `if (capability === ...)` and never an agent id (pattern:2, pattern:13). The career store keeps its
@@ -399,6 +433,8 @@ const STORES = [
   { table: 'humor_records', fields: HUMOR_FIELDS, map: HUMOR_READ_MAP, targeted: false, allCorrections: true, repos: null, write: writeHumor },
   // AGT-644: the strategy store reads every `correction` AND every `grade` (grades travel with corrections).
   { table: 'strategy_records', fields: STRATEGY_FIELDS, map: STRATEGY_READ_MAP, targeted: false, allCorrections: true, correctionKinds: ['correction', 'grade'], repos: null, write: writeStrategy },
+  // AGT-655: the security store, the same shape as the strategy one.
+  { table: 'security_records', fields: SECURITY_FIELDS, map: SECURITY_READ_MAP, targeted: false, allCorrections: true, correctionKinds: ['correction', 'grade'], repos: null, write: writeSecurity },
 ];
 
 export function storeFor(capability) {
@@ -724,6 +760,8 @@ export function parseArgs(argv) {
       // --untick the ones to drop. Comma-separated strategy_records ids.
       case 'tick': modes.push('tick'); out.tick = idList(value); break;
       case 'untick': out.untick = idList(value); break;
+      // AGT-655: where a security --write puts the findings ingest file for scripts/audit-ledger.js.
+      case 'findings-out': out.findingsOut = value; break;
       default: return { error: `unrecognized flag "--${key}"` };
     }
   }
@@ -753,6 +791,8 @@ export function parseArgs(argv) {
     if (!storeFor(out.capability)) return { error: `--capability "${out.capability}" is not in the read map` };
   }
   if (out.mode === 'write' && !out.answer) return { error: '--answer=<json | path> is required with --write' };
+  if (out.findingsOut !== undefined && (out.mode !== 'write' || !out.findingsOut)) return { error: '--findings-out=<path> is used only with --write' };
+  if (out.findingsOut && !out.sessionName) return { error: '--findings-out needs --session-name=<name> (the ingest file is found_by session:<name>)' };
   return out;
 }
 
@@ -1278,7 +1318,51 @@ async function readWeekShips(db) {
   return { ...week, decisions, ships };
 }
 
+// --- AGT-655: the security store's extra reads --------------------------------------------------
+//
+// Pure. A value with every array dropped, at any depth; scalars and objects (the counts) stay.
+function dropArrays(v) {
+  if (!isPlainObject(v)) return v;
+  return Object.fromEntries(Object.entries(v).filter(([, x]) => !Array.isArray(x)).map(([k, x]) => [k, dropArrays(x)]));
+}
+const jsonBytes = v => Buffer.byteLength(JSON.stringify(v ?? null), 'utf8');
+// Pure. The collector snapshot as the prompt carries it: a section over `sectionBytes` keeps its
+// counts and drops its arrays (`truncated: true`); then, while the whole is over `totalBytes`, the
+// largest section not yet cut is cut the same way. Scalars at the top (mode, collected_at) stay.
+export function capInventory(data, { sectionBytes = INVENTORY_SECTION_BYTES, totalBytes = INVENTORY_TOTAL_BYTES } = {}) {
+  if (!isPlainObject(data)) return data ?? null;
+  const out = { ...data };
+  const cut = k => { out[k] = { ...dropArrays(out[k]), truncated: true }; };
+  for (const [k, v] of Object.entries(out)) if (isPlainObject(v) && jsonBytes(v) > sectionBytes) cut(k);
+  while (jsonBytes(out) > totalBytes) {
+    const next = Object.entries(out).filter(([, v]) => isPlainObject(v) && !v.truncated).sort((a, b) => jsonBytes(b[1]) - jsonBytes(a[1]))[0];
+    if (!next) break;
+    cut(next[0]);
+  }
+  return out;
+}
+// The newest (offset 0) or second-newest (offset 1) `inventory` row's data, capped. Null when absent.
+async function readInventoryAt(db, offset) {
+  const rows = await db.get(`security_records?kind=eq.inventory&select=id,data,created_at&order=created_at.desc,id.desc&limit=${offset + 1}`);
+  const row = rows[offset];
+  return row ? { id: row.id, ...capInventory(row.data) } : null;
+}
+const readInventory = db => readInventoryAt(db, 0);
+const readInventoryPrevious = db => readInventoryAt(db, 1);
+// The strategy store's read of the security store: the newest scorecard (its head) and every open
+// blocker gap, titles and tiers only. Always an object, so the key is present even when both are empty.
+async function readSecurityPosture(db) {
+  const [card] = await db.get('security_records?kind=eq.scorecard&select=id,kind,title,body,data,created_at&order=created_at.desc,id.desc&limit=1');
+  const gaps = await db.get('security_records?kind=eq.gap&data->>tier=eq.blocker&or=(data->>status.is.null,data->>status.neq.closed)' +
+    '&select=id,title,data&order=created_at.desc,id.desc'); // newest first; agt-84 pins the count of ascending clauses
+  return { scorecard: card ? recordHead(card) : null, open_blockers: gaps.map(g => ({ title: g.title, tier: g.data?.tier ?? null })) };
+}
+
 const EXTRA_READERS = {
+  // AGT-655
+  inventory: readInventory,
+  inventory_previous: readInventoryPrevious,
+  security: readSecurityPosture,
   competitors: readCompetitors,
   market: readRecentMarket,
   career: readRecentCareer,
@@ -1718,6 +1802,109 @@ export function planUpdates(updates, liveRows, now) {
     patches.push({ id: u.id, data });
   }
   return { errors, patches };
+}
+
+// --- AGT-655: the security write check, the findings file and the write -------------------------
+//
+// Pure. Returns {ok, errors} -- every error, not just the first. A refusal names the field and, for a
+// detector hit, the detector and the path, never the matched value (it may be a real secret).
+export const GAP_TIERS = ['blocker', 'should_fix', 'nice_to_have'];
+export const DOCUMENT_STATUSES = ['draft', 'approved'];
+export const DATA_LABELS = ['public', 'private', 'client_confidential', 'personal'];
+function eachString(v, at, out) {
+  if (typeof v === 'string') out.push([at, v]);
+  else if (Array.isArray(v)) v.forEach((x, i) => eachString(x, `${at}[${i}]`, out));
+  else if (isPlainObject(v)) for (const [k, x] of Object.entries(v)) { out.push([`${at} key`, k]); eachString(x, `${at}.${k}`, out); }
+  return out;
+}
+export function securityRecordErrors(kind, data) {
+  const d = isPlainObject(data) ? data : {};
+  const e = [];
+  const need = key => { if (!hasValue(d[key])) e.push(`needs data.${key}`); };
+  const oneOf = (key, values) => { if (!values.includes(d[key])) e.push(`data.${key} must be one of ${values.join('|')} (got ${JSON.stringify(d[key])})`); };
+  switch (kind) {
+    case 'gap':
+      need('control'); oneOf('tier', GAP_TIERS); need('fix'); need('effort'); need('cost');
+      break;
+    case 'document':
+      oneOf('status', DOCUMENT_STATUSES);
+      if (d.status === 'approved') e.push('data.status "approved" is the principal\'s word alone -- a model answer writes only "draft"');
+      break;
+    case 'classification':
+      need('store'); oneOf('label', DATA_LABELS);
+      break;
+    default: break;
+  }
+  return e;
+}
+export function validateSecurityAnswer(capability, answer) {
+  const errors = [];
+  if (!isPlainObject(answer)) return { ok: false, errors: ['the answer must be a JSON object'] };
+  if (capability !== undefined && !Object.prototype.hasOwnProperty.call(SECURITY_READ_MAP, capability)) {
+    errors.push(`capability "${capability}" is not in SECURITY_READ_MAP`);
+  }
+  const items = answer.records_to_write;
+  if (!Array.isArray(items)) errors.push('the answer carries no records_to_write array');
+  for (const [i, item] of (Array.isArray(items) ? items : []).entries()) {
+    if (!isPlainObject(item)) { errors.push(`records_to_write[${i}] is not an object`); continue; }
+    if (!SECURITY_KINDS.includes(item.kind)) errors.push(`records_to_write[${i}] has unknown kind "${item.kind}"`);
+    if (typeof item.title !== 'string' || !item.title.trim()) errors.push(`records_to_write[${i}] (${item.kind}) has no title`);
+    if (item.data !== undefined && !isPlainObject(item.data)) { errors.push(`records_to_write[${i}].data must be an object`); continue; }
+    for (const e of securityRecordErrors(item.kind, item.data)) errors.push(`records_to_write[${i}] (${item.kind}) ${e}`);
+  }
+  for (const [at, s] of eachString(answer, 'answer', [])) {
+    const hits = scanText('answer', s);
+    if (hits.length) errors.push(`${at} matches the private-scan detector ${[...new Set(hits.map(h => h.detector))].join(', ')} -- no secret value is ever written`);
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+// Pure. The written gap records -> the audit-ledger.js --ingest document (one finding per gap).
+export function findingsFromGaps(records, sessionName) {
+  const gaps = (Array.isArray(records) ? records : []).filter(r => r?.kind === 'gap');
+  return {
+    found_by: `session:${sessionName}`,
+    findings: gaps.map(g => {
+      const d = g.data ?? {};
+      return {
+        kind: 'other',
+        finding_type: 'security',
+        confidence: ['high', 'medium', 'low'].includes(d.confidence) ? d.confidence : 'medium',
+        family: 'other',
+        locations: [{ location: d.where || 'inventory', text: g.title }],
+        governing_fact: `${d.control}: ${hasValue(d.risk) ? d.risk : g.title}`,
+        proposed_resolution: `${d.fix} (effort ${d.effort}, cost ${d.cost}, tier ${d.tier})`,
+      };
+    }),
+  };
+}
+
+// --write on a security slug: check the whole answer first (exit 2, nothing written), ONE
+// security_records insert, then the findings ingest file when gaps were written and --findings-out was
+// given. Never a DELETE, never a PATCH; the session applies the file through audit-ledger.js.
+async function writeSecurity(args, answer) {
+  const stop = message => { console.error(`personal-agent: ${message}`); process.exitCode = 2; };
+  const check = validateSecurityAnswer(args.capability, answer);
+  if (!check.ok) return stop(`answer refused, nothing written: ${check.errors.join('; ')}`);
+  const db = rest();
+  const source = `${args.capability} ${new Date().toISOString().slice(0, 10)}`;
+  const session_name = args.sessionName || null;
+  const rows = answer.records_to_write.map(item => ({
+    kind: item.kind, title: item.title, body: item.body ?? null, data: item.data ?? {}, source, session_name,
+  }));
+  let inserted = [];
+  if (rows.length) {
+    try { inserted = await db.insert('security_records', rows); } catch (e) { return stop(e.message); }
+  }
+  let findingsFile = null;
+  if (args.findingsOut && rows.some(r => r.kind === 'gap')) {
+    try {
+      fs.writeFileSync(args.findingsOut, JSON.stringify(findingsFromGaps(rows, args.sessionName), null, 2) + '\n', 'utf8');
+      findingsFile = args.findingsOut;
+    } catch (e) { return stop(`records written (${inserted.length}) but the findings file failed: ${e.message}`); }
+  }
+  const urgent = SECURITY_URGENT_SLUGS.includes(args.capability) ? answer.urgent === true : null;
+  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), findings_file: findingsFile, urgent }) + '\n');
 }
 
 // --- AGT-650: --tick / --untick, the attended confirm -------------------------------------------
