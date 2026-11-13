@@ -742,7 +742,8 @@ async function partK() {
   results.push("get-pages-with-range-and-exact-count");
 
   const tie = countOf(src, "&order=created_at.asc,id.asc");
-  assert.strictEqual(tie, 7, `${SCRIPT_REL} has ${tie} \`&order=created_at.asc,id.asc\` clauses, expected 7`);
+  // AGT-665: +1 for the market_leads inbox read (fileNewLeads)
+  assert.strictEqual(tie, 8, `${SCRIPT_REL} has ${tie} \`&order=created_at.asc,id.asc\` clauses, expected 8`);
   const bare = countOf(src, "&order=created_at.asc") - tie;
   assert.strictEqual(bare, 0,
     `${SCRIPT_REL} still has ${bare} \`&order=created_at.asc\` clauses with no \`,id.asc\` tiebreak -- ` +

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1019 | scripts/personal-agent.js | AGT-665 -- strategy writes file market-check leads.
 // DeepBench v7.0.1015 | scripts/personal-agent.js | AGT-655 -- a fourth record store (security_records): SECURITY_READ_MAP over the twelve security kinds, every correction and grade on every render, the newest collector inventory (and, for the exposure scan, the one before it) as facts with per-section byte caps, validateSecurityAnswer() (gap/document/classification rules, no private-scan detector hit anywhere), writeSecurity() (one insert, an optional findings ingest file for audit-ledger.js, never a DELETE or PATCH), and the strategy store's `security` read of the scorecard and open blockers on its advise and readiness slugs.
 // Kickoff: docs/kickoffs/v7.0.1015-AGT-655-trenton-call-path.md.
 // DeepBench v7.0.1010 | scripts/personal-agent.js | AGT-650 -- the mentor call path: twenty strategy kinds and two new
@@ -1605,6 +1606,7 @@ export function validateStrategyAnswer(answer) {
       }
     }
   }
+  const lead = validateLeads(marketCheckLeads(answer)); if (lead.error) errors.push(lead.error);
   return { ok: errors.length === 0, errors };
 }
 
@@ -1738,6 +1740,37 @@ export function labelPatch(label, at) {
   return body;
 }
 
+export const hostOf = url => { try { return new URL(url).hostname.toLowerCase().replace(/^www\./, ''); } catch { return null; } };
+export function marketCheckLeads(answer, capability, today, sessionName) {
+  const list = v => (Array.isArray(v) ? v : []);
+  return list(answer?.records_to_write).filter(r => ['offer', 'roadmap'].includes(r?.kind)).flatMap(r => {
+    const mc = r.data?.market_check;
+    return list(mc?.competitors).filter(c => ['yes', 'partial'].includes(c?.ships)).map(c => ({
+      company: String(c.name ?? '').split(' (')[0].trim(),
+      what_they_sell: null,
+      overlap_with_deepbench: `Strategy market check: ships ${c.ships} on ${r.kind === 'offer' ? 'an offer' : 'a roadmap'} line`,
+      public_url: c.url,
+      seen_on: DAY.test(mc.checked_on) ? mc.checked_on : today,
+      source_capability: capability, status: 'new', session_name: sessionName,
+    }));
+  });
+}
+export function newLeads(leads, competitors = [], inbox = []) {
+  const low = s => String(s ?? '').trim().toLowerCase();
+  const seen = new Set(inbox.flatMap(l => [low(l.company), hostOf(l.public_url)]));
+  return leads.filter(lead => {
+    const co = low(lead.company), host = hostOf(lead.public_url) ?? co;
+    const listed = competitors.some(c => low(c.name) === co || low(c.name).startsWith(co + ' ') || (c.domain && (host === low(c.domain) || host.endsWith('.' + low(c.domain)))));
+    if (listed || seen.has(co) || seen.has(host)) return false;
+    seen.add(co).add(host);
+    return true;
+  });
+}
+export async function fileNewLeads(db, leads) {
+  if (!leads.length) return [];
+  const fresh = newLeads(leads, await readCompetitors(db), await db.get('market_leads?select=company,public_url&order=created_at.asc,id.asc'));
+  return fresh.length ? db.insert('market_leads', fresh) : [];
+}
 // --write on a strategy slug: check the whole answer first (exit 2, nothing written), ONE
 // strategy_records insert, then one PATCH per label -- only from a curating capability. Never a DELETE.
 async function writeStrategy(args, answer) {
@@ -1779,7 +1812,11 @@ async function writeStrategy(args, answer) {
   for (const p of patches) {
     try { updated += (await db.patch(`strategy_records?id=eq.${encodeURIComponent(p.id)}`, { data: p.data })).length; } catch (e) { return stop(e.message); }
   }
-  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), labels_patched: patched, updated }) + '\n');
+  let filed = [];
+  if (inserted.length) {
+    try { filed = await fileNewLeads(db, marketCheckLeads(answer, args.capability, new Date().toISOString().slice(0, 10), session_name)); } catch (e) { console.error(`personal-agent: leads not filed: ${e.message}`); }
+  }
+  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), labels_patched: patched, updated, leads: filed.length }) + '\n');
 }
 
 // AGT-650. Pure: updates_to_write against the live rows -> {errors, patches:[{id, data}]}, one merged
