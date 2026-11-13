@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1018 | scripts/run-project.js | AGT-570 -- the two boot reads name this cycle in x-deepbench-cycle; inert until migration agt570_own_row_exemption is applied.
 // DeepBench v7.0.979 | scripts/run-project.js | AGT-602 -- an off-queue leverage mark drops that one mark, never the answer (leverage_unrecorded).
 // DeepBench v7.0.928 | scripts/run-project.js | AGT-532 -- AN UNDECIDED GATE CARD IS REPORTED, AND A
 // REFUSAL CARRIES THE REASON. Pass one reads the undecided `gated_before_build` cards from
@@ -945,11 +946,19 @@ async function rest(base, key, pathAndQuery, init = {}) {
   }
 }
 
+// AGT-570: the header the two boot reads name this cycle in. Inert until migration
+// agt570_own_row_exemption is applied -- the gate accepts the header and does not yet read it.
+export const OWN_CYCLE_HEADER = "x-deepbench-cycle";
+export function bootHeaders(cycleId) {
+  const id = String(cycleId ?? "").trim();
+  return id ? { [OWN_CYCLE_HEADER]: id } : {};
+}
+
 // Every instrument is called as an RPC POST, including the STABLE ones a GET would also serve. One
 // call shape for all of them means a function that later becomes VOLATILE does not silently start
 // 404ing on a GET this file forgot to convert.
-async function rpc(base, key, name, body = {}) {
-  const r = await rest(base, key, `rpc/${name}`, { method: "POST", body: JSON.stringify(body) });
+async function rpc(base, key, name, body = {}, headers = {}) {
+  const r = await rest(base, key, `rpc/${name}`, { method: "POST", headers, body: JSON.stringify(body) });
   if (r.error) return { error: r.error };
   const rows = Array.isArray(r.rows) ? r.rows : [r.rows];
   return { row: rows[0] ?? null, rows };
@@ -1109,7 +1118,7 @@ async function readInstruments({ base, key, project, cycleId, trigger, tenant })
   const blockers = await rest(base, key, `project_blockers?project=eq.${encodeURIComponent(project)}&select=*`);
   if (blockers.error) return { error: blockers.error };
 
-  const boot = await rpc(base, key, "runner_should_boot");
+  const boot = await rpc(base, key, "runner_should_boot", {}, bootHeaders(cycleId));
   if (boot.error) return { error: boot.error };
   const queue = await rpc(base, key, "prime_directive_queue");
   if (queue.error) return { error: queue.error };
@@ -1229,7 +1238,7 @@ async function main() {
     }
 
     // (b) The pick, re-read LIVE, and the state compared against it. Header note (3).
-    const liveBoot = await rpc(base, key, "runner_should_boot");
+    const liveBoot = await rpc(base, key, "runner_should_boot", {}, bootHeaders(args.cycleId));
     if (liveBoot.error) {
       return emit({ code: EXIT_CANNOT_RUN, json: args.json,
         payload: { ok: false, exitCode: EXIT_CANNOT_RUN, kind: "cannot-run", error: liveBoot.error },
