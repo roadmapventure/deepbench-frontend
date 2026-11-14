@@ -1,3 +1,4 @@
+// DeepBench v7.0.1024 | tests/regression/agt-86f-full-review-roots.test.mjs | AGT-168
 // DeepBench v7.0.550 | tests/regression/agt-86f-full-review-roots.test.mjs | AGT-86 slice 6
 //
 // FEATURE: AGT-86 slice 6 -- the full review reads the new places. scripts/audit-corpus.js gains
@@ -186,9 +187,14 @@ export default async function run() {
         "x-vercel-protection-bypass: BYPASS_SECRET",
         cat("Co-Authored-By: Claude <", "noreply", "@anthropic.com>"),
         cat("bob", "@", "austintexas.gov"),
+        cat('const FAKE_KEY = "ses424f', '-not-a-real-key";'),
+        cat('SUPABASE_SERVICE_KEY: "agt666-offline', '-mock",'),
+        cat('process.env.SUPABASE_SERVICE_KEY = "agt-434-seam', '-dummy";'),
       ];
       const neg = scan.scanText("fixture.txt", negative.join("\n"));
       assert.deepEqual(neg.map(h => `${h.detector}@${h.line}`), [], "no known-safe shape is flagged");
+      assert.equal(scan.allowlistReason(cat("agt-434-seam", "-dummy")), "self-declared test fixture value");
+      assert.equal(scan.scanText("f.txt", `const BYPASS_SECRET = '${cat("QqWwEeRrTtYyUuIiOoPpAaSsDdFf", "mock")}';`).length, 1);
       const findings = scan.aggregate(hits);
       assert.equal(findings.length, hits.length, "under the cap: one finding per hit");
       for (const f of findings) {
@@ -244,7 +250,7 @@ export default async function run() {
       const byFact = d => doc.findings.filter(f => f.governing_fact.startsWith(`${d} `));
       const bypass = byFact("vercel_bypass");
       assert.ok(bypass.some(f => f.locations[0].location === "audit-private/vercel_bypass"), "the bypass literal is aggregated");
-      assert.ok(byFact("personal_path").length >= 1, ">=1 personal_path finding");
+      assert.equal(byFact("personal_path").length, 0);
       assert.ok(!r.stdout.includes("****"), "stdout carries counts only");
       allFindings.push(...doc.findings);
       if (before === null) {

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1024 | scripts/audit-private-scan.js | AGT-168 -- a self-declared fixture value is not a secret
 // DeepBench v7.0.613 | scripts/audit-private-scan.js | AGT-168 slice 1 -- THE SCAN CAN NOW GRADE A
 // CHANGE INSTEAD OF THE TREE, which is what lets CI run it at all. THIS IS PURELY ADDITIVE: every
 // line before the `--- AGT-168` divider further down is unchanged, so scanTree(), scanText(),
@@ -136,6 +137,7 @@ export const ALLOWLIST = [
   { re: /^\$[A-Za-z_][A-Za-z0-9_]*$/, reason: "shell variable reference -- names the variable, not its value" },
   { re: /SUPABASE_URL/, reason: "the project URL is public by design" },
   { re: /^sb_publishable_/, reason: "the publishable key ships in the browser bundle by design" },
+  { re: /^[a-z0-9]+(?:-[a-z0-9]+)*-(?:dummy|mock|not-a-real-key)$/, reason: "self-declared test fixture value" },
 ];
 
 // AGT-196 -- THE ONE ALLOWLIST ENTRY POINT. Every allowlist question in this module goes through
