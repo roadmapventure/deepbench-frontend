@@ -22,7 +22,7 @@
 //   D  AGGREGATE -- 26 hits of one detector -> 1 finding at audit-private/<detector>; 25 -> 25; two
 //      different rosters give one fingerprint(). Without aggregation 26 -> 26.
 //   E  LEDGER SHAPE -- every finding round-trips toRow()+fingerprint(), kind in audit_findings' CHECK set.
-//   F  LIVE -- --private-scan on THIS repo writes >=1 vercel_bypass (aggregate) and >=1 personal_path;
+//   F  LIVE -- --private-scan on THIS repo writes 0 vercel_bypass and 0 personal_path;
 //      audit_findings' row count is unchanged (the scan never writes the database).
 //
 // EVERY PLANTED VALUE IS FAKE AND ASSEMBLED FROM PIECES, so this file's own source never carries a
@@ -249,7 +249,7 @@ export default async function run() {
       assert.equal(doc.found_by, "auditor:private-scan");
       const byFact = d => doc.findings.filter(f => f.governing_fact.startsWith(`${d} `));
       const bypass = byFact("vercel_bypass");
-      assert.ok(bypass.some(f => f.locations[0].location === "audit-private/vercel_bypass"), "the bypass literal is aggregated");
+      assert.equal(bypass.length, 0);
       assert.equal(byFact("personal_path").length, 0);
       assert.ok(!r.stdout.includes("****"), "stdout carries counts only");
       allFindings.push(...doc.findings);
