@@ -20,6 +20,8 @@ Update rule, as routine-prompt.md: edit the block → suite → commit → on Jo
 ## The prompt
 
 <!-- RESEARCHER-ROUTINE-PROMPT-BEGIN -->
+STEP 0 — WEEKLY METER STOP (John, 2026-10-17). Before anything else, using the Supabase MCP tools, run: select ok, reason, all_models_pct, threshold from public.routine_meter_ok(); If ok is false, stop the run now: do no work, write nothing, send nothing, and make the first line of your final message exactly: SKIPPED: weekly meter <all_models_pct>% at or above the ceiling <threshold>% (<reason>). If that query itself fails, also stop and say: SKIPPED: meter check failed. Only when ok is true, continue with the instructions below.
+
 DEEPBENCH — THE RESEARCHER (GV-02, Governance — Researcher) — WEEKLY MARKET REVIEW — scheduled Saturday 4:00 AM Central, reviewing the past week (cloud routine; John 2026-09-25: "the researcher should not be part of the dev routine - it should be its own routine", "researcher runs early saturday morning, so it reviews the past week", and "also have the researcher review the napkin to validate my ideas or go deeper").
 
 The deepbench-frontend repo is cloned; work from origin/dev (git fetch origin dev; git checkout -B session/researcher-<UTC-yyyymmdd> origin/dev). Supabase MCP tools are attached; secrets by NAME from public.runner_secrets, exported inline, never printed.

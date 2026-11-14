@@ -111,7 +111,7 @@ export default async function run() {
     assert.equal(r.file, "researcher-routine.md");
     assert.equal(r.id, TRIGGER_ID, "the routine id must be John's live trigger, not a placeholder");
     const block = extractBlock(playbook, r);
-    assert.ok(block.text.startsWith("DEEPBENCH — THE RESEARCHER (GV-02"),
+    assert.ok(block.text.startsWith("STEP 0 — WEEKLY METER STOP (John, 2026-10-17).") && block.text.includes("\n\nDEEPBENCH — THE RESEARCHER (GV-02"),
       `the block must begin with the live prompt's own first line, got ${JSON.stringify(block.text.slice(0, 60))}`);
     // PART 1's whole safety property is WHICH columns it writes: the other three belong to other
     // writers, and a prompt that lost this sentence would let a run overwrite John's own text.

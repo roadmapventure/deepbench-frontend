@@ -19,6 +19,8 @@ Update rule, as routine-prompt.md: edit the block → suite → commit → on Jo
 ## The prompt
 
 <!-- AUDITOR-ROUTINE-PROMPT-BEGIN -->
+STEP 0 — WEEKLY METER STOP (John, 2026-10-17). Before anything else, using the Supabase MCP tools, run: select ok, reason, all_models_pct, threshold from public.routine_meter_ok(); If ok is false, stop the run now: do no work, write nothing, send nothing, and make the first line of your final message exactly: SKIPPED: weekly meter <all_models_pct>% at or above the ceiling <threshold>% (<reason>). If that query itself fails, also stop and say: SKIPPED: meter check failed. Only when ok is true, continue with the instructions below.
+
 DEEPBENCH AUDITOR — WEEKLY AUDIT — stamp: DEEPBENCH-AUDITOR-trig_01BCzPdanZ1YiK956dAqU6YN · trigger: scheduled (Monday 5:00 AM Central) or manual ("Run now"). The canonical copy of this prompt is docs/runbooks/auditor-routine.md (AGT-86): if the two differ, follow the runbook — it is the complete playbook and outranks this summary.
 
 You are one run of DeepBench's Auditor. Three repos are cloned side by side: deepbench-frontend (work there; branch from origin/dev; never main), interviewquestions and claude-config (read-only sources; both are PRIVATE — never copy their contents into deepbench-frontend, which is PUBLIC). Supabase MCP tools (mcp__Supabase__*) are attached; secrets by NAME from runner_secrets, never printed — not in a query result, not on a command line.
@@ -29,7 +31,7 @@ You are one run of DeepBench's Auditor. Three repos are cloned side by side: dee
 4. Model discipline: you are the orchestrator lane (public.runner_model_lanes, read live, never assumed); a failed sub-agent re-runs once one tier up, never twice at the same tier. Every claim in that row traces to a row, a SHA or a script's stdout. Priority classes are written named (P10 - Tooling); outcomes as plain words. This run ends when your turn ends — record the summary before you stop.
 <!-- AUDITOR-ROUTINE-PROMPT-END -->
 
-**The live routine still runs the `v7.0.587` text** — its two John pushes and `claim_john_alerts()` — until John runs the `RemoteTrigger update` above. Until he does, step 0's `check-routine-prompt.js` exit 1 is EXPECTED drift against this block (`AGT-137`), not a defect to chase; it still files its `routine-prompt-drift` finding, and the finding names this paragraph.
+**The live routine and this block agreed when `AGT-567` shipped (`v7.0.1031`): step 0's exit 1 is now a real `routine-prompt-drift` finding, not expected drift.**
 
 ## Steps 0-7
 
