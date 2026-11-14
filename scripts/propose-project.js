@@ -27,7 +27,7 @@
 //
 // Six doors, two validators:
 //   --prepare --out=<path>
-//       asks rpc/project_batch_state for the batches whose sensor is up (`review_due`), CLAIMS them in
+//       asks rpc/project_finish_line for the batches whose sensor is up (`review_due`), CLAIMS them in
 //       order and writes the FIRST ONE IT CLAIMED (by slug) as the task context: epic_id, project,
 //       epic, members, findings (the findings list: open, carried and listed), projects. The claim is
 //       a conditional PATCH of epics.proposal_attempted_at (AGT-291 D4): a batch another pass took
@@ -295,7 +295,7 @@ async function prepare(args) {
     if (!r.ok) die(1, `propose-project: ${method} ${q} -> HTTP ${r.status} ${r.text.slice(0, 400)}`);
     return r.json;
   };
-  const due = pickDue(await call("POST", "rpc/project_batch_state", {}));
+  const due = pickDue(await call("POST", "rpc/project_finish_line", {}));
   if (due.length === 0) die(3, NOTHING_DUE);
   // AGT-291 D4: CLAIM, in order, and take the first batch this pass actually got. The guard is in
   // the query, so the claim is atomic -- never read-then-write (CLAUDE.md: atomic counters).

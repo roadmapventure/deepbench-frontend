@@ -796,12 +796,12 @@ async function theLiveGateObeysItsOwnLadder() {
     b => listSlugs.has(slugOfProject.get(projectOfEpic.get(b.epic_id)))).length;
 
   // AGT-291: the finish-line count, read from the ONE function that measures the finish line
-  // (public.project_batch_state()) rather than re-derived from projects/epics/backlog_items here.
+  // (public.project_finish_line()) rather than re-derived from projects/epics/backlog_items here.
   // LEFT and FRESH are that function's definition; a second copy in this file would be free to
   // disagree with it, and the thing this arm grades is whether the GATE reads the sensor.
   const batches = asArray(
-    await pg(url, key, "rpc/project_batch_state", { method: "POST", body: "{}" }),
-    "rpc/project_batch_state");
+    await pg(url, key, "rpc/project_finish_line", { method: "POST", body: "{}" }),
+    "rpc/project_finish_line");
   // The COLUMN is graded by the detail pair below (own-property finish_due, then the number), not
   // here: this file keeps its own red on the count it already measures, and the dedicated guard
   // tests/regression/agt-291-finish-sensor.test.mjs is the one that names an unapplied migration.
@@ -915,7 +915,7 @@ async function theLiveGateObeysItsOwnLadder() {
     "detail must always carry finish_due -- without it a reader cannot tell 'there is nothing at " +
     "all' from 'a project batch is finished and nobody has proposed the next one'");
   assert.strictEqual(Number(d.finish_due), finishDue,
-    `detail.finish_due=${d.finish_due} but project_batch_state() holds ${finishDue} review_due ` +
+    `detail.finish_due=${d.finish_due} but project_finish_line() holds ${finishDue} review_due ` +
     "batch(es). review_due, never proposal_due: a batch claimed inside 24 hours is finished but is " +
     "not work to go and find, so counting proposal_due here would re-boot the fire every hour");
   if (v.reason === FIND_WORK_REASON) {
