@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1038 | scripts/agent-log.js | AGT-317 -- after its own row and its citations land, sweeps this session's model-turn timings into public.routine_turn_timings (scripts/lib/turn-timings.mjs sweep()). Best-effort and stderr only: the printed line and every exit code are unchanged.
 // DeepBench v7.0.881 | scripts/agent-log.js | AGT-502 -- --cache-creation-tokens / --cache-read-tokens: the two flags whose absence from parseArgs() made every caller sum three differently-priced input quantities into --input-tokens. All-or-nothing as a pair with each other, independent of input/output, absent = NULL not 0 (SES-423).
 // DeepBench v7.0.538 | scripts/agent-log.js | SES-424 slice 6 -- the parser and the citation writer MOVED
 // OUT to lib/pattern-citations.js, unchanged, so the EXECUTOR's writer (lib/activity-log.js) calls the same
@@ -152,6 +153,7 @@ import { logActivity } from '../lib/activity-log.js';
 // only a MODEL's answer is coerced -- see that module's header).
 import { parsePatternsApplied, writeCitations, coercePatternNumbers } from '../lib/pattern-citations.js';
 import { runWithCallSource } from '../lib/request-context.js';
+import { sweep } from './lib/turn-timings.mjs';
 import { SERVICE_CATALOG } from '../shared/ai-patterns.js';
 
 export const CALL_SOURCE = 'session';
@@ -352,6 +354,12 @@ async function main() {
   // the FK's target), the citations second, and a refusal here exits 2 WITHOUT unwriting the turn.
   const cited = await writeCitations(back.row.id, args.patternsApplied, args.agent, args.capability);
   if (cited.error) fail(cited.error);
+
+  // FEATURE: AGT-317 -- every caller of this script is a session that just ran an agent, so this is
+  // where a run's model-turn timings are stored (scripts/lib/turn-timings.mjs). Best-effort, stderr
+  // only: the printed line and the exit code above are this script's contract and stay untouched.
+  const swept = await sweep({ cycle: args.cycle, sweptBy: `${args.agent}:${args.capability}` });
+  process.stderr.write(`turn-timings: ${swept.ok ? `recorded ${swept.recorded}` : 'not recorded'}${swept.reason ? ` -- ${swept.reason}` : ''}\n`);
 
   if (args.json) {
     process.stdout.write(JSON.stringify({ id: back.row.id, trace_id: traceId, call_source: back.row.call_source, visitor_id: back.row.visitor_id, citations: cited.citations }) + '\n');
