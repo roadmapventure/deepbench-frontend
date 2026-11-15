@@ -1,3 +1,4 @@
+// DeepBench v7.0.1032 | api/web-memory.js | AGT-017 -- the GET reads Brent's Identity, Knowledge and Guardrails from his Skill Profiles (assemblePrompt + enrichPrompt); REFLECT is unchanged (callReflect)
 // DeepBench v7.0.34 | api/web-memory.js | LOG-121 -- handler wrapped in withRequestContext(); the
 // request-scoped context is read inside logActivity(), so no logging call site in this file changes
 // DeepBench v6.3.99 | api/web-memory.js | LOG-35b -- log the real summarization call, response's own model field
@@ -9,7 +10,9 @@
 //   GET  ?url=<encoded_url>&goal=<encoded_goal>  — retrieve memory + execution plan before a run
 //   POST                                          — save what the agent learned after a run
 
-import { assembleContext } from "../lib/agent-run.js";
+import { callReflect } from "../lib/agent-run.js";
+import { assemblePrompt } from "./prompt/db-assembly.js";
+import { enrichPrompt } from "./prompt/ai-enrichment.js";
 import { embedContent } from "../lib/vector-search.js";
 import { logActivity } from "../lib/activity-log.js";
 import { withRequestContext } from "../lib/request-context.js";
@@ -46,25 +49,23 @@ async function handler(req, res) {
         "Review your knowledge and write a step-by-step execution plan for this run.",
       ].filter(Boolean).join("\n");
 
-      // Full pipeline: configs + RAG (matchCount=10 for Brent — needs more portal history) + REFLECT
-      const { systemPrompt, executionPlan, debugInfo } = await assembleContext(
-        "brent",
-        "global",
-        queryText,
-        taskDescription,
-        {
-          matchCount: 10,
-          isFetchAgent: true,
-        }
-      );
+      // AGT-017: one prompt assembler over Brent's own Skill Profile rows (capability
+      // `portal-data-fetch`) — Identity, Guardrails and Knowledge, with his retrieval breadth
+      // (match_count 10, scope agent) carried by the Knowledge Skill Profile rather than by an
+      // options argument. REFLECT is unchanged: the same unlogged callReflect() this route
+      // already made, now fed the assembled identity and knowledge sections.
+      const promptRequest = await assemblePrompt({ capability_slug: "portal-data-fetch", agent_id: "brent", tenant_id: "global", task_context: { goal: queryText } });
+      const enriched = await enrichPrompt({ prompt_request: promptRequest, agent_id: "brent", capability_slug: "portal-data-fetch" });
+      const sections = enriched.sections || {};
+      const executionPlan = await callReflect(sections.identity || "", sections["knowledge-brent-knowledge"] || "", taskDescription, promptRequest.agent_card?.name || "brent");
 
       return res.status(200).json({
-        memoryContext: systemPrompt,
+        memoryContext: executionPlan ? `${enriched.system_prompt}\n\n---\n\n=== EXECUTION PLAN ===\n${executionPlan}` : enriched.system_prompt,
         executionPlan,
-        hasResume:    debugInfo.layers.role  ? true  : false,
-        hasPlaybook:  debugInfo.layers.guardrail ? true : false,
-        ragMatchCount: debugInfo.layers.rag ? debugInfo.token_estimates.rag : 0,
-        _debug: debugInfo,
+        hasResume: !!sections.identity,
+        hasPlaybook: !!sections.guardrails,
+        ragMatchCount: Object.values(enriched.debug?.rag_chunks_by_section || {}).reduce((a, n) => a + (Number(n) || 0), 0),
+        _debug: enriched.debug,
       });
 
     } catch (err) {
