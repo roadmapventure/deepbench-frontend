@@ -1,3 +1,4 @@
+// DeepBench v7.0.1034 | tests/regression/agt-232-decline-records-a-skip.test.mjs | AGT-232 -- arm F
 // DeepBench v7.0.669 | tests/regression/agt-232-decline-records-a-skip.test.mjs | AGT-232 -- A
 // DECLINED HEAD IS RECORDED, SO THE TURN BUYS A ROW.
 //
@@ -33,6 +34,9 @@
 // yields `undefined` and arm A throws on the first call.
 
 import assert from "assert";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { selfRun } from "./_lib/self-run.js";
 import { answerErrors, declineSkipFor } from "../../scripts/run-project.js";
 
@@ -40,6 +44,17 @@ const PICK = "AGT-232";
 const OTHER = "ZZQ-999";
 const CYCLE = "86eec755-8ab8-4263-894d-e021b9d1d755";
 const REORDER_PIN = "may not re-order the board";
+
+// Arm F's subject: the runbook line step 5 (c) is read from, opened read-only.
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const RUNBOOK = path.join(ROOT, "docs", "runbooks", "runner-cycle.md");
+const PASSOVER_MARKER = "A RECORDED PASS-OVER IS NOT A MISMATCH";
+const DECLINE_SENTENCE =
+  "A DECLINE BUYS A ROW (`AGT-232`): a (c) refusal, `stop` or `report` writes a `runner_skips` row on the PICK, never the row named (`skip_recorded`).";
+const PASSOVER_SENTENCE = "Past a blocked head the sanctioned answer is `passed_over`.";
+const ACCEPTING_HALF =
+  "TODAY THIS IS THE ACCEPTING HALF ONLY: no manager Skill row emits `passed_over` yet";
+const RETIRED_CLAUSE = "filed separately at this ship";
 
 // The state the driver built at (b): the pick it read for itself, the queue the lister returned, and
 // a roster the off-pick assignment's capability is on -- so the ONLY thing wrong with that answer is
@@ -205,12 +220,47 @@ function armE() {
   console.log("  [AGT-232] arm E: the reason is the report trimmed, a blank report still buys the row, and the author is one trimmed cycle id.");
 }
 
+// ---------------------------------------------------------------------------------------------
+// (F) the runbook says what a decline buys -- the prose half of this ticket, read from the file
+// ---------------------------------------------------------------------------------------------
+// WHY THIS ARM IS HERE. Arms A-E prove `declineSkipFor()` writes the row; nothing proved that the
+// procedure a cycle actually READS says so. runner-cycle.md step 5 (c) held 0 `runner_skips` while
+// the driver wrote one, and it pointed at a clause "filed separately at this ship" whose ticket is
+// `removed` -- a pointer to nothing. This arm fails on `origin/dev`'s runbook, where neither new
+// sentence exists and the retired pointer does. Read-only: it writes nothing and needs no
+// credentials. It asserts the ACCEPTING-HALF sentence is still THERE on purpose -- the emitting
+// half (`dm-run-intent` / `dm-guardrails`) is John-gated and unbuilt, so that caveat is true and
+// removing it would be the lie.
+function armF() {
+  const text = fs.readFileSync(RUNBOOK, "utf8");
+
+  const lines = text.split("\n").filter(l => l.includes(PASSOVER_MARKER));
+  assert.strictEqual(lines.length, 1,
+    `${PASSOVER_MARKER} appears on ${lines.length} lines of docs/runbooks/runner-cycle.md; step 5 (c) is one line and the assertions below are about that line, not the file`);
+  const line = lines[0];
+
+  for (const [label, sentence] of [
+    ["the decline's row", DECLINE_SENTENCE],
+    ["the sanctioned answer past a blocked head", PASSOVER_SENTENCE],
+    ["the accepting-half caveat", ACCEPTING_HALF],
+  ]) {
+    assert.ok(line.includes(sentence),
+      `step 5 (c) does not say ${label}, verbatim. A cycle reading the runbook still does not learn it.\nMissing: ${sentence}`);
+  }
+
+  assert.ok(!text.includes(RETIRED_CLAUSE),
+    `docs/runbooks/runner-cycle.md still points at a clause "${RETIRED_CLAUSE}" -- AGT-203, the row it pointed at, is removed, so the pointer leads nowhere`);
+
+  console.log("  [AGT-232] arm F: runner-cycle.md step 5 (c) says a decline buys a runner_skips row on the PICK, names passed_over past a blocked head, keeps the accepting-half caveat, and no longer points at a retired clause.");
+}
+
 async function run() {
   armA();
   armB();
   armC();
   armD();
   armE();
+  armF();
 }
 
 export default run;
