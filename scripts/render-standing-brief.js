@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1046 | scripts/render-standing-brief.js | DAT-30 -- Secret age: every stored key in `runner_secrets` with the age of its last value change, the oldest named, and the rotating ones counted against their own cadence; read and rendered by NAME, never a value, and outside factsSha() like Stalled and Wasted cycles because an age advances with the clock.
 // DeepBench v7.0.977 | scripts/render-standing-brief.js | AGT-610 -- Redesign after refusal: the attempt ledger, displayed; outside factsSha like Stalled and Wasted cycles.
 // DeepBench v7.0.976 | scripts/render-standing-brief.js | AGT-367 -- a tenth group, `Wasted cycles`:
 // the last 7 days of `runner_cycles` with the CAUSE on each row, counted per cause by
@@ -1712,6 +1713,28 @@ export function asOf(nowIso) {
 }
 
 /**
+ * FEATURE: DAT-30 -- the age of every stored key, by NAME. `secrets` is exactly what fetchFacts()
+ * read with the name/date projection; NO VALUE IS READ HERE OR THERE, which is the point of the
+ * group. `rotation_days` NULL means the row is not a key that rotates (an address, a username), so
+ * it prints its age and stays out of the overdue denominator -- counting it would report a breach
+ * that cannot happen. Absent says it was not read; `[]` is a measured zero. Pure: the clock is the
+ * `nowIso` argument, so a fixture can drive every cell.
+ */
+export function renderSecretAge(secrets, stamp, nowIso) {
+  const lead = `**Secret age** — *${stamp}.* \`runner_secrets\` by NAME; no value is read.`;
+  if (!Array.isArray(secrets)) return `${lead}\n\n- *The secret ledger was not read for this render.*\n`;
+  if (!secrets.length) return `${lead}\n\n- **No stored key — a measured zero.**\n`;
+  const rows = secrets.map(r => ({ ...r, age: Math.floor((new Date(nowIso) - new Date(r.rotated_at)) / 86400000) }));
+  const rot = rows.filter(r => r.rotation_days != null);
+  const old = rot.reduce((m, r) => (!m || r.age > m.age ? r : m), null);
+  const late = r => r.age >= r.rotation_days;
+  return [`${lead} **Oldest key: ${old ? `${old.age} days (\`${old.name}\`)` : "—"}**, ${rot.filter(late).length} of ${rot.length} rotating keys overdue.`, "",
+    "| key | value changed | days old | due | state |", "|---|---|---|---|---|",
+    ...rows.map(r => `| \`${r.name}\` | ${cst(r.rotated_at)} | ${r.age} | ${r.rotation_days ?? "—"} | ${r.rotation_days == null ? "does not rotate" : late(r) ? "**overdue**" : "ok"} |`),
+    "", "- GitHub Actions secrets are not in this table.", ""].join("\n");
+}
+
+/**
  * The block body. Deterministic for a given (facts, nowIso) — the clock is an ARGUMENT, never read
  * in here, so the guard can assert this function directly. `facts` is exactly what fetchFacts()
  * returns, so the test can drive it from a fixture.
@@ -1741,7 +1764,7 @@ export function renderBlock(facts, nowIso) {
   // "not read", never "she has not run".
   // FEATURE: AGT-607 — stalls joins the destructure on the same terms as victoria: absent means
   // "not read", never "no stall was reported".
-  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste, ledger } = facts;
+  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste, ledger, secrets } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -2013,6 +2036,12 @@ export function renderBlock(facts, nowIso) {
   // Same contract as the ten groups above it -- a pure helper a fixture can drive, rendering what
   // fetchFacts() read and deciding no state `refusal_ledger_brief()` already derived itself.
   L.push(renderRefusalLedger(ledger, stamp));
+
+  // ---- Secret age (FEATURE: DAT-30) ----------------------------------------------------------
+  // AFTER Redesign after refusal and BEFORE Human gates, which keeps Human gates the last group
+  // (SES-386). Same contract as the eleven groups above it -- a pure helper a fixture can drive,
+  // rendering what fetchFacts() read by NAME and deciding nothing the dates do not already say.
+  L.push(renderSecretAge(secrets, stamp, nowIso));
 
   // ---- Human gates (FEATURE: SES-386) -------------------------------------------------------
   // After Staff watch (SES-378 slice 5 landed between it and Ticket hygiene), before the provenance
@@ -2429,7 +2458,18 @@ export async function fetchFacts(url, key) {
     "proposed_projects?select=slug,name,proposal_reason,proposed_at,tickets,by_class,cycles&order=proposed_at,slug");
   if (!Array.isArray(proposedProjects)) die("the proposed_projects read came back non-array — refusing to render the proposed-projects group from nothing");
 
-  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste, ledger };
+  // FEATURE: DAT-30 -- the stored keys' rotation stamps. THE PROJECTION IS NAME AND DATES ONLY and
+  // that is the feature, not a style rule: this group exists to make a key's age visible WITHOUT
+  // anything reading the key, so `value` must never appear in it (tests/regression/dat-30-secret-age
+  // .test.mjs greps this file for exactly that). Columns are NAMED, never `select=*`
+  // (.claude/rules/supabase-column-grants.md).
+  //
+  // A non-array REFUSES rather than rendering an unmeasured zero, same posture as every read above:
+  // "no key is stored" would be a remarkable fact and must never be how a failed read looks.
+  const secrets = await rest(url, key, "runner_secrets?select=name,rotated_at,rotation_days&order=rotated_at.asc,name.asc");
+  if (!Array.isArray(secrets)) die("secret-age read came back non-array");
+
+  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste, ledger, secrets };
 }
 
 async function main() {
