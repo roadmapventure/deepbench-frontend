@@ -1,3 +1,6 @@
+// DeepBench v7.0.1043 | tests/regression/agt-317-routine-turn-timings.test.mjs | AGT-317 -- arm D:
+// the report attributes by what a transcript itself says (kind + served model), every read is
+// paged, and the coverage lines count by cycle id and never by swept_by.
 // DeepBench v7.0.1038 | tests/regression/agt-317-routine-turn-timings.test.mjs | AGT-317
 //
 // WHAT THIS GUARDS. A routine run's model-turn time is measured from the harness transcript and
@@ -6,6 +9,8 @@
 //   A  OFFLINE  the measuring itself (scripts/lib/turn-timings.mjs) on fixtures written here.
 //   B  OFFLINE  the three wirings read as source: agent-log.js sweeps after its own write and
 //               never decides an exit code on it; the CLI's exits; the migration mirror's grants.
+//   D  OFFLINE  (v7.0.1043) who a row is about: lane = kind + served model; the coverage counts
+//               joined on the cycle id; and reads that page past 1,000 rows.
 //   C  LIVE     (SUPABASE_URL + SUPABASE_SERVICE_KEY; notRun otherwise) the table takes an upsert
 //               on (session_id, transcript), refuses a row whose slow counts do not add up, and
 //               is closed to the browser key. Its own rows are deleted before it returns.
@@ -21,7 +26,7 @@ import {
   classifyTurn, measureTranscript, findTranscripts, localRows, sweep, verdict,
   SLOW_TURN_MS, WAIT_TOKENS_PER_SEC, MIN_SESSIONS, TABLE,
 } from "../../scripts/lib/turn-timings.mjs";
-import { parseArgs, routineOf, summarize } from "../../scripts/measure-routine-turns.js";
+import { parseArgs, routineOf, summarize, laneOf, coverage, coverageLines, readAll, PAGE } from "../../scripts/measure-routine-turns.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -174,6 +179,83 @@ function armSource() {
   assert.ok(sql.includes("raise exception 'AGT-317 GRANTS:"), "the migration asserts its own grants and never trusts the success flag");
 }
 
+// D OFFLINE. Who a stored row is about, from the facts it carries and no others.
+async function armAttribution() {
+  assert.equal(laneOf({ kind: "main", model: "claude-opus-5", swept_by: "designer:design-kickoff" }), "main claude-opus-5",
+    "the lane is the transcript's own kind and served model; swept_by plays no part");
+  assert.equal(laneOf({ kind: "subagent", model: null }), "subagent model-unknown");
+  // Two sessions as they are stored: every row of a session carries the session's LAST caller.
+  const C1 = "11111111-1111-4111-8111-111111111111", C2 = "22222222-2222-4222-8222-222222222222", C3 = "33333333-3333-4333-8333-333333333333";
+  const mk = (session_id, transcript, cycle_id, recorded_at, over = {}) => ({ session_id, transcript, kind: transcript === "main" ? "main" : "subagent",
+    model: transcript === "main" ? "claude-opus-5" : "claude-fable-5-2", cycle_id, swept_by: "architect:review-audit-worklist", recorded_at,
+    first_at: at(0), last_at: at(60), turns: 10, turn_ms: 50000, tool_ms: 2000, slow_turns: 0, slow_generating: 0, slow_waiting: 0, max_ms: 9000, ...over });
+  const stored = [
+    mk("s1", "main", C1, at(100)), mk("s1", "agent-a", C1, at(100)),
+    mk("s2", "main", null, at(200), { swept_by: "harry:strategy-advise" }),
+  ];
+  const stamps = new Map([[C1, "DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH"]]);
+  assert.deepEqual(summarize(stored, r => `${routineOf(r, stamps)} | ${laneOf(r)}`).map(g => [g.key, g.transcripts, g.turns]), [
+    ["harry | main claude-opus-5", 1, 10],
+    ["runner:KURqMH | main claude-opus-5", 1, 10],
+    ["runner:KURqMH | subagent claude-fable-5-2", 1, 10],
+  ], "one swept_by on every row of a session, and still three lanes");
+
+  const cycles = [
+    { id: C1, stamp: "DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH", started_at: at(50), outcome: "shipped" },   // before the first sweep, and stored
+    { id: C2, stamp: "DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH", started_at: at(150), outcome: "did_not_run" },
+    { id: C3, stamp: "DEEPBENCH-RUNNER-AUTOMATED-trig_01AAMaJbdt2ye6hMMpCDy5Yd", started_at: at(160), outcome: "shipped" },
+    { id: "44444444-4444-4444-8444-444444444444", stamp: "DEEPBENCH-RUNNER-AUTOMATED-trig_01AAMaJbdt2ye6hMMpCDy5Yd", started_at: at(10), outcome: "shipped" }, // before, not stored: not counted
+    { id: "55555555-5555-4555-8555-555555555555", stamp: "session rank-backlog (in cycle x)", started_at: at(170), outcome: "shipped" },                     // a helper's row is not a lane
+  ];
+  const logged = [
+    { agent_id: "builder", visitor_id: C1, created_at: at(120) },
+    { agent_id: "builder", visitor_id: C3, created_at: at(165) },
+    { agent_id: "auditor", visitor_id: null, created_at: at(130) },
+    { agent_id: "trenton", visitor_id: null, created_at: at(20) },   // before the first sweep: no claim either way
+  ];
+  const c = coverage(stored, cycles, logged);
+  assert.equal(c.since, at(100));
+  assert.deepEqual(c.lanes, [
+    { key: "runner:CDy5Yd", cycles: 1, stored: 0, did_not_run: 0, ran_unstored: 1 },
+    { key: "runner:KURqMH", cycles: 2, stored: 1, did_not_run: 1, ran_unstored: 0 },
+  ]);
+  assert.deepEqual(c.agents, [
+    { agent: "auditor", turns: 1, in_stored_cycle: 0, in_unstored_cycle: 0, no_cycle: 1 },
+    { agent: "builder", turns: 2, in_stored_cycle: 1, in_unstored_cycle: 1, no_cycle: 0 },
+  ]);
+  assert.deepEqual([c.turns, c.in_stored_cycle, c.in_unstored_cycle, c.no_cycle], [3, 1, 1, 1]);
+  const lines = coverageLines(c);
+  assert.equal(lines.length, 6);
+  assert.equal(lines[1], "runner:CDy5Yd  cycles 1  stored 0  did not run 0  ran and stored nothing 1");
+  assert.equal(lines[3], "AGENT TURNS LOGGED SINCE THEN: 3 -- 1 in a cycle with stored timing, 1 in a cycle with none, 1 outside any cycle");
+  assert.equal(lines[4], "LOGGED IN A CYCLE WITH NO STORED TIMING: builder 1");
+  assert.equal(lines[5], "LOGGED OUTSIDE ANY CYCLE (nothing stored ties these to a session; not a claim they went unmeasured): auditor 1");
+  assert.ok(!lines.join("\n").includes("trenton"), "a turn logged before the first stored sweep is not called unmeasured");
+  // The swept_by overwrite that produced the old line: builder logged, another agent's label is on
+  // every row. Counted by cycle, builder's turn in C1 is in a cycle WITH stored timing.
+  assert.equal(c.agents.find(a => a.agent === "builder").in_stored_cycle, 1);
+  assert.deepEqual(coverageLines(coverage([], cycles, logged)), ["MEASURED AND NOT: nothing is stored in this window, so nothing is said about any lane or agent"]);
+
+  // Paging: 1,003 rows arrive as 1,000 + 3, never as the first 1,000 alone.
+  const urls = [];
+  const pages = [Array.from({ length: PAGE }, (_, i) => ({ i })), [{ i: 1000 }, { i: 1001 }, { i: 1002 }]];
+  const got = await readAll("runner_cycles?select=id&order=id.asc", { env: { SUPABASE_URL: "https://db.invalid/", SUPABASE_SERVICE_KEY: "k" },
+    fetchImpl: async url => { urls.push(url); return { ok: true, json: async () => pages[urls.length - 1] }; } });
+  assert.equal(got.rows.length, 1003);
+  assert.deepEqual(urls, [
+    "https://db.invalid/rest/v1/runner_cycles?select=id&order=id.asc&limit=1000&offset=0",
+    "https://db.invalid/rest/v1/runner_cycles?select=id&order=id.asc&limit=1000&offset=1000",
+  ]);
+  assert.match((await readAll("x?select=id", { env: {} })).error, /is not set/);
+  assert.deepEqual(await readAll("x?select=id", { env: { SUPABASE_URL: "https://db.invalid", SUPABASE_SERVICE_KEY: "k" },
+    fetchImpl: async () => ({ ok: false, status: 500, text: async () => "57014" }) }), { error: "HTTP 500 57014" });
+
+  const cli = read("scripts/measure-routine-turns.js");
+  assert.ok(!cli.includes("LOGGED A TURN BUT STORED NO TIMING"), "the line that named agents by swept_by is gone");
+  assert.ok(!cli.includes("limit=10000"), "no single capped read is left");
+  assert.ok(!cli.includes("const measured = new Set("), "no measured-set is built from swept_by");
+}
+
 async function armLive(base, key) {
   const sid = `agt317-test-${randomUUID()}`;
   const call = (q, init = {}, k = key) => fetch(`${base}/rest/v1/${q}`, { ...init,
@@ -214,7 +296,8 @@ async function run() {
   await armSweep(fx);
   armVerdict();
   armSource();
-  const results = ["A measure+sweep+verdict", "B source"];
+  await armAttribution();
+  const results = ["A measure+sweep+verdict", "B source", "D attribution+coverage+paging"];
   const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = process.env.SUPABASE_SERVICE_KEY ?? "";
   if (!base || !key) {
