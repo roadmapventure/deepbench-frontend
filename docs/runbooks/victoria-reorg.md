@@ -73,7 +73,7 @@ Update rule, as routine-prompt.md and auditor-routine.md: edit the block → sui
 word `RemoteTrigger update` with the WHOLE `ccr` (`environment_id`, `events`, `session_context`) read
 from a fresh `get`, then read back `derived_state.model` and `allowed_tools`. The routine exists, so
 `--routine=victoria-reorg` locates a finding by its id (`routine/trig_012xvmXsXAjbVxdbYhUTq6W1/prompt`), as model-watch
-does; the block is unchanged and the live prompt equals it (checked 2026-10-02, exit 0).
+does. Since `AGT-517` (`v7.0.1045`) the block opens with the live routine's own STEP 0 meter stop; below that stop the live prompt is still the `v7.0.864` text, so the check exits 1 at the `Step 3` line until the block is pasted (`AGT-490`, `AGT-493`).
 
 The block carries no trigger id and no model id: the id lives in the table above, never in the block, and the model is the
 `model_assignments` row the sub-agent's own assembly prints at run time.
@@ -81,6 +81,8 @@ The block carries no trigger id and no model id: the id lives in the table above
 ### The prompt
 
 <!-- VICTORIA-REORG-PROMPT-BEGIN -->
+STEP 0 — WEEKLY METER STOP (John, 2026-10-14). This runs before everything below, including the npm ci line. Using the Supabase MCP tools, run: select ok, reason, all_models_pct from public.routine_meter_ok(); If ok is false, stop the run now: do no work, write nothing, send nothing, and make the first line of your final message exactly: SKIPPED: weekly meter <all_models_pct>% (<reason>). If that query itself fails, also stop and say: SKIPPED: meter check failed. Only when ok is true, continue with the instructions below.
+
 Before anything else, in the clone run: npm ci --no-audit --no-fund --ignore-scripts (the scripts need their packages; this is a no-op if they are already installed).
 
 DEEPBENCH VICTORIA-PRIORITIZE — WEEKLY TUESDAY 5:00 AM CENTRAL · trigger: scheduled, or manual "Run now" (John runs the first one himself). This run is UNATTENDED: nobody reviews it afterward, so decide, record and finish. Do not ask anyone anything.
