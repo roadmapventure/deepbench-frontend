@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1052 | scripts/personal-agent.js | AGT-722 -- a fifth record store (writing_records): WRITING_READ_MAP over the ten writing kinds, every correction and grade on every render, the deny-aware Library read (personal_source_denies drops items before ranking; a client_private item outside LIBRARY_PRIVATE_SECTIONS drops too), the writing team reads (career, strategy facts, market messaging, the idea board as direction only, the postings marked apply), validateWritingAnswer() with two write guards (blocked client terms; a waiting fact stated as fact), and writeWriting() (one insert, never a DELETE or PATCH).
+// Kickoff: docs/kickoffs/v7.0.1052-AGT-722-laura-call-path.md.
 // DeepBench v7.0.1019 | scripts/personal-agent.js | AGT-665 -- strategy writes file market-check leads.
 // DeepBench v7.0.1015 | scripts/personal-agent.js | AGT-655 -- a fourth record store (security_records): SECURITY_READ_MAP over the twelve security kinds, every correction and grade on every render, the newest collector inventory (and, for the exposure scan, the one before it) as facts with per-section byte caps, validateSecurityAnswer() (gap/document/classification rules, no private-scan detector hit anywhere), writeSecurity() (one insert, an optional findings ingest file for audit-ledger.js, never a DELETE or PATCH), and the strategy store's `security` read of the scorecard and open blockers on its advise and readiness slugs.
 // Kickoff: docs/kickoffs/v7.0.1015-AGT-655-trenton-call-path.md.
@@ -253,6 +255,30 @@ export const SECURITY_READ_MAP = {
   'security-document-draft': ['document', 'classification', 'gap', 'decision'],
   'security-advise': ['gap', 'classification', 'decision', 'scorecard', 'document'],
 };
+// AGT-722. The writing store's ten kinds (writing_records_kind_check, AGT-721) and its OWN read map,
+// never folded into another. `correction` and `grade` are in no list: every one of them is read on
+// every render (the store's correctionKinds).
+export const WRITING_KINDS = [
+  'draft', 'proposal', 'match_report', 'fact_candidate', 'practice', 'source', 'method', 'correction', 'grade', 'rule',
+];
+export const WRITING_READ_MAP = {
+  'writing-tailor': ['practice', 'method', 'rule', 'fact_candidate'],
+  'writing-draft': ['draft', 'practice', 'method', 'rule', 'fact_candidate'],
+  'writing-weekly-check': ['proposal', 'draft', 'practice', 'method', 'rule'],
+  'writing-predraft': ['draft', 'match_report', 'practice', 'method', 'rule'],
+  'writing-watch': ['source', 'practice', 'method'],
+};
+const WRITING_SLUGS = Object.keys(WRITING_READ_MAP);
+// The kinds a model answer may write: never `correction` or `grade` (the principal's, written by the
+// session with --principal) and never `rule` (the principal's, written only over the Supabase MCP).
+export const WRITING_MODEL_KINDS = WRITING_KINDS.filter(k => !['correction', 'grade', 'rule'].includes(k));
+export const WRITING_PRINCIPAL_KINDS = ['correction', 'grade'];
+export const PROPOSAL_TARGETS = ['linkedin', 'resume'];
+export const PUBLISHER_TYPES = ['recruiter', 'association', 'product_career', 'vendor'];
+// The writing team reads' byte cuts (kickoff section 4).
+export const WRITING_TEAM_BYTES = { career_writing: 8000, strategy_facts: 6000, market_messaging: 6000, napkin_direction: 5000 };
+export const POSTINGS_MARKED_LIMIT = 5;
+export const POSTING_TEXT_CHARS = 4000;
 // One inventory section's byte cap; past it the section keeps its scalars (its counts) and drops its
 // arrays, marked truncated. The whole inventory stays under INVENTORY_TOTAL_BYTES.
 export const INVENTORY_SECTION_BYTES = 40000;
@@ -283,6 +309,12 @@ export const LIBRARY_SECTIONS = {
   'strategy-weekly-study': [],
   'strategy-mentor-review': ['goals', 'value'],
 };
+// AGT-722: the writing slugs' Library sections, in their OWN map (agt-644 pins LIBRARY_SECTIONS to the
+// seven strategy slugs); readLibrary reads either. Every writing slug reads the same eight sections' text.
+export const WRITING_LIBRARY_SECTIONS = Object.fromEntries(WRITING_SLUGS.map(c => [c, ['facts', 'identity', 'works', 'value', 'evidence', 'goals', 'approach', 'taste']]));
+// AGT-722. The deny-aware Library's second line, keyed by capability: for a capability named here, a
+// `client_private` item outside these sections never reaches the catalog. Absent capabilities are unchanged.
+export const LIBRARY_PRIVATE_SECTIONS = Object.fromEntries(WRITING_SLUGS.map(c => [c, ['evidence', 'value']]));
 // A capability that reads the head of every UNSECTIONED item (to label it), and how many characters.
 export const LIBRARY_UNSECTIONED_HEADS = { 'strategy-library-curate': 2000 };
 // The hard cap on the Library's text half; past it the catalog stays and the bodies drop.
@@ -301,6 +333,10 @@ const CAREER_DOC_KINDS = ['resume', 'cover_letter'];
 export const LIBRARY_TEXT_SKIP_KINDS = Object.fromEntries(['strategy-daily-brief', 'strategy-weekly-review',
   'strategy-readiness-check', 'strategy-library-curate', 'strategy-advise', 'strategy-weekly-study', 'strategy-mentor-review']
   .map(c => [c, CAREER_DOC_KINDS]));
+// AGT-722: the watch reads method, not the record -- every granted kind but the voice samples and the
+// profile stays a catalog line.
+LIBRARY_TEXT_SKIP_KINDS['writing-watch'] = ['confirmed_fact', 'cover_letter', 'document', 'goals', 'linkedin_comment',
+  'linkedin_position', 'linkedin_post', 'product_snapshot', 'resume', 'synthesis', 'vision'];
 // The capabilities whose answer may carry labels[] for the catalog rows.
 export const LIBRARY_CURATORS = ['strategy-library-curate'];
 // The write check's constants: the one emoji, always last (rule 1); the hard ceiling in code points;
@@ -370,6 +406,8 @@ const STRATEGY_EXTRA_READS = ['library', 'market', 'career', 'napkin', 'week'];
 // AGT-650: every strategy slug but curate also reads `memory` and `product`; the study and the mentor
 // review read `sources`; the mentor review, the advise and the brief read `goals`.
 const MENTOR_READS = ['memory', 'product'];
+const WRITING_BASE_READS = ['library', 'goals'];
+const WRITING_TEAM_READS = ['career_writing', 'strategy_facts', 'market_messaging', 'napkin_direction'];
 export const EXTRA_READS = {
   'career-linkedin-alerts': 'competitors',
   'humor-weekly-draft': HUMOR_EXTRA_READS,
@@ -396,6 +434,14 @@ export const EXTRA_READS = {
   'security-deep-check': ['inventory'],
   'security-document-draft': ['inventory'],
   'security-advise': ['inventory'],
+  // AGT-722: every writing slug reads the Library and the goals; all but the watch read the career,
+  // strategy, market and idea-board stores (each cut to WRITING_TEAM_BYTES); the pre-draft also reads
+  // the postings marked apply that carry no draft yet. Readers name tables, never agents.
+  'writing-tailor': [...WRITING_BASE_READS, ...WRITING_TEAM_READS],
+  'writing-draft': [...WRITING_BASE_READS, ...WRITING_TEAM_READS],
+  'writing-weekly-check': [...WRITING_BASE_READS, ...WRITING_TEAM_READS],
+  'writing-predraft': [...WRITING_BASE_READS, ...WRITING_TEAM_READS, 'postings_marked'],
+  'writing-watch': WRITING_BASE_READS,
 };
 // AGT-650: the team reads a strategy render carries are cut to these byte budgets, the rows that share
 // the most stems with the query kept first (newest first on a tie, and with no query), so the memory,
@@ -436,6 +482,8 @@ const STORES = [
   { table: 'strategy_records', fields: STRATEGY_FIELDS, map: STRATEGY_READ_MAP, targeted: false, allCorrections: true, correctionKinds: ['correction', 'grade'], repos: null, write: writeStrategy },
   // AGT-655: the security store, the same shape as the strategy one.
   { table: 'security_records', fields: SECURITY_FIELDS, map: SECURITY_READ_MAP, targeted: false, allCorrections: true, correctionKinds: ['correction', 'grade'], repos: null, write: writeSecurity },
+  // AGT-722: the writing store, the same shape again.
+  { table: 'writing_records', fields: 'id,kind,title,body,data,source,created_at', map: WRITING_READ_MAP, targeted: false, allCorrections: true, correctionKinds: ['correction', 'grade'], repos: null, write: writeWriting },
 ];
 
 export function storeFor(capability) {
@@ -763,6 +811,8 @@ export function parseArgs(argv) {
       case 'untick': out.untick = idList(value); break;
       // AGT-655: where a security --write puts the findings ingest file for scripts/audit-ledger.js.
       case 'findings-out': out.findingsOut = value; break;
+      // AGT-722: the session writes the principal's own words (a grade, a correction) -- never a model answer.
+      case 'principal': out.principal = true; break;
       default: return { error: `unrecognized flag "--${key}"` };
     }
   }
@@ -793,6 +843,7 @@ export function parseArgs(argv) {
   }
   if (out.mode === 'write' && !out.answer) return { error: '--answer=<json | path> is required with --write' };
   if (out.findingsOut !== undefined && (out.mode !== 'write' || !out.findingsOut)) return { error: '--findings-out=<path> is used only with --write' };
+  if (out.principal && (out.mode !== 'write' || storeFor(out.capability)?.write !== writeWriting)) return { error: '--principal is used only with --write on a writing slug' };
   if (out.findingsOut && !out.sessionName) return { error: '--findings-out needs --session-name=<name> (the ingest file is found_by session:<name>)' };
   return out;
 }
@@ -1001,9 +1052,15 @@ async function readLibrary(db, args) {
   const rows = await db.get(`personal_sources?status=eq.current&kind=in.(${kinds.map(k => encodeURIComponent(k)).join(',')})` +
     `&select=${LIBRARY_CATALOG}&order=section.asc.nullsfirst,id.asc`);
   if (!rows.length) return null;
-  const { catalog, counts } = collapseCatalog(rows);
+  // AGT-722: the deny list (personal_source_denies) and the client_private second line drop items from
+  // the catalog BEFORE ranking, so a dropped item is never a catalog line, a search hit or text. An
+  // agent with no deny rows, on a capability absent from LIBRARY_PRIVATE_SECTIONS, reads exactly as before.
+  const denies = await db.get(`personal_source_denies?agent_id=eq.${encodeURIComponent(args.agent)}&select=source_id`);
+  const allowed = libraryAllowed(rows, denies.map(d => d.source_id), args.capability);
+  if (!allowed.length) return null;
+  const { catalog, counts } = collapseCatalog(allowed);
 
-  const wanted = new Set(LIBRARY_SECTIONS[args.capability] ?? []);
+  const wanted = new Set(LIBRARY_SECTIONS[args.capability] ?? WRITING_LIBRARY_SECTIONS[args.capability] ?? []);
   const headChars = LIBRARY_UNSECTIONED_HEADS[args.capability] ?? 0;
   // AGT-650: the question decides what is read first, by the Library's own full-text (and, with an
   // embedding key, vector) ranking -- rpc/library_search -- in place of AGT-648's stem overlap. An item
@@ -1242,6 +1299,15 @@ async function readGoals(db) {
   };
 }
 
+// AGT-722. Pure. The catalog rows a capability may see: never a denied id; and, for a capability in
+// LIBRARY_PRIVATE_SECTIONS, never a client_private item outside its named sections.
+export function libraryAllowed(rows, deniedIds = [], capability = null) {
+  const denied = new Set(deniedIds);
+  const privateOk = LIBRARY_PRIVATE_SECTIONS[capability] ?? null;
+  return (rows ?? []).filter(r => !denied.has(r.id)
+    && !(privateOk && r.sensitivity === 'client_private' && !privateOk.includes(r.section)));
+}
+
 // AGT-647. Pure helpers, exported for the test.
 // Count-only kinds leave the catalog and come back as one {kind, count} line each.
 export function collapseCatalog(rows) {
@@ -1359,7 +1425,72 @@ async function readSecurityPosture(db) {
   return { scorecard: card ? recordHead(card) : null, open_blockers: gaps.map(g => ({ title: g.title, tier: g.data?.tier ?? null })) };
 }
 
+// --- AGT-722: the writing store's extra reads ---------------------------------------------------
+//
+// Each reader names a TABLE, never an agent (Rule #1), and cuts itself to WRITING_TEAM_BYTES: the rows
+// that share the most stems with the ask first, newest first on a tie (rankTrim takes rows oldest first, so
+// each reads newest first and reverses: agt-84 pins the count of ascending order clauses).
+const writingHead = r => ({ ...recordHead(r), data: r.data ?? {} });
+async function readCareerWriting(db, args) {
+  const rows = (await db.get('career_records?kind=in.(resume_fact,resume_line,evidence,correction,target)' +
+    '&select=id,kind,title,body,data,created_at&order=created_at.desc,id.desc')).reverse();
+  return rankTrim(rows.map(writingHead), strategyQuery(args), WRITING_TEAM_BYTES.career_writing);
+}
+async function readStrategyFacts(db, args) {
+  const rows = (await db.get('strategy_records?kind=in.(fact,correction,decision,offer)' +
+    '&select=id,kind,title,body,data,created_at&order=created_at.desc,id.desc')).reverse();
+  return rankTrim(rows.map(recordHead), strategyQuery(args), WRITING_TEAM_BYTES.strategy_facts);
+}
+async function readMarketMessaging(db, args) {
+  const rows = (await db.get('market_records?kind=in.(message,feature_benefit,ip_asset,correction)&or=(status.is.null,status.neq.retired)' +
+    '&select=id,kind,title,body,data,created_at&order=created_at.desc,id.desc')).reverse();
+  return rankTrim(rows.map(recordHead), strategyQuery(args), WRITING_TEAM_BYTES.market_messaging);
+}
+// Pure. The idea board as DIRECTION only: a row is kept when its research note reads as validated and
+// not as rejected; each kept row is marked direction_only; newest first, cut to the byte budget.
+export const NAPKIN_VALIDATED = /\b(validated|supported|strong|confirmed)\b/i;
+export const NAPKIN_REJECTED = /\b(weak|not validated|unvalidated|rejected|parked|no evidence)\b/i;
+export function napkinDirection(rows, bytes = WRITING_TEAM_BYTES.napkin_direction) {
+  const kept = [];
+  let used = 2;
+  for (const r of rows ?? []) {
+    const note = r?.research_note == null ? '' : String(r.research_note);
+    if (!note.trim() || !NAPKIN_VALIDATED.test(note) || NAPKIN_REJECTED.test(note)) continue;
+    const item = { id: r.id, text: r.text ?? null, status: r.status ?? null, research_note: note.slice(0, NAPKIN_VERDICT_CHARS), direction_only: true };
+    const size = Buffer.byteLength(JSON.stringify(item), 'utf8') + 1;
+    if (used + size > bytes) continue;
+    used += size;
+    kept.push(item);
+  }
+  return kept;
+}
+async function readNapkinDirection(db) {
+  return napkinDirection(await db.get('napkin_ideas?select=id,text,status,research_note,updated_at' +
+    '&or=(archived.is.null,archived.eq.false)&research_note=not.is.null&order=updated_at.desc,id.asc'));
+}
+// The postings the career records mark for application (data.verdict apply) that no writing draft
+// names in data.posting_id yet: newest POSTINGS_MARKED_LIMIT, each with its text cut.
+async function readPostingsMarked(db) {
+  const drafted = new Set((await db.get('writing_records?kind=eq.draft&select=id,posting_id:data->>posting_id&order=id.asc'))
+    .map(r => r.posting_id).filter(Boolean));
+  const rows = await db.get('career_records?kind=eq.posting&data->>verdict=eq.apply&select=id,title,body,data,created_at&order=created_at.desc,id.asc');
+  return rows.filter(r => !drafted.has(r.id)).slice(0, POSTINGS_MARKED_LIMIT).map(r => ({
+    id: r.id,
+    title: r.title,
+    company: r.data?.company ?? null,
+    url: r.data?.url ?? null,
+    must_haves: r.data?.must_haves ?? null,
+    text: String(r.data?.text ?? r.body ?? '').slice(0, POSTING_TEXT_CHARS),
+  }));
+}
+
 const EXTRA_READERS = {
+  // AGT-722
+  career_writing: readCareerWriting,
+  strategy_facts: readStrategyFacts,
+  market_messaging: readMarketMessaging,
+  napkin_direction: readNapkinDirection,
+  postings_marked: readPostingsMarked,
   // AGT-655
   inventory: readInventory,
   inventory_previous: readInventoryPrevious,
@@ -1942,6 +2073,126 @@ async function writeSecurity(args, answer) {
   }
   const urgent = SECURITY_URGENT_SLUGS.includes(args.capability) ? answer.urgent === true : null;
   process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), findings_file: findingsFile, urgent }) + '\n');
+}
+
+// --- AGT-722: the writing write check and --write -----------------------------------------------
+//
+// Pure. Every rule is a property of this code path, never an instruction the model is asked to obey.
+// `rules` are the store's `rule` rows ({data: {blocked_terms: [...]}}); `practices` the stored practice
+// rows ({data: {url, publisher_type}}), so a method citing a stored vendor practice is told apart.
+// `principal: true` is the session writing the principal's own words: then ONLY correction and grade.
+const httpUrl = v => typeof v === 'string' && /^https?:\/\//i.test(v.trim()) && hostOf(v.trim()) !== null;
+function blockedTermRes(rules) {
+  const terms = new Set();
+  for (const r of rules ?? []) for (const t of Array.isArray(r?.data?.blocked_terms) ? r.data.blocked_terms : []) {
+    if (typeof t === 'string' && t.trim()) terms.add(t.trim());
+  }
+  return [...terms].map(t => [t, new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRe(t)}(?![\\p{L}\\p{N}_])`, 'iu')]);
+}
+export function writingRecordErrors(kind, data, { vendorUrls = new Set() } = {}) {
+  const d = isPlainObject(data) ? data : {};
+  const e = [];
+  const need = key => { if (!hasValue(d[key])) e.push(`needs data.${key}`); };
+  const oneOf = (key, values) => { if (!values.includes(d[key])) e.push(`data.${key} must be one of ${values.join('|')} (got ${JSON.stringify(d[key])})`); };
+  switch (kind) {
+    case 'proposal':
+      oneOf('target', PROPOSAL_TARGETS);
+      for (const k of ['section', 'current', 'proposed', 'reason', 'source']) need(k);
+      break;
+    case 'practice':
+      if (!httpUrl(d.url)) e.push('needs data.url, an http(s) link');
+      need('date');
+      oneOf('publisher_type', PUBLISHER_TYPES);
+      break;
+    case 'method': {
+      const sources = Array.isArray(d.sources) ? d.sources : [];
+      const urls = sources.map(s => (typeof s === 'string' ? s : s?.url)).map(u => (typeof u === 'string' ? u.trim() : u));
+      if (urls.length < 2 || !urls.every(httpUrl)) { e.push('needs data.sources, an array of at least two http(s) links'); break; }
+      const vendor = sources.map((s, i) => (isPlainObject(s) && s.publisher_type === 'vendor') || vendorUrls.has(urls[i]));
+      if (vendor.filter(Boolean).length > 1) e.push('data.sources carries more than one vendor practice -- a vendor only corroborates');
+      const independent = new Set(urls.filter((u, i) => !vendor[i]).map(hostOf));
+      if (independent.size < 2) e.push(`data.sources needs two independent non-vendor sources on two distinct hosts (got ${independent.size})`);
+      break;
+    }
+    case 'fact_candidate':
+      need('statement');
+      break;
+    default: break;
+  }
+  return e;
+}
+export function validateWritingAnswer(capability, answer, rules = [], { principal = false, practices = [] } = {}) {
+  const errors = [];
+  if (!isPlainObject(answer)) return { ok: false, errors: ['the answer must be a JSON object'] };
+  if (capability !== undefined && !Object.prototype.hasOwnProperty.call(WRITING_READ_MAP, capability)) {
+    errors.push(`capability "${capability}" is not in WRITING_READ_MAP`);
+  }
+  const allowedKinds = principal ? WRITING_PRINCIPAL_KINDS : WRITING_MODEL_KINDS;
+  const items = Array.isArray(answer.records_to_write) ? answer.records_to_write : null;
+  if (!items) errors.push('the answer carries no records_to_write array');
+  const vendorUrls = new Set();
+  for (const p of [...(practices ?? []), ...(items ?? [])]) {
+    if (p?.kind !== undefined && p.kind !== 'practice') continue;
+    if (p?.data?.publisher_type === 'vendor' && typeof p.data.url === 'string') vendorUrls.add(p.data.url.trim());
+  }
+  const statements = [];
+  for (const [i, item] of (items ?? []).entries()) {
+    if (!isPlainObject(item)) { errors.push(`records_to_write[${i}] is not an object`); continue; }
+    if (!WRITING_KINDS.includes(item.kind)) { errors.push(`records_to_write[${i}] has unknown kind "${item.kind}"`); continue; }
+    if (!allowedKinds.includes(item.kind)) {
+      errors.push(`records_to_write[${i}] is a ${item.kind}: ${principal ? 'a --principal write carries only correction and grade' : "that kind is the principal's word, never a model answer"}`);
+      continue;
+    }
+    if (typeof item.title !== 'string' || !item.title.trim()) errors.push(`records_to_write[${i}] (${item.kind}) has no title`);
+    if (item.data !== undefined && !isPlainObject(item.data)) { errors.push(`records_to_write[${i}].data must be an object`); continue; }
+    for (const e of writingRecordErrors(item.kind, item.data, { vendorUrls })) errors.push(`records_to_write[${i}] (${item.kind}) ${e}`);
+    if (item.kind === 'fact_candidate' && hasValue(item.data?.statement)) statements.push(String(item.data.statement).trim());
+  }
+  // Write guard 2: a draft that states a waiting fact as fact.
+  for (const [i, item] of (items ?? []).entries()) {
+    if (!isPlainObject(item) || item.kind !== 'draft') continue;
+    const texts = eachString({ title: item.title, body: item.body, data: item.data }, `records_to_write[${i}]`, []).map(([, s]) => s);
+    for (const st of statements) {
+      if (texts.some(s => s.includes(st))) errors.push(`records_to_write[${i}] (draft "${item.title}") states a waiting fact as fact: a fact_candidate's statement is not a fact until the principal ticks it`);
+    }
+  }
+  // Write guard 1: no blocked client term anywhere in the answer, whole word, any case.
+  const terms = blockedTermRes(rules);
+  for (const [at, s] of eachString(answer, 'answer', [])) {
+    for (const [term, re] of terms) {
+      if (!re.test(s)) continue;
+      const m = /^answer\.records_to_write\[(\d+)\]/.exec(at);
+      const rec = m && items?.[Number(m[1])];
+      const where = rec ? `records_to_write[${m[1]}] (${rec.kind} "${rec.title}")` : at;
+      errors.push(`${where} names the blocked client term "${term}" -- a client is never named in a writing record`);
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+// --write on a writing slug: load the rule rows and the stored practices, check the whole answer
+// first (exit 2, nothing written), then ONE writing_records insert. Never a DELETE, never a PATCH.
+async function writeWriting(args, answer) {
+  const stop = message => { console.error(`personal-agent: ${message}`); process.exitCode = 2; };
+  const db = rest();
+  let rules;
+  let practices;
+  try {
+    rules = await db.get('writing_records?kind=eq.rule&select=data&order=id.asc');
+    practices = await db.get('writing_records?kind=eq.practice&select=kind,data&order=id.asc');
+  } catch (e) { return stop(e.message); }
+  const check = validateWritingAnswer(args.capability, answer, rules, { principal: Boolean(args.principal), practices });
+  if (!check.ok) return stop(`answer refused, nothing written: ${check.errors.join('; ')}`);
+  const source = `${args.capability} ${new Date().toISOString().slice(0, 10)}`;
+  const session_name = args.sessionName || null;
+  const rows = answer.records_to_write.map(item => ({
+    kind: item.kind, title: item.title, body: item.body ?? null, data: item.data ?? {}, source, session_name,
+  }));
+  let inserted = [];
+  if (rows.length) {
+    try { inserted = await db.insert('writing_records', rows); } catch (e) { return stop(e.message); }
+  }
+  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id) }) + '\n');
 }
 
 // --- AGT-650: --tick / --untick, the attended confirm -------------------------------------------
