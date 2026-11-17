@@ -1,3 +1,7 @@
+// DeepBench v7.0.1049 | tests/regression/agt-317-routine-turn-timings.test.mjs | AGT-317 -- arm E:
+// a transcript holding an hour-long turn is set aside and named; the writing speed is printed per
+// lane, alone beside with a peer; a session's wall time is split; a chained cycle is counted by
+// where its start and end fall.
 // DeepBench v7.0.1043 | tests/regression/agt-317-routine-turn-timings.test.mjs | AGT-317 -- arm D:
 // the report attributes by what a transcript itself says (kind + served model), every read is
 // paged, and the coverage lines count by cycle id and never by swept_by.
@@ -11,6 +15,8 @@
 //               never decides an exit code on it; the CLI's exits; the migration mirror's grants.
 //   D  OFFLINE  (v7.0.1043) who a row is about: lane = kind + served model; the coverage counts
 //               joined on the cycle id; and reads that page past 1,000 rows.
+//   E  OFFLINE  (v7.0.1049) what the report says the cause is: the idle set-aside, the writing
+//               speed per lane and arm, where a session's wall time went, and chained cycles.
 //   C  LIVE     (SUPABASE_URL + SUPABASE_SERVICE_KEY; notRun otherwise) the table takes an upsert
 //               on (session_id, transcript), refuses a row whose slow counts do not add up, and
 //               is closed to the browser key. Its own rows are deleted before it returns.
@@ -24,9 +30,9 @@ import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   classifyTurn, measureTranscript, findTranscripts, localRows, sweep, verdict,
-  SLOW_TURN_MS, WAIT_TOKENS_PER_SEC, MIN_SESSIONS, TABLE,
+  SLOW_TURN_MS, WAIT_TOKENS_PER_SEC, MIN_SESSIONS, TABLE, IDLE_TURN_MS, idleRow, laneOf as libLaneOf,
 } from "../../scripts/lib/turn-timings.mjs";
-import { parseArgs, routineOf, summarize, laneOf, coverage, coverageLines, readAll, PAGE } from "../../scripts/measure-routine-turns.js";
+import { parseArgs, routineOf, summarize, laneOf, coverage, coverageLines, readAll, PAGE, timeSplit, splitLine, speedLine, idleLine } from "../../scripts/measure-routine-turns.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = rel => fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -167,7 +173,7 @@ function armSource() {
   assert.deepEqual(summarize([
     { swept_by: "jerry:a", cycle_id: null, turns: 4, turn_ms: 297000, tool_ms: 14000, slow_turns: 2, slow_generating: 1, slow_waiting: 1, max_ms: 200000 },
     { swept_by: "jerry:a", cycle_id: null, turns: 1, turn_ms: 1400, tool_ms: 0, slow_turns: 0, slow_generating: 0, slow_waiting: 0, max_ms: 1400 },
-  ], r => routineOf(r)), [{ key: "jerry", transcripts: 2, turns: 5, turn_s: 298, tool_s: 14, slow: 2, generating: 1, waiting: 1, max_s: 200 }]);
+  ], r => routineOf(r)), [{ key: "jerry", transcripts: 2, turns: 5, turn_s: 298, tool_s: 14, slow: 2, generating: 1, waiting: 1, max_s: 200, out: 0 }]);
   const cli = read("scripts/measure-routine-turns.js");
   assert.ok(cli.includes('process.exit(v.verdict === "not-enough-runs" ? 3 : 0);'), "not-enough-runs is exit 3, an answer and not a failure");
 
@@ -216,8 +222,8 @@ async function armAttribution() {
   const c = coverage(stored, cycles, logged);
   assert.equal(c.since, at(100));
   assert.deepEqual(c.lanes, [
-    { key: "runner:CDy5Yd", cycles: 1, stored: 0, did_not_run: 0, ran_unstored: 1 },
-    { key: "runner:KURqMH", cycles: 2, stored: 1, did_not_run: 1, ran_unstored: 0 },
+    { key: "runner:CDy5Yd", cycles: 1, stored: 0, did_not_run: 0, ran_in_span: 0, ran_outside: 1 },
+    { key: "runner:KURqMH", cycles: 2, stored: 1, did_not_run: 1, ran_in_span: 0, ran_outside: 0 },
   ]);
   assert.deepEqual(c.agents, [
     { agent: "auditor", turns: 1, in_stored_cycle: 0, in_unstored_cycle: 0, no_cycle: 1 },
@@ -226,8 +232,8 @@ async function armAttribution() {
   assert.deepEqual([c.turns, c.in_stored_cycle, c.in_unstored_cycle, c.no_cycle], [3, 1, 1, 1]);
   const lines = coverageLines(c);
   assert.equal(lines.length, 6);
-  assert.equal(lines[1], "runner:CDy5Yd  cycles 1  stored 0  did not run 0  ran and stored nothing 1");
-  assert.equal(lines[3], "AGENT TURNS LOGGED SINCE THEN: 3 -- 1 in a cycle with stored timing, 1 in a cycle with none, 1 outside any cycle");
+  assert.equal(lines[1], "runner:CDy5Yd  cycles 1  stored 0  did not run 0  ran inside a stored session of its trigger 0  ran outside any 1");
+  assert.equal(lines[3], "AGENT TURNS LOGGED SINCE THEN: 3 -- 1 in a cycle with stored timing (under its id, or inside a stored session of its trigger), 1 in a cycle with none, 1 outside any cycle");
   assert.equal(lines[4], "LOGGED IN A CYCLE WITH NO STORED TIMING: builder 1");
   assert.equal(lines[5], "LOGGED OUTSIDE ANY CYCLE (nothing stored ties these to a session; not a claim they went unmeasured): auditor 1");
   assert.ok(!lines.join("\n").includes("trenton"), "a turn logged before the first stored sweep is not called unmeasured");
@@ -254,6 +260,89 @@ async function armAttribution() {
   assert.ok(!cli.includes("LOGGED A TURN BUT STORED NO TIMING"), "the line that named agents by swept_by is gone");
   assert.ok(!cli.includes("limit=10000"), "no single capped read is left");
   assert.ok(!cli.includes("const measured = new Set("), "no measured-set is built from swept_by");
+}
+
+// E OFFLINE. What the report says the cause is, on rows written here.
+function armCause() {
+  assert.equal(IDLE_TURN_MS, 3600000);
+  assert.deepEqual([{ max_ms: 3599999 }, { max_ms: 3600000 }, {}, null].map(idleRow), [false, true, false, false]);
+  assert.equal(laneOf, libLaneOf, "one laneOf: the report re-exports the library's");
+
+  // Twenty sessions whose slow turns are all the model writing, and one transcript left open for a
+  // day: it spans every other session and holds the only waiting turn.
+  const writing = many(20, { slow_turns: 5, slow_generating: 5, max_ms: 90000 });
+  const open = row("left-open", 0, { last_at: at(300000), turns: 89, slow_turns: 1, slow_waiting: 1, max_ms: 86795215 });
+  const v = verdict([...writing, open]);
+  assert.deepEqual([v.verdict, v.sessions, v.transcripts, v.turns, v.slow, v.waiting, v.set_aside], ["generation", 20, 20, 2000, 100, 0, 1]);
+  assert.deepEqual([v.alone.transcripts, v.peers.transcripts], [20, 0], "a transcript set aside is nobody's peer");
+  const kept = verdict([...writing, { ...open, max_ms: 3599999 }]);
+  assert.deepEqual([kept.sessions, kept.waiting, kept.set_aside, kept.peers.transcripts], [21, 1, 0, 21], "one millisecond under the bar it is an ordinary transcript");
+  assert.equal(idleLine(writing), "SET ASIDE: none -- no stored transcript holds a turn of 1 h or longer");
+  assert.equal(idleLine([...writing, { ...open, session_id: "dec7e575-cb73-48e3-8f47-eb0ca2484fb2", transcript: "main" }]),
+    "SET ASIDE: 1 transcript(s) holding a turn of 1 h or longer -- a session left open, not a model at work; in no line of this report: dec7e575 main (longest 86795s)");
+
+  // Writing speed: two lanes, and one lane in both arms. s1 and s2 overlap; s0 and s3 run alone.
+  const w = (session, startS, kind, model, turn_ms, output_tokens) => row(session, startS, { kind, model, turn_ms, output_tokens });
+  const sp = verdict([
+    w("s0", 0, "main", "m1", 100000, 7000),
+    w("s1", 10000, "main", "m1", 100000, 7200), w("s2", 10100, "main", "m1", 100000, 7200),
+    w("s3", 20000, "subagent", "m2", 50000, 6000),
+  ]).speed;
+  assert.deepEqual(sp, { all: 78.3, lanes: [
+    { lane: "main m1", alone: { turns: 100, per_sec: 70 }, peers: { turns: 200, per_sec: 72 } },
+    { lane: "subagent m2", alone: { turns: 100, per_sec: 120 }, peers: { turns: 0, per_sec: null } },
+  ] });
+  assert.equal(speedLine(sp.lanes[0]), "main m1                    alone 70 over 100 turn(s) | with another session live 72 over 200 turn(s)");
+  assert.equal(speedLine(sp.lanes[1]), "subagent m2                alone 120 over 100 turn(s) | with another session live — over 0 turn(s)");
+  assert.deepEqual(verdict([]).speed, { all: null, lanes: [] });
+  assert.equal(summarize([{ turns: 4, turn_ms: 100000, tool_ms: 0, slow_turns: 0, slow_generating: 0, slow_waiting: 0, max_ms: 1, output_tokens: 7000 },
+    { turns: 1, turn_ms: 50000, tool_ms: 0, slow_turns: 0, slow_generating: 0, slow_waiting: 0, max_ms: 1, output_tokens: 2400 }], () => "k")[0].out, 9400);
+  const cli = read("scripts/measure-routine-turns.js");
+  assert.ok(cli.includes('output ${g.out} tok (${g.turn_s ? Math.round((g.out / g.turn_s) * 10) / 10 : "—"}/s)'), "every summary line carries the tokens written and the speed");
+  assert.ok(cli.includes("const kept = stored.filter(r => !idleRow(r));") && cli.includes("summarize(kept, ") && !cli.includes("summarize(stored, "),
+    "no summary line is built over a transcript that was set aside");
+
+  // Where a session's wall time went: a main transcript and its two sub-agents; a session that
+  // stored no main transcript says nothing.
+  const t = (session_id, kind, firstS, lastS, turn_ms, tool_ms) => ({ session_id, kind, first_at: at(firstS), last_at: at(lastS), turn_ms, tool_ms });
+  const split = timeSplit([
+    t("a", "main", 0, 1000, 400000, 600000), t("a", "subagent", 100, 400, 250000, 50000), t("a", "subagent", 500, 900, 390000, 10000),
+    t("b", "subagent", 0, 50, 50000, 0),
+  ], () => "runner:KURqMH");
+  assert.deepEqual(split, [{ key: "runner:KURqMH", sessions: 1, wall_s: 1000, own_s: 400, tool_s: 600, sub_transcripts: 2, sub_span_s: 700 }]);
+  assert.equal(splitLine(split[0]), "runner:KURqMH  sessions 1  wall 1000s  own model turns 400s (40%)  tool calls 600s (60%); its 2 sub-agent transcript(s) span 700s");
+
+  // Chained cycles: one session of trigger KURqMH ran from 0 to 1,000 s and its rows carry the LAST
+  // cycle's id. A cycle with no row under its id is inside that span, or it is not.
+  const K = "DEEPBENCH-RUNNER-AUTOMATED-trig_017TZ3JZcLBK6AYH6DKURqMH", Y = "DEEPBENCH-RUNNER-AUTOMATED-trig_01AAMaJbdt2ye6hMMpCDy5Yd";
+  const id = n => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`;
+  const stored = [
+    { session_id: "early", transcript: "main", kind: "main", cycle_id: null, swept_by: "jerry:job-alerts", recorded_at: at(10), first_at: at(0), last_at: at(9) },
+    { session_id: "chain", transcript: "main", kind: "main", cycle_id: id(8), swept_by: "designer:design-kickoff", recorded_at: at(1000), first_at: at(0), last_at: at(1000) },
+  ];
+  const cycles = [
+    { id: id(8), stamp: K, started_at: at(900), ended_at: at(990), outcome: "gated_before_build" },   // the id the rows carry
+    { id: id(7), stamp: K, started_at: at(100), ended_at: at(200), outcome: "gated_before_build" },   // chained: inside the span
+    { id: id(6), stamp: K, started_at: at(950), ended_at: at(1100), outcome: "gated_before_build" },  // ends after the last sweep
+    { id: id(5), stamp: Y, started_at: at(100), ended_at: at(200), outcome: "shipped" },               // another trigger, same minutes
+    { id: id(4), stamp: K, started_at: at(300), ended_at: null, outcome: null },                       // still running
+    { id: id(3), stamp: K, started_at: at(400), ended_at: at(401), outcome: "did_not_run" },
+  ];
+  const logged = [
+    { agent_id: "designer", visitor_id: id(7), created_at: at(150) },
+    { agent_id: "architect", visitor_id: id(6), created_at: at(1050) },
+  ];
+  const c = coverage(stored, cycles, logged);
+  assert.deepEqual(c.lanes, [
+    { key: "runner:CDy5Yd", cycles: 1, stored: 0, did_not_run: 0, ran_in_span: 0, ran_outside: 1 },
+    { key: "runner:KURqMH", cycles: 5, stored: 1, did_not_run: 1, ran_in_span: 1, ran_outside: 2 },
+  ]);
+  assert.deepEqual([c.turns, c.in_stored_cycle, c.in_unstored_cycle, c.no_cycle], [2, 1, 1, 0], "a turn logged in a chained cycle is in a cycle with stored timing");
+  const lines = coverageLines(c);
+  assert.equal(lines[2], "runner:KURqMH  cycles 5  stored 1  did not run 1  ran inside a stored session of its trigger 1  ran outside any 2");
+  assert.equal(lines[4], "LOGGED IN A CYCLE WITH NO STORED TIMING: architect 1");
+  assert.ok(lines[0].includes("a session that chains cycles keeps one cycle id on its rows (AGT-697)"));
+  assert.ok(!cli.includes("ran and stored nothing") && !cli.includes("ran_unstored"), "the alarm column that counted chained cycles as unmeasured is gone");
 }
 
 async function armLive(base, key) {
@@ -297,7 +386,8 @@ async function run() {
   armVerdict();
   armSource();
   await armAttribution();
-  const results = ["A measure+sweep+verdict", "B source", "D attribution+coverage+paging"];
+  armCause();
+  const results = ["A measure+sweep+verdict", "B source", "D attribution+coverage+paging", "E idle+speed+split+chained"];
   const base = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = process.env.SUPABASE_SERVICE_KEY ?? "";
   if (!base || !key) {

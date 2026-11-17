@@ -1,3 +1,9 @@
+// DeepBench v7.0.1049 | scripts/lib/turn-timings.mjs | AGT-317 -- a transcript holding a turn of
+// IDLE_TURN_MS or longer is a session left open, not a model at work: verdict() sets it aside and
+// says how many. verdict() also returns the writing speed -- output tokens per second of model
+// time -- over every kept turn, and per lane alone beside with another session live: the one
+// measurement that separates a model writing from a model slowed by a peer. Never one figure
+// across lanes, because lanes write at different speeds and the mix differs by arm (pattern:56).
 // DeepBench v7.0.1038 | scripts/lib/turn-timings.mjs | AGT-317
 //
 // How long the model took between tool calls, read from the harness's own transcript.
@@ -26,6 +32,13 @@ export const WAIT_TOKENS_PER_SEC = 20;
 export const MIN_SESSIONS = 20;
 export const PEER_OVERLAP_MS = 60000;
 export const TABLE = "routine_turn_timings";
+// No model call spans an hour. Measured 2026-11-17 over 86 stored transcripts: the longest turn
+// that wrote at writing speed is 427 s; the one turn above it is 86,795 s, in a session opened one
+// day and picked up the next. Declared, not fitted (pattern:18).
+export const IDLE_TURN_MS = 3600000;
+export const idleRow = r => (r?.max_ms ?? 0) >= IDLE_TURN_MS;
+// The lane a transcript ran in, from the two facts the transcript itself gave.
+export const laneOf = row => `${row.kind ?? "kind-unknown"} ${row.model ?? "model-unknown"}`;
 
 export function classifyTurn(ms, outputTokens) {
   if (ms < SLOW_TURN_MS) return "fast";
@@ -151,11 +164,14 @@ export async function sweep({ env = process.env, fsImpl = fs, fetchImpl = fetch,
 
 // The answer to "which is it", over stored rows. Counts first, one word last.
 export function verdict(rows) {
-  const list = Array.isArray(rows) ? rows : [];
+  const all = Array.isArray(rows) ? rows : [];
+  const list = all.filter(r => !idleRow(r));
   const span = r => [Date.parse(r.first_at), Date.parse(r.last_at)];
   const arm = () => ({ transcripts: 0, turns: 0, slow_waiting: 0, per_1000: null });
   const alone = arm(), peers = arm();
   let turns = 0, slow = 0, generating = 0, waiting = 0;
+  const total = [0, 0], wrote = new Map();
+  const perSec = ([tokens, ms]) => (ms > 0 ? Math.round((tokens / (ms / 1000)) * 10) / 10 : null);
   for (const r of list) {
     const [a, b] = span(r);
     const others = new Set();
@@ -165,6 +181,11 @@ export function verdict(rows) {
       if (Math.min(b, d) - Math.max(a, c) >= PEER_OVERLAP_MS) others.add(o.session_id);
     }
     const side = others.size ? peers : alone;
+    const w = wrote.get(laneOf(r)) ?? { alone: [0, 0, 0], peers: [0, 0, 0] };
+    const cell = w[others.size ? "peers" : "alone"];
+    for (const c of [total, cell]) { c[0] += r.output_tokens ?? 0; c[1] += r.turn_ms ?? 0; }
+    cell[2] += r.turns;
+    wrote.set(laneOf(r), w);
     side.transcripts += 1; side.turns += r.turns; side.slow_waiting += r.slow_waiting;
     turns += r.turns; slow += r.slow_turns; generating += r.slow_generating; waiting += r.slow_waiting;
   }
@@ -180,5 +201,8 @@ export function verdict(rows) {
     word = alone.turns && peers.turns && peers.per_1000 >= 2 * alone.per_1000 && peers.per_1000 > 0
       ? "waiting-with-peers" : "waiting";
   } else word = "mixed";
-  return { verdict: word, sessions, transcripts: list.length, turns, slow, generating, waiting, alone, peers };
+  return { verdict: word, sessions, transcripts: list.length, turns, slow, generating, waiting, alone, peers,
+    set_aside: all.length - list.length,
+    speed: { all: perSec(total), lanes: [...wrote.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([lane, w]) => ({ lane,
+      alone: { turns: w.alone[2], per_sec: perSec(w.alone) }, peers: { turns: w.peers[2], per_sec: perSec(w.peers) } })) } };
 }
