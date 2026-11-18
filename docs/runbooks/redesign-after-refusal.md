@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.1057 | runbooks/redesign-after-refusal.md | AGT-680 — door (d): the cooldown marker is written after the pickup and names the ticket it took. -->
 <!-- DeepBench v7.0.1004 | runbooks/redesign-after-refusal.md | AGT-642 — door (d): redesign-first fires ahead of any new pick. -->
 <!-- DeepBench v7.0.977 | runbooks/redesign-after-refusal.md | AGT-610 — a refused ticket is redesigned twice, then diagnosed (John, standing decision 6e94edcb, 2026-11-05). -->
 
@@ -41,10 +42,16 @@ There are three doors and a cycle meets each of them where it already looks:
   wall, the database gate and `lanes_full`, but **ahead of any new pick** — and names the ticket in
   `detail.redesign_ticket` (`public.redesign_due_ticket()`: `refusal_parked_tickets()` minus a ticket
   whose gate card was ruled John's and minus one a redesign cycle was handed in the last 24 hours).
-  Set `last_step` to `redesign: <that id>` FIRST — that is the cooldown marker, so a pickup that ends
-  without an attempt lets the next parked ticket have its turn — then run `--next`, which takes that
-  same ticket, and continue at section 3. Undecided gate cards come before this: `rule-cards-only`
-  now fires with work pickable too (2-hour retry, `last_step` `rule-cards: <n>`).
+  Run `--next` FIRST, while your own row carries no `redesign:` marker: it re-reads
+  `redesign_due_ticket()` and takes the ticket that function names then. THEN set `last_step` to
+  `redesign: <the id --next printed>` — the cooldown marker, naming the ticket the pickup took, so a
+  pickup that ends without an attempt lets the next parked ticket have its turn — and continue at
+  section 3. Never the marker first (`AGT-680`): the cooldown has no exception for the asking cycle,
+  so a marker written before the pickup cooled the very ticket the gate named and `--next` took the
+  next one down. An id that differs from `detail.redesign_ticket` means another cycle marked that
+  ticket in between; yours is the one `--next` printed. The next heartbeat's `last_step` erases the
+  marker unless it keeps this prefix (`AGT-689`). Undecided gate cards come before this:
+  `rule-cards-only` now fires with work pickable too (2-hour retry, `last_step` `rule-cards: <n>`).
 
 ## 3. The pickup (`--next`)
 
@@ -52,8 +59,10 @@ There are three doors and a cycle meets each of them where it already looks:
 node scripts/redesign-pickup.js --next [--out=<task.json>]
 ```
 
-The candidate is **row 1** of `refusal_parked_tickets()` (ordered `need_score desc`, then `queue`,
-then id). The task file carries the ticket row and a `redesign` block — `attempt_no`, `basis` (the
+The candidate is the ticket `public.redesign_due_ticket()` names — `refusal_parked_tickets()`
+(ordered `need_score desc`, then `queue`, then id) minus John's cards and the 24-hour cooldown —
+and **row 1** of that list when it names none (`AGT-642`).
+The task file carries the ticket row and a `redesign` block — `attempt_no`, `basis` (the
 latest unresolved skip's own reason text), `never_send` (every action already refused on this
 ticket), `kickoff_link`. Exit 3 means the file is written and the Designer's answer is awaited.
 
