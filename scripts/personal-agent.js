@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1053 | scripts/personal-agent.js | AGT-725 -- a fixed read `profile_facts` (readProfileFacts) on four writing slugs: every current facts-section item in full, the newest LinkedIn profile's headline/About and current-role sections, and the current master resume, outside the ranked Library budget and capped at PROFILE_FACTS_BYTES (the master resume cut first, the facts never); readLibrary drops the same items from its text plan (libraryTextSkips) so nothing travels twice, catalog unchanged.
+// Kickoff: docs/kickoffs/v7.0.1053-AGT-725-laura-fixed-reads.md.
 // DeepBench v7.0.1052 | scripts/personal-agent.js | AGT-722 -- a fifth record store (writing_records): WRITING_READ_MAP over the ten writing kinds, every correction and grade on every render, the deny-aware Library read (personal_source_denies drops items before ranking; a client_private item outside LIBRARY_PRIVATE_SECTIONS drops too), the writing team reads (career, strategy facts, market messaging, the idea board as direction only, the postings marked apply), validateWritingAnswer() with two write guards (blocked client terms; a waiting fact stated as fact), and writeWriting() (one insert, never a DELETE or PATCH).
 // Kickoff: docs/kickoffs/v7.0.1052-AGT-722-laura-call-path.md.
 // DeepBench v7.0.1019 | scripts/personal-agent.js | AGT-665 -- strategy writes file market-check leads.
@@ -322,6 +324,14 @@ export const LIBRARY_UNSECTIONED_HEADS = { 'strategy-library-curate': 2000 };
 // highest-trust material first instead of whatever happens to sort first (the humorist's 1.2 MB lesson).
 export const LIBRARY_BYTES = 60000;
 export const LIBRARY_ITEM_CHARS = 12000;
+// AGT-725: the fixed read's own hard cap, outside LIBRARY_BYTES; past it the master resume is cut first,
+// then the profile text, never the facts. The selectors that name its items (data, never an agent id).
+export const PROFILE_FACTS_BYTES = 40000;
+export const PROFILE_FACTS_SECTION = 'facts';
+export const PROFILE_KIND = 'linkedin_profile';
+export const MASTER_RESUME_KIND = 'resume';
+export const MASTER_RESUME_TITLE = /current master/i;
+export const CURRENT_ROLE_DATES = /present/i;
 // Kinds that reach the catalog as one count line each, never row by row (141 voice samples on 2026-11-11).
 export const LIBRARY_COUNT_ONLY_KINDS = ['linkedin_post', 'linkedin_comment'];
 // The research verdict an idea-board read keeps per entry when the agent has no note column (AGT-647).
@@ -408,6 +418,9 @@ const STRATEGY_EXTRA_READS = ['library', 'market', 'career', 'napkin', 'week'];
 const MENTOR_READS = ['memory', 'product'];
 const WRITING_BASE_READS = ['library', 'goals'];
 const WRITING_TEAM_READS = ['career_writing', 'strategy_facts', 'market_messaging', 'napkin_direction'];
+// AGT-725: the fixed read of the confirmed facts, the current LinkedIn text and the master resume, listed
+// FIRST so it reaches the task context before the ranked Library (facts first is the guardrail's order).
+const WRITING_FIXED_READS = ['profile_facts', ...WRITING_BASE_READS];
 export const EXTRA_READS = {
   'career-linkedin-alerts': 'competitors',
   'humor-weekly-draft': HUMOR_EXTRA_READS,
@@ -437,10 +450,11 @@ export const EXTRA_READS = {
   // AGT-722: every writing slug reads the Library and the goals; all but the watch read the career,
   // strategy, market and idea-board stores (each cut to WRITING_TEAM_BYTES); the pre-draft also reads
   // the postings marked apply that carry no draft yet. Readers name tables, never agents.
-  'writing-tailor': [...WRITING_BASE_READS, ...WRITING_TEAM_READS],
-  'writing-draft': [...WRITING_BASE_READS, ...WRITING_TEAM_READS],
-  'writing-weekly-check': [...WRITING_BASE_READS, ...WRITING_TEAM_READS],
-  'writing-predraft': [...WRITING_BASE_READS, ...WRITING_TEAM_READS, 'postings_marked'],
+  // AGT-725: all but the watch also read `profile_facts` (WRITING_FIXED_READS).
+  'writing-tailor': [...WRITING_FIXED_READS, ...WRITING_TEAM_READS],
+  'writing-draft': [...WRITING_FIXED_READS, ...WRITING_TEAM_READS],
+  'writing-weekly-check': [...WRITING_FIXED_READS, ...WRITING_TEAM_READS],
+  'writing-predraft': [...WRITING_FIXED_READS, ...WRITING_TEAM_READS, 'postings_marked'],
   'writing-watch': WRITING_BASE_READS,
 };
 // AGT-650: the team reads a strategy render carries are cut to these byte budgets, the rows that share
@@ -1069,10 +1083,12 @@ async function readLibrary(db, args) {
   // query, an RPC error or no hit: the trust order alone, as before. Goals-section items are left to
   // the `goals` block when the slug reads it, so their text never travels twice.
   const skipKinds = new Set(LIBRARY_TEXT_SKIP_KINDS[args.capability] ?? []);
-  const skipSections = new Set([].concat(EXTRA_READS[args.capability] ?? []).includes('goals') ? ['goals'] : []);
+  // AGT-725: likewise the facts section, the profile and the master resume when the slug reads
+  // `profile_facts` (libraryTextSkips); they stay catalog lines.
+  const { skipSections, skipIds } = libraryTextSkips(args.capability, catalog);
   const query = strategyQuery(args);
   const search = query ? await libraryHits(db, query, { agentId: args.agent }) : { hits: [], method: 'trust' };
-  const plan = libraryPlan(catalog, search.hits, { wanted, skipKinds, skipSections });
+  const plan = libraryPlan(catalog, search.hits, { wanted, skipKinds, skipSections, skipIds });
   const full = plan.map(p => p.id);
   const onlySections = new Map(plan.filter(p => p.sections).map(p => [p.id, p.sections]));
   const heads = headChars ? catalog.filter(c => !c.section).map(c => c.id) : [];
@@ -1166,9 +1182,9 @@ export async function libraryHits(db, query, opts = {}) {
 // Pure. Which catalog items are read as text, in what order, and (for an item the search reached only
 // through some of its sections) which sections: search hits first by best score, then the capability's
 // own sections in trust order. A skipped kind or section is never text.
-export function libraryPlan(catalog, hits, { wanted = new Set(), skipKinds = new Set(), skipSections = new Set() } = {}) {
+export function libraryPlan(catalog, hits, { wanted = new Set(), skipKinds = new Set(), skipSections = new Set(), skipIds = new Set() } = {}) {
   const byId = new Map(catalog.map(c => [c.id, c]));
-  const eligible = c => c && !skipKinds.has(c.kind) && !(c.section && skipSections.has(c.section));
+  const eligible = c => c && !skipKinds.has(c.kind) && !(c.section && skipSections.has(c.section)) && !skipIds.has(c.id);
   const best = new Map();
   const whole = new Set();
   const sections = new Map();
@@ -1297,6 +1313,106 @@ async function readGoals(db) {
     items: trustOrder(items).map(row => ({ id: row.id, title: row.title, text: cutItem(row.body) })),
     kpis: [...latest.values()],
   };
+}
+
+// --- AGT-725: the fixed read of the profile and the confirmed facts -------------------------------
+//
+// Newest first: doc_date, then id (both descending).
+const newestFirst = rows => [...rows].sort((a, b) => String(b.doc_date ?? '').localeCompare(String(a.doc_date ?? ''))
+  || String(b.id).localeCompare(String(a.id)));
+// Pure. Which rows the fixed read names: the newest current linkedin_profile item and the current resume
+// whose title matches MASTER_RESUME_TITLE (each null when there is none).
+export function profileFactsPick(rows) {
+  const current = (rows ?? []).filter(r => r && (r.status == null || r.status === 'current'));
+  const profile = newestFirst(current.filter(r => r.kind === PROFILE_KIND))[0] ?? null;
+  const master = newestFirst(current.filter(r => r.kind === MASTER_RESUME_KIND && MASTER_RESUME_TITLE.test(String(r.title ?? ''))))[0] ?? null;
+  return { profile, master };
+}
+// Pure. What a capability's Library text plan leaves to its own extra reads: the goals section when it
+// reads `goals`; the facts section, the profile and the master resume when it reads `profile_facts`.
+export function libraryTextSkips(capability, catalog) {
+  const reads = [].concat(EXTRA_READS[capability] ?? []);
+  const skipSections = new Set();
+  const skipIds = new Set();
+  if (reads.includes('goals')) skipSections.add('goals');
+  if (reads.includes('profile_facts')) {
+    skipSections.add(PROFILE_FACTS_SECTION);
+    const { profile, master } = profileFactsPick(catalog);
+    if (profile) skipIds.add(profile.id);
+    if (master) skipIds.add(master.id);
+  }
+  return { skipSections, skipIds };
+}
+// Pure. A profile section is the current role when it is a position (`<title> | <company> | <dates>`)
+// whose last `|` field matches CURRENT_ROLE_DATES.
+export function isCurrentRole(heading) {
+  const parts = String(heading ?? '').split('|');
+  return parts.length >= 2 && CURRENT_ROLE_DATES.test(parts[parts.length - 1]);
+}
+const byteSize = v => Buffer.byteLength(JSON.stringify(v), 'utf8');
+// The longest head of `text` (with a cut marker) for which `whole(cut)` stays within `bytes`.
+function fitText(text, whole, bytes) {
+  const t = String(text ?? '');
+  const cut = keep => `${t.slice(0, keep)}\n[... cut: ${t.length - keep} more characters, over PROFILE_FACTS_BYTES]`;
+  let lo = 0, hi = t.length;
+  while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (byteSize(whole(cut(mid))) <= bytes) lo = mid; else hi = mid - 1; }
+  return cut(lo);
+}
+// Pure. The fixed read under `bytes`: the master resume's text is cut first (truncated: true), then the
+// profile sections' bodies from the last; the facts are never cut.
+export function capProfileFacts(block, bytes = PROFILE_FACTS_BYTES) {
+  if (!block) return block;
+  const out = { ...block };
+  if (byteSize(out) <= bytes) return out;
+  if (out.master_resume?.text) {
+    const m = { ...out.master_resume, truncated: true };
+    out.master_resume = m;
+    m.text = fitText(m.text, text => ({ ...out, master_resume: { ...m, text } }), bytes);
+  }
+  if (byteSize(out) > bytes && out.profile?.sections?.length) {
+    const sections = out.profile.sections.map(s => ({ ...s }));
+    out.profile = { ...out.profile, sections, truncated: true };
+    for (let i = sections.length - 1; i >= 0 && byteSize(out) > bytes; i--) {
+      const withBody = body => ({ ...out, profile: { ...out.profile, sections: sections.map((s, j) => (j === i ? { ...s, body } : s)) } });
+      sections[i].body = fitText(sections[i].body, withBody, bytes);
+    }
+  }
+  if (byteSize(out) > bytes) console.error(`personal-agent: profile_facts is ${byteSize(out)} bytes -- over ${bytes} by its facts alone, which are never cut`);
+  return out;
+}
+const joinSections = parts => parts.map(s => (s.heading ? `## ${s.heading}\n` : '') + (s.body ?? '')).join('\n\n');
+
+// `profile_facts`: every current facts-section item in full (trust order), the newest LinkedIn profile's
+// ord-0 section and current-role sections, and the current master resume in full -- each outside the
+// ranked Library and its LIBRARY_BYTES, the whole capped by capProfileFacts. `ids` (every item named)
+// is a non-enumerable property: readable by code, never serialized into the task context.
+async function readProfileFacts(db) {
+  const facts = await db.get(`personal_sources?section=eq.${PROFILE_FACTS_SECTION}&status=eq.current&select=id,title,kind,trust,doc_date,body&order=id.asc`);
+  const named = await db.get(`personal_sources?status=eq.current&kind=in.(${PROFILE_KIND},${MASTER_RESUME_KIND})&select=id,kind,title,doc_date,body&order=id.asc`);
+  const { profile, master } = profileFactsPick(named);
+  const ids = [...facts.map(f => f.id), ...(profile ? [profile.id] : []), ...(master ? [master.id] : [])];
+  if (!ids.length) return null;
+  const parts = await getByIds(db, 'personal_source_sections', 'source_id', ids, 'id,source_id,ord,heading,body', 'source_id.asc,ord.asc');
+  const sectionsOf = id => parts.filter(p => p.source_id === id).sort((a, b) => a.ord - b.ord);
+  const fullText = row => { const s = sectionsOf(row.id); return s.length ? joinSections(s) : String(row.body ?? ''); };
+  let profileOut = null;
+  if (profile) {
+    const s = sectionsOf(profile.id);
+    const head = s.find(p => p.ord === 0) ?? null;
+    const keep = s.filter(p => p === head || (p.ord > 0 && isCurrentRole(p.heading)));
+    profileOut = {
+      id: profile.id,
+      export_heading: head?.heading ?? null,
+      sections: keep.length ? keep.map(p => ({ heading: p.heading, body: p.body })) : [{ heading: profile.title, body: String(profile.body ?? '') }],
+    };
+  }
+  const block = capProfileFacts({
+    facts: trustOrder(facts).map(f => ({ id: f.id, title: f.title, kind: f.kind, trust: f.trust, text: fullText(f) })),
+    profile: profileOut,
+    master_resume: master ? { id: master.id, title: master.title, text: fullText(master) } : null,
+  });
+  Object.defineProperty(block, 'ids', { value: ids, enumerable: false });
+  return block;
 }
 
 // AGT-722. Pure. The catalog rows a capability may see: never a denied id; and, for a capability in
@@ -1508,6 +1624,8 @@ const EXTRA_READERS = {
   sources: readSources,
   product: readProduct,
   goals: readGoals,
+  // AGT-725
+  profile_facts: readProfileFacts,
 };
 
 async function render(args) {
