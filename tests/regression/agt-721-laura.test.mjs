@@ -1,10 +1,10 @@
-// DeepBench v7.0.1051 | tests/regression/agt-721-laura.test.mjs | AGT-721 -- Laura (CW-01): rows, store, grants, denies, north-star pin
+// DeepBench v7.0.1053 | tests/regression/agt-721-laura.test.mjs | AGT-721 -- Laura (CW-01): rows, store, grants, denies, north-star pin; live arm no longer pins is_active (hired 2026-11-17)
 //
 // FEATURE: AGT-721 -- Laura (CW-01), the principal's Career Writer for LinkedIn and resumes, a personal-lane agent
 // (migration agt721_writing_store: public.writing_records and public.personal_source_denies, RLS on, zero anon/authenticated
 // grants). Agent rows applied verbatim from docs/design/agt-721-laura-seed.sql (1 agent, 5 writing-* Capabilities, 10 cw-
 // Skills, 30 links, 1 north-star pin, 13 personal_source_grants by kind -- never connections -- and a per-item deny list of
-// the engagement and partner-proposal documents). is_active stays false: hiring her is the principal's word alone.
+// the engagement and partner-proposal documents). is_active is the principal's hire word alone (hired 2026-11-17).
 // Same arms as agt-653-trenton.test.mjs, re-prefixed, plus the grant and deny arm.
 // BASELINE: new file; on unchanged origin/dev (267c43b4) the live arm reads agents?id=eq.laura -> [] and cannot pass.
 
@@ -160,9 +160,13 @@ async function partE_live() {
     return r.json();
   };
 
-  assert.deepStrictEqual(await rest(`agents?id=eq.${SELF_ID}&select=code,lane,is_active`),
-    [{ code: "CW-01", lane: "personal", is_active: false }],
-    `agents row '${SELF_ID}' is not exactly [{code:'CW-01', lane:'personal', is_active:false}] -- is_active is the principal's hire, not this build's`);
+  // is_active is the principal's hire word (true since 2026-11-17, decision 92b3ef1b), never this build's, so the arm
+  // pins code and lane only and checks is_active is a boolean either way.
+  const row = await rest(`agents?id=eq.${SELF_ID}&select=code,lane,is_active`);
+  assert.strictEqual(row.length, 1, `agents row '${SELF_ID}' missing`);
+  assert.deepStrictEqual({ code: row[0].code, lane: row[0].lane }, { code: "CW-01", lane: "personal" },
+    `agents row '${SELF_ID}' is not {code:'CW-01', lane:'personal'}`);
+  assert.strictEqual(typeof row[0].is_active, "boolean", "is_active must be a boolean");
   results.push("live-laura-cw01-personal-inactive");
 
   const asgn = (await rest(`agent_capability_assignments?agent_id=eq.${SELF_ID}&select=capability_slug`)).map(r => r.capability_slug).sort();
