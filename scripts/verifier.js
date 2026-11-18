@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1056 | scripts/verifier.js | AGT-673 -- a kickoff naming apply_migration says who applies it.
 // DeepBench v7.0.991 | scripts/verifier.js | AGT-629 -- a test the pre-build tree genuinely LACKED is not an unmeasured red: `absentPreBuildFrom()` reads the `— ABSENT pre-build` lines `renderOut()` now writes, both baseline readers carry `absent` beside `measured`, and `baselineCoverageFinding()` exempts ONLY a name on such a line. Every other uncovered name still refuses (AGT-457) and `regressionDelta()` is untouched, so a red new test still blocks.
 // DeepBench v7.0.978 | scripts/verifier.js | AGT-609 -- every verdict carries a rules fingerprint; gradeDelivery() is the ONE grading path verify-ship and the re-grade lane share.
 // DeepBench v7.0.977 | scripts/verifier.js | AGT-610 -- the risk declaration: every task names what it touches, how far it reaches, how it is undone; graded for coverage, never for its decision.
@@ -2635,6 +2636,21 @@ export function kickoffRiskFinding(text, out = {}) {
   return null;
 }
 
+export const APPLY_CLAUSE = "apply";
+export const APPLY_LINE_FROM = [7, 0, 1057];
+export const APPLY_LINE = "**Apply:** orchestrator over the Supabase connector; Builder none";
+export function kickoffApplyFinding(text, out = {}) {
+  const t = String(text ?? "");
+  if (!t.includes("apply_migration")) { out.note = "apply: no apply_migration named (AGT-673)."; return null; }
+  if (t.split("\n").some(l => l.startsWith(APPLY_LINE))) { out.note = "apply: declared (AGT-673)."; return null; }
+  const s = kickoffStampVersion(t), f = APPLY_LINE_FROM;
+  const graded = s !== null && (s[0] !== f[0] ? s[0] > f[0] : s[1] !== f[1] ? s[1] > f[1] : s[2] >= f[2]);
+  if (!graded) { out.note = `NOT GRADED (AGT-673): stamp ${s ? "v" + s.join(".") : "absent"} predates v7.0.1057.`; return null; }
+  return { kind: "kickoff-no-lanes", clause: APPLY_CLAUSE, remedy_owner: KICKOFF_REMEDY_OWNER,
+    remedy: 're-assemble design-kickoff ONCE with "no_lanes":true; the caller never writes the Apply line',
+    reason: "kickoff apply declaration (AGT-673): apply_migration is named and no line starts `" + APPLY_LINE + "`. The apply is the orchestrator's connector call, never a Builder task; no connector, the step stops and the ticket parks." };
+}
+
 export function anchorBlockLines(text) {
   const lines = String(text ?? "").split("\n");
   let start = -1;
@@ -3876,6 +3892,7 @@ async function main() {
     if (risk) {
       return emit({ code: 1, payload: { ok: false, exitCode: 1, ...risk, risk_parts: riskOut.parts, risk_covered: riskOut.covered }, prose: risk.reason });
     }
+    const applyOut = {}; const apply = kickoffApplyFinding(text, applyOut); if (apply) return emit({ code: 1, payload: { ok: false, exitCode: 1, ...apply }, prose: apply.reason });
     // ---- AGT-187: THE THIRD CLAUSE -- the green says WHOSE declaration it graded. -------------
     //
     // ORDER IS cap -> lanes -> attestation, and it is not interchangeable: the first two grade the
@@ -3926,6 +3943,7 @@ async function main() {
         baseline_note: baselineNote,
       anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
         risk_note: riskOut.note,
+        apply_note: applyOut.note,
         attests: "the Designer's own answer carries these exact bytes -- the Lanes: line is the Designer's" },
         prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376), and ATTESTED: the Designer's answer carries these exact bytes (AGT-187)` });
     }
@@ -3934,6 +3952,7 @@ async function main() {
       baseline_note: baselineNote,
       anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
       risk_note: riskOut.note,
+      apply_note: applyOut.note,
       attests: "a Lanes: line is present -- NOT that the Designer wrote it" },
       prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376). UNATTESTED (AGT-187): a Lanes: line is present -- NOT that the Designer wrote it. Pass --answer=<path> to attest it.` });
   }
