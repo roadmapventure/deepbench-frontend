@@ -1,3 +1,4 @@
+// DeepBench v7.0.1058 | tests/regression/agt-102-routine-prompt-drift.test.mjs | AGT-625 -- arm F derives the checklist count; arm G proves the rule offline
 // DeepBench v7.0.559 | tests/regression/agt-102-routine-prompt-drift.test.mjs | AGT-102 slice 1
 // FEATURE: AGT-102 -- the Auditor compares the prompt a live routine actually runs with its repo
 // block (scripts/check-routine-prompt.js) and files any difference as `routine-prompt-drift`.
@@ -14,8 +15,9 @@
 //   E  NOTE -- a runner drift note with --cycle=<uuid> -> exit 1, confidence medium, fingerprint equal
 //      to B's runner finding; --note without --cycle, and --routine=other -> exit 2.
 //   F  ROW (credentialed, else notRun) -- au-behavior carries the routine-prompt-drift [code] line and
-//      "twenty-four"; one runner_before_images row under cycle a428ca66-... for skill_profiles with
+//      a spelled count equal to its own check lines (AGT-625); one runner_before_images row under cycle a428ca66-... for skill_profiles with
 //      row_data, its decision kind agent-row, backlog_id AGT-102.
+//   G  COUNT (offline) -- checklistCount(): 24/24 and 27/27 pass; "twenty-four" over 27 lines, an unreadable objective and zero lines throw.
 // Pre-change: A-E fail at spawn (no script), D on the placeholder, F on the missing line.
 
 import assert from "node:assert/strict";
@@ -26,6 +28,20 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import { fingerprint } from "../../scripts/audit-ledger.js";
+
+// AGT-625: the count is derived from the row, never pinned.
+const ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+  "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+export const spell = n => n < 20 ? ONES[n] : TENS[Math.floor(n / 10)] + (n % 10 ? "-" + ONES[n % 10] : "");
+export function checklistCount(objective, method) {
+  const m = /^Run the approved checklist: ([a-z-]+) named checks in (\w+) jobs/.exec(objective ?? "");
+  assert.ok(m, `the objective opens with its spelled count (got ${JSON.stringify(String(objective ?? "").slice(0, 80))})`);
+  const lines = (String(method ?? "").match(/^[a-z][a-z0-9-]+ (\[code\] )?— /gm) ?? []).length;
+  assert.ok(lines >= 1 && lines <= 99, `1..99 check lines (got ${lines})`);
+  assert.equal(m[1], spell(lines), `the objective says ${m[1]} named checks; the method holds ${lines} check lines (${spell(lines)})`);
+  return { spelled: m[1], lines };
+}
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = path.join(ROOT, "scripts", "check-routine-prompt.js");
@@ -168,13 +184,30 @@ async function run() {
       assert.ok(b, "au-behavior exists");
       assert.match(b.method ?? "", /^routine-prompt-drift \[code\] — /m, "the checklist line for routine-prompt-drift");
       assert.ok((b.method ?? "").includes("routine-prompt-drift by scripts/check-routine-prompt.js"), "the [code] sentence names the script");
-      assert.match(b.objective ?? "", /twenty-four/);
+      const c = checklistCount(b.objective, b.method);
+      console.log(`    F checklist: ${c.spelled} = ${c.lines} check lines`);
       const imgs = await get(`runner_before_images?cycle_id=eq.${CYCLE}&table_name=eq.skill_profiles&select=pk_value,row_data,decision_id`);
       assert.equal(imgs.length, 1, `one before-image under the cycle (got ${imgs.length})`);
       assert.equal(imgs[0].pk_value, b.id, "the image is the au-behavior row");
       assert.ok(imgs[0].row_data, "row_data not null");
       const [d] = await get(`runner_decisions?id=eq.${imgs[0].decision_id}&select=kind,backlog_id`);
       assert.deepEqual(d, { kind: "agent-row", backlog_id: "AGT-102" });
+    });
+
+    await arm("G count", async () => {
+      const obj = w => `Run the approved checklist: ${w} named checks in six jobs, x.`;
+      const mk = n => ["BOARD HEALTH — duplicate tickets.",
+        ...Array.from({ length: n }, (_, i) => `check-${i + 1} ${i % 4 ? "" : "[code] "}— a test.`), "THE RULES. Every finding."].join("\n");
+      assert.deepEqual(checklistCount(obj("twenty-four"), mk(24)), { spelled: "twenty-four", lines: 24 });
+      assert.deepEqual(checklistCount(obj("twenty-seven"), mk(27)), { spelled: "twenty-seven", lines: 27 });
+      // Teeth: the count must track the list, in both directions.
+      assert.throws(() => checklistCount(obj("twenty-four"), mk(27)),
+        /twenty-four named checks; the method holds 27 check lines/, "a stale count over a grown list throws");
+      assert.throws(() => checklistCount("Run the checklist.", mk(24)), /spelled count/, "an unreadable objective throws");
+      assert.throws(() => checklistCount(obj("zero"), mk(0)), /1\.\.99 check lines \(got 0\)/, "zero check lines throws");
+      assert.equal(spell(19), "nineteen");
+      assert.equal(spell(30), "thirty");
+      assert.equal(spell(99), "ninety-nine");
     });
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
