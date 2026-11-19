@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.1061 | runbooks/redesign-after-refusal.md | AGT-683 — an attended-only redesign parks the ticket (--park); --diagnose needs a refusal. -->
 <!-- DeepBench v7.0.1057 | runbooks/redesign-after-refusal.md | AGT-680 — door (d): the cooldown marker is written after the pickup and names the ticket it took. -->
 <!-- DeepBench v7.0.1004 | runbooks/redesign-after-refusal.md | AGT-642 — door (d): redesign-first fires ahead of any new pick. -->
 <!-- DeepBench v7.0.977 | runbooks/redesign-after-refusal.md | AGT-610 — a refused ticket is redesigned twice, then diagnosed (John, standing decision 6e94edcb, 2026-11-05). -->
@@ -68,7 +69,7 @@ ticket), `kickoff_link`. Exit 3 means the file is written and the Designer's ans
 
 Run the Designer exactly as runbook **step 6** — `node scripts/agent-prompt.js --agent=designer
 --capability=design-kickoff --intent=ds-kickoff-intent --task-file=…`, on the `judgment` lane read
-live from `runner_model_lanes`, logged with `scripts/agent-log.js`. Three outcomes:
+live from `runner_model_lanes`, logged with `scripts/agent-log.js`. Four outcomes:
 
 1. **A kickoff** carrying a `risk` block and a `Redesign:` line → `--open`, then
    `node scripts/commit-kickoff.js`, then step 7 as for any ticket.
@@ -77,6 +78,10 @@ live from `runner_model_lanes`, logged with `scripts/agent-log.js`. Three outcom
    5a. The Development Manager rules it split or waive; a split's parts are filed first per step
    8b-bis and enter the queue normally.
 3. **Premise dead** → removal proposed, as step 6.
+4. **Attended-only** (the remaining work needs John, a credential, a `.claude/` write or an attended
+   apply) → `node scripts/redesign-pickup.js --park --ticket=<id> --cycle-id=<uuid> --reason=<what only an attended session can do>`.
+   The ticket leaves the redesign list until an attended session deletes the row. Never park a
+   ticket whose `parked_why` is `refused`: run the attempt path.
 
 A Designer/Development-Manager disagreement is recorded **on the Manager's ruling** (a reversible
 decision with a handle) and shows in the brief. **A team ballot needs a capability John has not
@@ -141,6 +146,8 @@ The `/feedback` filing is **attempted and its result recorded — never asserted
 `not sent (--no-send)` or `spawn error: …` result is a result; the brief then prints the text
 paste-ready instead of claiming it was filed.
 
+`--diagnose` exits 3 and sends nothing when the ticket has 0 refused attempts (AGT-683).
+
 **No third build, no other tool, no reworded step.** QA: `close_refusal_diagnostic()` writes nothing
 to `backlog_items` — its body references `runner_refusal_attempts` and `runner_before_images` and
 nothing else, and the fixture's `updated_at` is unchanged after it runs.
@@ -158,6 +165,7 @@ with itself.
 Every write carries a `runner_before_images` row owned by the cycle that made it:
 
 - the attempt rows — delete the row and its image; an attempt is not a decision;
+- the attended-only park: delete the attempt-0 row and its before-image.
 - the Knowledge addendum and the cycle-card re-pin — `select public.reverse_decision(<id>, 'John',
   '<why>', NULL);` (the image carries the FULL prior row, so the undo is a restore);
 - the DDL — the migration's captured down, `runner_migration_downs` row `agt610_refusal_ledger`

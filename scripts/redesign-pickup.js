@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1061 | scripts/redesign-pickup.js | AGT-683 -- --park takes an attended-only ticket off the redesign list; --diagnose refuses a ticket with 0 refusals; --next carries parked_why.
 // DeepBench v7.0.1004 | scripts/redesign-pickup.js | AGT-642 -- --next takes the ticket the gate named (redesign_due_ticket(): John's cards and a 24h cooldown skipped), so a blocked ticket is redesigned before any new pick.
 // DeepBench v7.0.977 | scripts/redesign-pickup.js | AGT-610 -- a refused ticket is redesigned twice, then diagnosed.
 // Spec: docs/kickoffs/v7.0.977-AGT-610-refusal-redesign-ledger.md section 4 (T2, §S).
@@ -160,6 +161,17 @@ export function nextLine(row) {
   return `node scripts/agent-prompt.js --agent=designer --capability=design-kickoff --intent=ds-kickoff-intent --task-file=${out}`;
 }
 
+/**
+ * AGT-683: --diagnose is the step after a SECOND REFUSAL. A ticket whose ledger holds no refused row
+ * (a needs-desktop ticket) has nothing to diagnose, and a diagnostic for it would park it with a
+ * /feedback report about a refusal that never happened. Null = go on; a string = the refusal message.
+ */
+export function diagnoseGuard(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (list.some(r => r && r.refused_at)) return null;
+  return `redesign-pickup --diagnose: ${list.length} attempt row(s), 0 refused -- a needs-desktop ticket has no refusal to diagnose; park it with --park instead`;
+}
+
 // --- CLI ----------------------------------------------------------------------------------------
 
 function parseArgs(argv) {
@@ -245,10 +257,16 @@ async function next(args) {
     die(1, `redesign-pickup --next: no backlog_items row reads backlog_id ${cand.backlog_id}`);
   }
 
+  // AGT-683: why the ticket is listed -- refused / permission-gate / needs-desktop -- so the Designer
+  // can rule a needs-desktop ticket attended-only (--park) instead of inventing a refusal to redesign.
+  const why = await rest(base, key, "POST", "rpc/refusal_parked_why", { p_backlog_id: cand.backlog_id });
+  if (!why.ok) die(1, `redesign-pickup --next: POST rpc/refusal_parked_why -> HTTP ${why.status} ${why.text.slice(0, 400)}`);
+
   const task = {
     ticket: t.json[0],
     redesign: {
       attempt_no: Number(cand.attempts || 0) + 1,
+      parked_why: why.json,
       basis: cand.basis,
       never_send: Array.isArray(cand.never_send) ? cand.never_send : [],
       kickoff_link: cand.kickoff_link,
@@ -385,6 +403,8 @@ async function diagnose(args) {
     `runner_refusal_attempts?backlog_id=eq.${encodeURIComponent(ticket)}&select=*&order=attempt_no`);
   if (!r.ok) die(1, `redesign-pickup --diagnose: GET runner_refusal_attempts -> HTTP ${r.status} ${r.text.slice(0, 400)}`);
   if (!Array.isArray(r.json)) die(1, "redesign-pickup --diagnose: the attempt read came back non-array");
+  const guard = diagnoseGuard(r.json);
+  if (guard !== null) die(3, guard); // AGT-683: nothing spawned, nothing sent
 
   const { feedback_text, refusals, labels } = assembleDiagnostic(ticket, r.json, unknowns);
 
@@ -415,16 +435,34 @@ async function diagnose(args) {
   process.exitCode = 0;
 }
 
+async function park(args) {
+  const ticket = ticketArg(args);
+  const cycle = cycleArg(args);
+  const reason = typeof args.reason === "string" ? args.reason.trim() : "";
+  if (!reason) die(2, "redesign-pickup --park: --reason=<text> is required -- name what only an attended session can do");
+  const { base, key } = creds();
+  // park_attended_only() owns every guard (not listed, already holds attempt 0, blank reason) and the before-image.
+  const r = await rest(base, key, "POST", "rpc/park_attended_only", {
+    p_cycle_id: cycle, p_backlog_id: ticket, p_reason: reason,
+  });
+  if (!r.ok) die(1, `redesign-pickup --park: ${r.json?.message ?? r.text.slice(0, 600)}`);
+  const row = r.json ?? {};
+  console.log(`redesign-pickup --park: ${ticket} parked attended-only, row ${row.id}; undo: delete the row and its before-image (cycle ${cycle})`);
+  process.exitCode = 0;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.next) return next(args);
   if (args.open) return open(args);
   if (args.refuse) return refuse(args);
   if (args.diagnose) return diagnose(args);
+  if (args.park) return park(args);
   die(2, "usage: redesign-pickup.js --next [--out=<path>]\n" +
     "       redesign-pickup.js --open --ticket=<id> --cycle-id=<uuid> --kickoff=<path>\n" +
     "       redesign-pickup.js --refuse --ticket=<id> --cycle-id=<uuid> --from=<json> [--dry-run] [--reason=<text>]\n" +
-    "       redesign-pickup.js --diagnose --ticket=<id> --cycle-id=<uuid> --unknowns-file=<path> [--no-send]");
+    "       redesign-pickup.js --diagnose --ticket=<id> --cycle-id=<uuid> --unknowns-file=<path> [--no-send]\n" +
+    "       redesign-pickup.js --park --ticket=<id> --cycle-id=<uuid> --reason=<text>");
 }
 
 // Importing this module for its exports must never run the CLI (SES-45).
