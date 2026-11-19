@@ -44,579 +44,203 @@
 > standing filing rules — and is maintained by hand, deliberately.
 
 <!-- BEGIN GENERATED — scripts/render-standing-brief.js — do not hand-edit inside this block -->
-## Live board state — generated, do not hand-edit — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST)*
+## Live board state — generated, do not hand-edit — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST)*
 
 > Rendered from the tables by `scripts/render-standing-brief.js` at every ship. **Every number below is derived; nothing here is maintained by hand.** The judgment prose beneath this block is the opposite — hand-maintained, deliberately, and this script never writes outside these markers. Where the two disagree about a number, this block is right and the sentence below is stale: say so rather than reconciling them by hand.
 
-**Board census** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* **642 open tickets**, 621 numbered, **21 open-but-unnumbered**, 1000 rows total.
+**Board census** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* **599 open tickets**, 574 numbered, **25 open-but-unnumbered**, 1000 rows total.
 
 | `status` | rows | share of board |
 |---|---:|---:|
-| `open` | 323 | 32.3% |
-| `done` | 272 | 27.2% |
-| `removal proposed` | 148 | 14.8% |
-| `delivered` | 132 | 13.2% |
-| `removed` | 86 | 8.6% |
-| `partial` | 39 | 3.9% |
+| `done` | 312 | 31.2% |
+| `open` | 299 | 29.9% |
+| `removal proposed` | 143 | 14.3% |
+| `delivered` | 133 | 13.3% |
+| `removed` | 89 | 8.9% |
+| `partial` | 24 | 2.4% |
 
-**`design_status` among OPEN tickets** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* Reads for selection (`SES-114`); `NULL` is *not* `auto`, it is not-yet-triaged and no cycle may backfill it.
+**`design_status` among OPEN tickets** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* Reads for selection (`SES-114`); `NULL` is *not* `auto`, it is not-yet-triaged and no cycle may backfill it.
 
 | `design_status` | open rows | selection effect |
 |---|---:|---|
-| `NULL` | 556 | full ceremony — not yet triaged |
-| `designed` | 34 | **not a skip** — build from `kickoff_link` (step 6 fast path) |
-| `needs-decision` | 29 | — |
-| `needs-desktop` | 22 | skipped, `record_skip()` — needs a session John attends (B39) |
+| `NULL` | 523 | full ceremony — not yet triaged |
+| `designed` | 35 | **not a skip** — build from `kickoff_link` (step 6 fast path) |
+| `needs-decision` | 25 | — |
+| `needs-desktop` | 15 | skipped, `record_skip()` — needs a session John attends (B39) |
 | `needs-john` | 1 | skipped, `record_skip()` — John decides on a card |
 
-**Scheduler and automation settings** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* §2b of the briefing, John's own switches, binding via `scheduler_gate()` at step 1b:
+**Scheduler and automation settings** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* §2b of the briefing, John's own switches, binding via `scheduler_gate()` at step 1b:
 
 - Scheduler: **on**, every **1 hour** on John's clock grid (America/Chicago hours divisible by the interval — `SES-151`, DST-proof).
 - Cron minute **40**, manual-fire tolerance **±10 min** (a start outside it is treated as a manual fire and is never paced).
 - Standing daily max: **196M tokens**. This is rung 3 of five, **below** the 48h stale floor: a standing number must not defeat the staleness brake.
 
-**Standing epic drain** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* Created only by John; the runner may read one, never write one (`drain_epic_next()` property 5). The finish line is drawn from the members he **named** (`runner_drain_scope`), never the live `now` tier (`SES-142`) — and within that list it is the members a milestone **gate ruled required** (`milestone_required`, `SES-310`) whenever the list carries such a ruling, every named member otherwise.
+**Standing epic drain** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* Created only by John; the runner may read one, never write one (`drain_epic_next()` property 5). The finish line is drawn from the members he **named** (`runner_drain_scope`), never the live `now` tier (`SES-142`) — and within that list it is the members a milestone **gate ruled required** (`milestone_required`, `SES-310`) whenever the list carries such a ruling, every named member otherwise.
 
 - **No drain standing.** Selection is the class-sorted board exactly as it is with no drain declared.
 
-**Proposed projects** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* A project whose batch finished proposes the next one (`AGT-240`): The Auditor grades what it built, The Development Manager proposes ONE project with its tickets and why. Its tickets are normal backlog rows the runner does not pick until you say yes. **0 proposed.**
+**Proposed projects** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* A project whose batch finished proposes the next one (`AGT-240`): The Auditor grades what it built, The Development Manager proposes ONE project with its tickets and why. Its tickets are normal backlog rows the runner does not pick until you say yes. **1 proposed.**
 
-- **None** — a measured none: no finished batch has proposed a project.
+- **`trusted-audit-checks`** — Trusted Audit Checks: **5 ticket(s)** (2 P10 - Tooling, 3 P9 - Bug Fixes), 12 predicted cycle(s), proposed Nov 14, 6:57 AM CST. Why: Today you cannot tell whether the platform's own checks are telling you anything: only 2 of the 319 cycle rows in the last seven days produced a run review, the one failing CI job has been red since 2026-08-31 and has never been filed because its evidence is mixed, the unclosed-delivery check flags 166 of 170 delivered rows from a column the ship never touches, and a model setting the family reje…
+- **Your yes starts it** — in a session, with your words verbatim: `select public.start_proposed_project('<slug>', '<your words>', '<session name>');` It flips the project to `executing` and locks its list; only a session can run it.
 
-**Open decisions** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* Decisions made under `M6-02` that are still inside their reversal window (`runner_settings.reversal_window_hours` = 72h). Silence finalises them; to reverse one, run the line beside it (`docs/runbooks/session-setup.md` § Reversing a decision).
+**Open decisions** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* Decisions made under `M6-02` that are still inside their reversal window (`runner_settings.reversal_window_hours` = 72h). Silence finalises them; to reverse one, run the line beside it (`docs/runbooks/session-setup.md` § Reversing a decision).
 
-- `ff5a0bb6` · ticket-status · `AGT-281` · Close-out: AGT-281 settles 'partial' · finalises Oct 5, 4:24 AM CST · `select public.reverse_decision('ff5a0bb6-7402-436d-8142-bde34f688b51','John','<why>');`
-- `433ae787` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 5, 4:24 AM CST · `select public.reverse_decision('433ae787-d53f-4a14-b982-e97d17923eca','John','<why>');`
 - `199f27ef` · ship · `AGT-281` · AGT-281 shipped at v7.0.741 (b33e89492cd2bf2f875ee00b16921bbd5bc4ab90) on verdict 94e15346-ebcd-4887-9a3a-21004122e93f · finalises Oct 5, 4:25 AM CST · `select public.reverse_decision('199f27ef-218c-4e56-991c-98992aaea425','John','<why>');`
-- `4c7c6014` · rollback · — · Auto-rollback held: ci-red on b33e894 was not reverted (card-only) · finalises Oct 5, 4:26 AM CST · `select public.reverse_decision('4c7c6014-4a3c-4ad9-a557-acc45d9ede47','John','<why>');`
-- `615e1de3` · reversal · `ZAGTPBC-1` · reversal of requirement-check decision 8c813a9f-5e1f-4b51-8744-6cf10c32cf4c -- applied: 1 restored, 0 restored-unverifi… · finalises Oct 5, 4:29 AM CST · `select public.reverse_decision('615e1de3-c481-4014-a6d4-617f468caaf4','John','<why>');`
-- `3572f973` · reversal · `ZAGTPBC-1` · reversal of requirement-check decision 629edcfa-8099-4ce8-a77f-3de35c8190f3 -- applied: 1 restored, 0 restored-unverifi… · finalises Oct 5, 4:41 AM CST · `select public.reverse_decision('3572f973-29d0-4729-bfac-1682420516bb','John','<why>');`
-- `2b7c5cbe` · reversal · `ZAGTPBC-1` · reversal of requirement-check decision f2084189-6e17-4b93-9eff-7083c9f22c08 -- applied: 1 restored, 0 restored-unverifi… · finalises Oct 5, 4:42 AM CST · `select public.reverse_decision('2b7c5cbe-cbba-4232-ae44-535cce67358d','John','<why>');`
-- `2f2ae42d` · model-catalog · — · Model catalog: 20 Claude model rows checked · finalises Oct 5, 4:48 AM CST · `select public.reverse_decision('2f2ae42d-340b-4d0f-a987-1a8099658368','John','<why>');`
-- `7b1c8ee3` · reversal · `ZAGTPBC-1` · reversal of requirement-check decision 38d79baa-09cb-4110-b846-09b37a809716 -- applied: 1 restored, 0 restored-unverifi… · finalises Oct 5, 4:54 AM CST · `select public.reverse_decision('7b1c8ee3-e28b-4b6c-a1f6-9025dea5dce0','John','<why>');`
-- `8beea924` · filing · — · Audit review 2026-W40: 30 findings → 9 tickets, 3 not-a-defect, 0 carried, 0 escalated · finalises Oct 5, 4:54 AM CST · `select public.reverse_decision('8beea924-ae5a-4315-8cc9-7e4f11dcb440','John','<why>');`
-- `cb984e86` · leverage · — · AGT-238 leverage first: AGT-281 marked as leverage -- outranks project order · finalises Oct 5, 5:02 AM CST · `select public.reverse_decision('cb984e86-d025-4456-b5d6-60944bef6b14','John','<why>');`
-- `5ea67a8c` · concurrency · — · AGT-238 concurrency from the corpus: 1 project(s) executing in the order agent-training · finalises Oct 5, 5:02 AM CST · `select public.reverse_decision('5ea67a8c-b879-483f-a7b2-8021b38147dc','John','<why>');`
-- `e88f9c83` · model-catalog · — · Model catalog: 9 Claude model rows checked · finalises Oct 5, 5:10 AM CST · `select public.reverse_decision('e88f9c83-0d4c-4c8f-95a6-dbf7c11b0ab2','John','<why>');`
-- `29ca1a81` · filing · — · Model assignment: capability/data-room-custody has no passing replacement -- ticket filed · finalises Oct 5, 5:10 AM CST · `select public.reverse_decision('29ca1a81-ea9b-4fcb-a22d-7172fc2502e4','John','<why>');`
-- `4dbd6d04` · model-keep · — · lane/orchestrator keeps claude-opus-5 · finalises Oct 5, 5:10 AM CST · `select public.reverse_decision('4dbd6d04-7826-47a6-9936-3fc730616d1d','John','<why>');`
-- `d4d745d1` · model-keep · — · lane/judgment keeps claude-fable-5-1 · finalises Oct 5, 5:10 AM CST · `select public.reverse_decision('d4d745d1-8213-46db-b6d6-da8d02cd9728','John','<why>');`
-- `0cadb5c4` · model-keep · — · capability/bench-report-card keeps claude-sonnet-4-6 · finalises Oct 5, 5:10 AM CST · `select public.reverse_decision('0cadb5c4-c390-48c2-ac9d-4c480b9c5cd0','John','<why>');`
-- `0ba1e3c9` · model-keep · — · lane/mechanical keeps claude-sonnet-5 · finalises Oct 5, 5:10 AM CST · `select public.reverse_decision('0ba1e3c9-01be-4096-893f-3f353ff7aefe','John','<why>');`
-- `17bb635d` · model-report · — · model-watch 2026-10-02: releases 1, retirements 10, watch reviewed 0, trials 2, switched 0, kept 4, reverted 0 · models… · finalises Oct 5, 5:14 AM CST · `select public.reverse_decision('17bb635d-49e3-4c3a-8d11-840e7693334a','John','<why>');`
-- `e69dac1e` · gate · `AGT-281` · Filed a gated_before_build card for AGT-281 and held it out of the pick; the remaining work is attended by design. · finalises Oct 5, 5:40 AM CST · `select public.reverse_decision('e69dac1e-158c-41a0-8bdd-a9ca2a0db75a','John','<why>');`
-- `cddfe7a6` · filing · — · Audit review 2026-W40: 19 findings → 1 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Oct 5, 5:46 AM CST · `select public.reverse_decision('cddfe7a6-ee6b-4724-9e23-de2569824514','John','<why>');`
-- `9ee2fe9b` · agent-row · `AGT-281` · Completed the SES-114 act on AGT-281: wrote design_status needs-desktop, the state half that the gate card alone did no… · finalises Oct 5, 5:48 AM CST · `select public.reverse_decision('9ee2fe9b-5e39-4c5e-ab23-cdc7f5935042','John','<why>');`
-- `be7e3331` · gate · — · Gate cards ruled by cycle 58c12f60-ef9b-441c-b59e-8e4df9740c62: 3 card(s) — {"john": 0, "accept": 2, "rework": 0, "reti… · finalises Oct 5, 5:58 AM CST · `select public.reverse_decision('be7e3331-cc3e-4279-9623-53bab1331de2','John','<why>');`
-- `581a9a07` · ship · `AGT-129` · AGT-129 shipped at v7.0.587 (ca56d1fca355892666b46f9192134a232f7b89e2) on verdict 22e1b2c9-43ed-4463-bfb7-d70b93907871 · finalises Oct 5, 6:20 AM CST · `select public.reverse_decision('581a9a07-c397-4c7d-8287-cfa17561135b','John','<why>');`
-- `0d725492` · john-ruling · — · John 2026-10-02: weekly pace limit back on (meter_limiter_off true -> false) so routines slow down instead of going dar… · finalises Oct 5, 9:26 AM CST · `select public.reverse_decision('0d725492-166a-4a9a-8591-14312dcdfd59','John','<why>');`
-- `0f257702` · requirement-check · `AGT-160` · The governance and tooling agents report what they find into the one findings list instead of filing tickets or leaving… · finalises Oct 5, 9:39 AM CST · `select public.reverse_decision('0f257702-5677-43c3-9910-d67142e07e0b','John','<why>');`
-- `874648b6` · john-ruling · `AGT-160` · John 2026-10-02: an agent breaking the ticket writing and review process, where a less important ticket gets developed… · finalises Oct 5, 10:16 AM CST · `select public.reverse_decision('874648b6-c254-4a1f-b152-5d94d6b28b72','John','<why>');`
-- `34ef662d` · filing · — · Audit review 2026-W40: 2 findings → 2 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Oct 5, 10:20 AM CST · `select public.reverse_decision('34ef662d-06b9-49dd-963d-bae8bfb49f76','John','<why>');`
-- `35980d96` · ticket · `AGT-309` · AGT-309 homed in Agent Training with need source john:runner_decisions:874648b6 — The Development Manager's own pick, c… · finalises Oct 5, 10:23 AM CST · `select public.reverse_decision('35980d96-28a9-42cc-8159-d1d5e30e1994','John','<why>');`
-- `26194e2b` · requirement-check · `AGT-309` · Your ruling on process-break fixes is read by nobody: Victoria scores them "can wait" and the manager files them where… · finalises Oct 5, 10:31 AM CST · `select public.reverse_decision('26194e2b-b28a-49b6-8bc7-d45d388904ad','John','<why>');`
-- `6a24f412` · ticket-scope · `AGT-309` · AGT-309 gains John's condition: The Development Manager's pick enters an active project only after Victoria has verifie… · finalises Oct 5, 10:31 AM CST · `select public.reverse_decision('6a24f412-8a22-4ece-8f23-e538e887000a','John','<why>');`
-- `d588abc0` · ticket-scope · `AGT-309` · Served-class ruling on AGT-309: P10 - Tooling, supports_class left NULL. · finalises Oct 5, 11:08 AM CST · `select public.reverse_decision('d588abc0-6406-48bf-8d9e-b766d922cc26','John','<why>');`
-- `501ab7c5` · routine-prompt-push · — · Pushed the docs/runbooks/routine-prompt.md block (origin/dev 57bc6767) to the four runner routines; all four read back… · finalises Oct 5, 11:25 AM CST · `select public.reverse_decision('501ab7c5-28eb-4aae-92d6-f0f0d028ccf9','John','<why>');`
-- `6668e1ac` · john-ruling · — · John 2026-10-02: before a next project is proposed to him, Victoria reviews it too, and it reaches him only when both T… · finalises Oct 5, 11:38 AM CST · `select public.reverse_decision('6668e1ac-3248-4172-9472-7cede7c15c7a','John','<why>');`
-- `7e89835f` · removal-proposal · `AGT-307` · AGT-307 removal proposed: duplicate of AGT-287 · finalises Oct 5, 11:46 AM CST · `select public.reverse_decision('7e89835f-6862-4bf5-a971-6e7ba2c4a116','John','<why>');`
-- `d4442471` · john-ruling · — · John 2026-10-02: Victoria, Nathan and Jerry create a new project plan; then Victoria and The Development Manager decide… · finalises Oct 5, 11:49 AM CST · `select public.reverse_decision('d4442471-8253-4151-9999-da39fc64cb75','John','<why>');`
-- `46859e0b` · john-ruling · `AGT-304` · John 2026-10-02: he is not turning off the GitHub failure emails — the failing CI tests are to be fixed, and the ticket… · finalises Oct 5, 11:56 AM CST · `select public.reverse_decision('46859e0b-4883-4f4f-8361-a1fec181d7d2','John','<why>');`
-- `24dd0537` · requirement-check · `AGT-304` · 38 regression suites fail on dev, so the ship gate cannot tell a new red from the standing one · finalises Oct 5, 12:00 PM CST · `select public.reverse_decision('24dd0537-451e-4b36-ad59-ce4969dbc3b6','John','<why>');`
-- `c794b432` · filing · — · Audit review 2026-W40: 4 findings → 3 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Oct 5, 12:01 PM CST · `select public.reverse_decision('c794b432-90c8-42f8-ae98-e38e34b0ae32','John','<why>');`
-- `7d7cbf5d` · ticket · `AGT-304` · AGT-304 placed in Tooling on The Development Manager's pick and Victoria's pass (need 5), by John's delegation · finalises Oct 5, 12:02 PM CST · `select public.reverse_decision('7d7cbf5d-ca00-4c12-8691-a59c6cf839a7','John','<why>');`
-- `3bfd99d9` · routine-created · — · Created two cloud routines switched OFF on John's word: victoria-reorg (trig_012xvmXsXAjbVxdbYhUTq6W1) and jerry-linked… · finalises Oct 5, 12:14 PM CST · `select public.reverse_decision('3bfd99d9-c4a9-4f0b-bfcd-de5ab89557ea','John','<why>');`
-- `54d80a6a` · agent-row · `AGT-309` · AGT-309: the process-break class recorded as rule JOHN-1002-PROCESS-BREAK-CLASS and as Victoria's inline Knowledge on r… · finalises Oct 5, 12:14 PM CST · `select public.reverse_decision('54d80a6a-78cc-43ce-ad07-1eae31228e29','John','<why>');`
-- `58c0e39c` · john-ruling · — · John 2026-10-02: file an issue for The Development Manager to find out why a routine run takes so long, whether other r… · finalises Oct 5, 12:29 PM CST · `select public.reverse_decision('58c0e39c-a2f7-40e1-9905-4cac834f68a2','John','<why>');`
-- `446d679d` · john-ruling · — · John 2026-10-02: he wants a ticket, proposed for The Development Manager and Victoria to decide on, for the Auditor rev… · finalises Oct 5, 12:34 PM CST · `select public.reverse_decision('446d679d-b095-4d48-a412-973a8ba098d8','John','<why>');`
-- `280f2fa0` · john-ruling · — · John 2026-10-02: for the four loop-closing items, The Development Manager's project pick plus Victoria's approval is en… · finalises Oct 5, 2:15 PM CST · `select public.reverse_decision('280f2fa0-ff5c-4050-a403-b81814615fab','John','<why>');`
-- `af1b9e8a` · john-ruling · — · John 2026-10-02: The Development Manager and Victoria may only assign tickets that improve existing projects; a new pro… · finalises Oct 5, 2:15 PM CST · `select public.reverse_decision('af1b9e8a-38bf-4a34-8ea5-dc56771dd9ad','John','<why>');`
-- `0739525d` · filing · — · Audit review 2026-W40: 5 findings → 5 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Oct 5, 2:18 PM CST · `select public.reverse_decision('0739525d-b9e5-4c7d-910b-f2128efb0743','John','<why>');`
-- `2df11863` · requirement-check · `AGT-291` · Nothing triggers the project finish line: two projects hold zero open tickets and neither is finished nor proposing a s… · finalises Oct 5, 2:18 PM CST · `select public.reverse_decision('2df11863-9902-404f-9a3e-7079a884811f','John','<why>');`
-- `4add65f1` · requirement-check · `AGT-312` · A next-project proposal reaches John on the manager's answer alone: no Victoria turn exists and nothing requires both t… · finalises Oct 5, 2:18 PM CST · `select public.reverse_decision('4add65f1-3ed3-4e23-b945-e473e941b4f6','John','<why>');`
-- `47c10256` · requirement-check · `AGT-313` · Nothing creates the next product project plan: no capability lets Victoria, Nathan and Jerry author one, and Jerry's sh… · finalises Oct 5, 2:19 PM CST · `select public.reverse_decision('47c10256-71e6-4fa0-b941-fe5985362b2b','John','<why>');`
-- `ed4e7743` · requirement-check · `AGT-314` · An empty queue wakes nobody: a fire with nothing pickable ends in two actions while open findings and unrouted tickets… · finalises Oct 5, 2:19 PM CST · `select public.reverse_decision('ed4e7743-b945-4e49-ad6d-85d6b78b09d7','John','<why>');`
-- `c1e9dc3a` · ticket · — · Four loop-closing tickets placed in active projects on The Development Manager's pick and Victoria's pass: AGT-314, AGT… · finalises Oct 5, 2:20 PM CST · `select public.reverse_decision('c1e9dc3a-28f8-45f0-8183-aac347caf42a','John','<why>');`
-- `956086bc` · ticket-scope · `AGT-281` · AGT-281: the attended steps are done; its remainder is now ordinary repo work a cycle can build, so the needs-desktop h… · finalises Oct 5, 2:23 PM CST · `select public.reverse_decision('956086bc-b83b-4f81-a603-de66f7b669b3','John','<why>');`
-- `30ce3418` · john-ruling · — · John 2026-10-02 asked whether the captured decisions and reasoning are used to make the agents smarter, how to make tha… · finalises Oct 5, 2:27 PM CST · `select public.reverse_decision('30ce3418-66b0-40f3-ab0d-92a801bd6e26','John','<why>');`
-- `43808c03` · agent-row · `AGT-309` · vc-process-break-class reads John's ruling 874648b6 as: an agent breaking the ticket process is enough; a priority inve… · finalises Oct 5, 2:49 PM CST · `select public.reverse_decision('43808c03-e7a1-4493-a770-068a81de1155','John','<why>');`
-- `49a3cd37` · requirement-check · `AGT-160` · The governance and tooling agents report what they find into the one findings list instead of filing tickets or leaving… · finalises Oct 5, 3:03 PM CST · `select public.reverse_decision('49a3cd37-9f45-484f-bffb-2d339d0cd3de','John','<why>');`
-- `e7572eb2` · filing · — · Audit review 2026-W40: 2 findings → 0 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Oct 5, 3:52 PM CST · `select public.reverse_decision('e7572eb2-efa2-49d8-bfd3-8e2c1a6ba9a8','John','<why>');`
-- `2178bf75` · requirement-check · `AGT-308` · A ticket gated at step 5 with no card and no design_status stays at queue #1 and is re-picked every fire · finalises Oct 5, 3:52 PM CST · `select public.reverse_decision('2178bf75-b797-493c-af2b-4c1358725c93','John','<why>');`
-- `71d3843d` · classification · — · board ordered: 3 ticket(s) given an automation_rank · finalises Oct 6, 1:48 AM CST · `select public.reverse_decision('71d3843d-d6f0-4909-8c36-4a7a06533376','John','<why>');`
-- `a551adc2` · hygiene · `AGT-79` · Ticket Owner: 26 derivable cell fix(es) on 26 row(s) — cost 1 · claim 0 · type 0 · revalidation 25 · finalises Oct 6, 1:53 AM CST · `select public.reverse_decision('a551adc2-889a-4886-b366-df400a5b3926','John','<why>');`
-- `85b530d7` · leverage · — · AGT-238 leverage first: AGT-308, AGT-314, AGT-312 marked as leverage -- outranks project order · finalises Oct 6, 1:54 AM CST · `select public.reverse_decision('85b530d7-e956-44e7-9eca-d7bf60bd4c42','John','<why>');`
-- `ee939ad5` · concurrency · — · AGT-238 concurrency from the corpus: 1 project(s) executing in the order agent-training · finalises Oct 6, 1:54 AM CST · `select public.reverse_decision('ee939ad5-39e9-4dd3-8c02-82d142312163','John','<why>');`
-- `106a0608` · gate · `AGT-308` · Both defects the Builder found outside the kickoff were captured as findings rather than fixed — limb 1 of the AGT-133… · finalises Oct 6, 2:38 AM CST · `select public.reverse_decision('106a0608-2dc5-4ea3-b454-eed1e31ae4bc','John','<why>');`
-- `a4aab0b8` · filing · — · Audit review 2026-W40: 25 findings → 3 tickets, 0 not-a-defect, 0 carried, 2 escalated · finalises Oct 6, 3:14 AM CST · `select public.reverse_decision('a4aab0b8-c597-4d42-8ee5-51b40b709837','John','<why>');`
-- `01f0ca08` · agent-row · `AGT-312` · AGT-312 (v7.0.747): Victoria gains the review-proposal capability as four rows -- intent Skill vc-proposal-intent, the… · finalises Oct 6, 3:51 AM CST · `select public.reverse_decision('01f0ca08-43c6-4b97-b3d6-94309b9b7144','John','<why>');`
-- **22 ticket-status decisions** finalising Oct 6, 4:21 AM CST → Oct 6, 10:27 PM CST · one batch, listed by query rather than one line each: `select id, backlog_id, summary, expires_at from public.runner_decisions where status='open' and kind='ticket-status' order by expires_at;` · reverse any one with `select public.reverse_decision('<id>','John','<why>');`
-- `33e08f26` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 6, 4:21 AM CST · `select public.reverse_decision('33e08f26-98ac-450a-96a0-aeb156c6b639','John','<why>');`
-- `66d801f0` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 6, 4:21 AM CST · `select public.reverse_decision('66d801f0-5de9-48fc-93bc-ec9c81f20e12','John','<why>');`
-- `fc1db2f0` · model-catalog · — · Model catalog: 20 Claude model rows checked · finalises Oct 6, 4:45 AM CST · `select public.reverse_decision('fc1db2f0-7d68-433e-9a49-15a1f205f6c5','John','<why>');`
-- `751decc0` · filing · — · Audit review 2026-W40: 21 findings → 3 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Oct 6, 4:48 AM CST · `select public.reverse_decision('751decc0-1b4d-43c5-84a4-1c5f65040b0b','John','<why>');`
-- `1c45bc8c` · model-catalog · — · Model catalog: 9 Claude model rows checked · finalises Oct 6, 4:50 AM CST · `select public.reverse_decision('1c45bc8c-bfd4-45cc-a050-16ef42e4048a','John','<why>');`
-- `e6bd3e07` · model-keep · — · capability/bench-report-card keeps claude-sonnet-4-6 · finalises Oct 6, 4:50 AM CST · `select public.reverse_decision('e6bd3e07-d641-469b-8a65-0e3c65151348','John','<why>');`
-- `ae07f1f5` · model-keep · — · capability/data-room-custody keeps claude-haiku-4-5-20251001 · finalises Oct 6, 4:50 AM CST · `select public.reverse_decision('ae07f1f5-48a6-4e42-83a1-711795b9eb66','John','<why>');`
-- `eeae7190` · model-keep · — · lane/judgment keeps claude-fable-5-1 · finalises Oct 6, 4:50 AM CST · `select public.reverse_decision('eeae7190-f0ba-435e-b630-ecb5972e15c5','John','<why>');`
-- `69052065` · model-keep · — · lane/mechanical keeps claude-sonnet-5 · finalises Oct 6, 4:50 AM CST · `select public.reverse_decision('69052065-22da-432b-bd9f-11b79673cf7d','John','<why>');`
-- `e5f969d5` · model-keep · — · lane/orchestrator keeps claude-opus-5 · finalises Oct 6, 4:50 AM CST · `select public.reverse_decision('e5f969d5-403e-4356-99ae-0c9f895ad936','John','<why>');`
-- `66cb91dd` · model-report · — · model-watch 2026-10-03: releases 0, retirements 16, watch reviewed 0, trials 0, switched 0, kept 5, reverted 0 · finalises Oct 6, 4:51 AM CST · `select public.reverse_decision('66cb91dd-5235-46b6-880a-17cd459a5a76','John','<why>');`
-- `5b80c95f` · leverage · — · AGT-238 leverage first: AGT-314, AGT-291, AGT-313 marked as leverage -- outranks project order · finalises Oct 6, 5:03 AM CST · `select public.reverse_decision('5b80c95f-5d36-4c33-9424-c6a1807b11b6','John','<why>');`
-- `ca79c855` · concurrency · — · AGT-238 concurrency from the corpus: 4 project(s) executing in the order dev-manager-capabilities, agent-training, tool… · finalises Oct 6, 5:03 AM CST · `select public.reverse_decision('ca79c855-77b9-465f-b8ec-0e2abefa6d82','John','<why>');`
-- `14507f0b` · agent-row · `AGT-314` · AGT-314: re-pin dm-knowledge-cycle-card 400f9cb1c7db1bd1 → 0607365c80ed65cb · finalises Oct 6, 5:45 AM CST · `select public.reverse_decision('14507f0b-ece4-42df-9dfb-3ba670698134','John','<why>');`
-- `e3e3ee0c` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 6, 6:29 AM CST · `select public.reverse_decision('e3e3ee0c-6264-4773-8501-9525c055ddf1','John','<why>');`
-- `5c3b8943` · ship · `AGT-314` · AGT-314 shipped at v7.0.748 (452311992fb95321b87e5b7e3e6264ce939720b3) on verdict 3406d996-72d0-44a5-98b8-f03358fb2848 · finalises Oct 6, 6:29 AM CST · `select public.reverse_decision('5c3b8943-84a6-445d-b80d-04f3f72b95cc','John','<why>');`
-- `55cf89ac` · agent-row · `AGT-291` · AGT-291: re-pin dm-knowledge-cycle-card 0607365c80ed65cb → 254dcbfa990f2bbf · finalises Oct 6, 7:25 AM CST · `select public.reverse_decision('55cf89ac-5ea4-4ead-91c2-bcf178d7d3b3','John','<why>');`
-- `c764b43f` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 6, 8:25 AM CST · `select public.reverse_decision('c764b43f-9922-4f94-afde-08de82dd149c','John','<why>');`
-- `12301a69` · filing · — · Audit review 2026-W40: 16 findings → 0 tickets, 0 not-a-defect, 0 carried, 0 escalated · finalises Oct 6, 8:48 AM CST · `select public.reverse_decision('12301a69-5547-4fc7-9ec1-30e17b2d5afb','John','<why>');`
-- `d94ee9ce` · design-ruling · `AGT-136` · Open questions ruled by cycle ba7c3c09-97f2-4f03-9bee-d92523901897: 7 question(s) — {"no": 2, "yes": 5, "john": 0, "wit… · finalises Oct 6, 8:48 AM CST · `select public.reverse_decision('d94ee9ce-1438-4375-9b18-8d7425342225','John','<why>');`
-- `2cd6086e` · agent-row · `AGT-313` · AGT-313 (v7.0.750): the product project plan -- Victoria gains plan-product-project as four rows; the growth review int… · finalises Oct 6, 10:28 AM CST · `select public.reverse_decision('2cd6086e-caba-4ac7-abca-f51ab27fe0ba','John','<why>');`
-- `e8a40847` · stall-report · — · Three peer cycles went quiet ~76-80 minutes ago; no claim released, nothing closed · finalises Oct 6, 10:44 AM CST · `select public.reverse_decision('e8a40847-92d2-4839-be4b-389f46cc4a34','John','<why>');`
-- `80ffbfa4` · gated · `AGT-313` · AGT-313 built green and could not be shipped: staging a tracked file is denied in this container · finalises Oct 6, 11:54 AM CST · `select public.reverse_decision('80ffbfa4-342a-4798-b666-68ac29285193','John','<why>');`
-- `9d2a40aa` · finding-capture · `AGT-273` · Builder deviation captured as a finding, not fixed now: the build lane has no path to apply DDL · finalises Oct 6, 12:10 PM CST · `select public.reverse_decision('9d2a40aa-755b-49e3-af8c-aeee6e33f907','John','<why>');`
-- `f51ca19b` · ticket-scope · `AGT-309` · AGT-309 premise revalidated alive but NARROWED: (a)(b)(c)(e) shipped in v7.0.743; the remainder is fix (d), the class t… · finalises Oct 6, 12:53 PM CST · `select public.reverse_decision('f51ca19b-c933-4aec-a2da-7d778d40c046','John','<why>');`
-- `7452fae9` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 6, 1:03 PM CST · `select public.reverse_decision('7452fae9-4e53-440a-aa62-4d3329f5e9bd','John','<why>');`
-- `3a6534ca` · ship · `AGT-309` · AGT-309 shipped at v7.0.751 (61b04c65890affbd796dbebd2ad50ea3334e28bb) on verdict 8833273f-c1d0-4704-8e23-d861b56d0bf9 · finalises Oct 6, 1:24 PM CST · `select public.reverse_decision('3a6534ca-bc02-4c4e-9c51-728bf4971921','John','<why>');`
-- `4056f8a8` · design-ruling · `AGT-136` · Open questions ruled by cycle fb9f991b-74ee-46ee-8025-8d374d00d85d: 3 question(s) — {"no": 2, "yes": 1, "john": 0, "wit… · finalises Oct 6, 1:46 PM CST · `select public.reverse_decision('4056f8a8-7d31-4d9e-b588-b6acb423fd3f','John','<why>');`
-- `11e2c07d` · filing · — · Audit review 2026-W40: 30 findings → 7 tickets, 0 not-a-defect, 0 carried, 1 escalated · finalises Oct 6, 1:55 PM CST · `select public.reverse_decision('11e2c07d-cbdf-4c01-bd15-3b76eefa36d3','John','<why>');`
-- `ac3443ea` · design-kickoff · `AGT-332` · Kickoff designed for AGT-332 (slice 1 of 2: Private bench group in data, Brittany moved to it) · finalises Oct 6, 2:20 PM CST · `select public.reverse_decision('ac3443ea-81a2-4375-b6d3-69a27cc38713','John','<why>');`
-- `a828b44f` · john-ruling · `AGT-337` · John 2026-10-03: private, user-created agents are exempt from the §19u "every hire is signed" rule and go live on creat… · finalises Oct 6, 2:38 PM CST · `select public.reverse_decision('a828b44f-11f3-4570-a35a-18b28b2d7382','John','<why>');`
-- `0eebdd32` · design-kickoff · `AGT-335` · Kickoff designed for AGT-335 · finalises Oct 6, 2:44 PM CST · `select public.reverse_decision('0eebdd32-b469-463d-ac3c-342ffba46f7a','John','<why>');`
-- `75033a11` · ticket-scope · `AGT-339` · AGT-339 scope set to the Activity tab layout John approved 2026-10-03, with the AI-patterns line; the read is two publi… · finalises Oct 6, 2:54 PM CST · `select public.reverse_decision('75033a11-5530-470d-845c-1dad61e17cbf','John','<why>');`
-- `2583ee42` · design-kickoff · `AGT-336` · Kickoff designed for AGT-336 (slice 1 of 2) · finalises Oct 6, 2:57 PM CST · `select public.reverse_decision('2583ee42-aa3b-41dd-8936-c722784678d6','John','<why>');`
-- `ea558dc3` · design-kickoff · `AGT-339` · Kickoff designed for AGT-339 · finalises Oct 6, 3:11 PM CST · `select public.reverse_decision('ea558dc3-cafd-4f8c-ae22-83e40b5453fd','John','<why>');`
-- `2bb82982` · design-kickoff · `AGT-342` · Kickoff designed for AGT-342 · finalises Oct 6, 3:15 PM CST · `select public.reverse_decision('2bb82982-60fa-4daf-aa5d-d70b2c35b666','John','<why>');`
-- `79a20f6a` · design-kickoff · `AGT-332` · Kickoff designed for AGT-332 slice 2 of 2 (RosterScreen: Private first, opens on Private, All excludes private agents) · finalises Oct 6, 3:18 PM CST · `select public.reverse_decision('79a20f6a-5086-4179-ad8d-27e0e8192fc7','John','<why>');`
-- `bfefb600` · design-kickoff · `AGT-333` · Kickoff designed for AGT-333 (per-agent MCP address /api/mcp/<agent id>; /api/mcp unchanged) · finalises Oct 6, 3:18 PM CST · `select public.reverse_decision('bfefb600-aecb-44fd-8262-83991fceab44','John','<why>');`
-- `8694dc25` · design-kickoff · `AGT-334` · Kickoff designed for AGT-334 slice 1 of 2 (Add Training + Connect buttons and the pill popup) · finalises Oct 6, 3:18 PM CST · `select public.reverse_decision('8694dc25-abb8-4273-87f7-899eea91293b','John','<why>');`
-- `d5fb7591` · design-kickoff · `AGT-336` · Kickoff designed for AGT-336 slice 2 of 2 · finalises Oct 6, 3:48 PM CST · `select public.reverse_decision('d5fb7591-4e35-4e22-832a-1f76e3c1c4b1','John','<why>');`
-- `067cc2ad` · john-ruling · `AGT-337` · John 2026-10-03 "approved all five": save-failure message, saving state, outside-AI tool copy, dashes on a new card, hi… · finalises Oct 6, 4:27 PM CST · `select public.reverse_decision('067cc2ad-27b1-42c5-918f-c66aeef14750','John','<why>');`
-- `4465403c` · requirement-check · `AGT-349` · The test line opens up on its own after sustained green readings, never above John's ceiling of 5 · finalises Oct 6, 4:43 PM CST · `select public.reverse_decision('4465403c-7dbe-49ec-8dc3-a13e378ffffd','John','<why>');`
-- `b8f2584d` · design-kickoff · `AGT-349` · Kickoff designed for AGT-349 · finalises Oct 6, 4:52 PM CST · `select public.reverse_decision('b8f2584d-4763-4f99-897d-fdad025323f0','John','<why>');`
-- `0c4ec06c` · concurrency · `AGT-349` · Test line 1 -> 2 (up): 3 green readings with headroom, 1 held, 11 waiting · finalises Oct 6, 5:16 PM CST · `select public.reverse_decision('0c4ec06c-4e0a-46bf-9c26-3d98c1f35546','John','<why>');`
-- `a8e633e3` · removal · `AGT-337` · John 2026-10-03 "yes remove test agents": the three live-test agents (max-lnorjl, priya-test-aqah5q, solo-test-mpwk32),… · finalises Oct 6, 5:19 PM CST · `select public.reverse_decision('a8e633e3-815d-439b-a52d-dbe11d841498','John','<why>');`
-- `6e0208fa` · concurrency · `AGT-349` · Test line 4 -> 5 (up): 3 green readings with headroom, 4 held, 3 waiting · finalises Oct 6, 5:56 PM CST · `select public.reverse_decision('6e0208fa-e9ae-48ef-8ddc-ee0318182d0c','John','<why>');`
-- `7ba9bf18` · status · `AGT-349` · AGT-349 open -> delivered on a block verdict (one newly red test, not this ticket's) · finalises Oct 6, 6:07 PM CST · `select public.reverse_decision('7ba9bf18-c607-4cb7-8ec8-75ac9d823530','John','<why>');`
-- `c6aace0b` · design-kickoff · `AGT-343` · Kickoff designed for AGT-343 · finalises Oct 6, 6:42 PM CST · `select public.reverse_decision('c6aace0b-48ec-4d1f-83a8-e9e6c910afb1','John','<why>');`
-- `acb9f0a8` · design-kickoff · `AGT-350` · Kickoff designed for AGT-350 · finalises Oct 6, 6:44 PM CST · `select public.reverse_decision('acb9f0a8-8b8d-4683-acbd-6d117aa977fb','John','<why>');`
-- `5560dcd9` · john-ruling · `AGT-338` · John 2026-10-03 "yes, build the fix": an agent's knowledge tool only ever gives out that agent's own knowledge, on ever… · finalises Oct 6, 6:49 PM CST · `select public.reverse_decision('5560dcd9-8684-48d2-a0ad-3425978e722b','John','<why>');`
-- `c7c92b3f` · design-kickoff · `AGT-344` · Kickoff designed for AGT-344 (slice 1 of 2) · finalises Oct 6, 6:57 PM CST · `select public.reverse_decision('c7c92b3f-734f-4935-a62d-7248b774e9e0','John','<why>');`
-- `64ff6ef4` · agent-row · `AGT-338` · AGT-338 slice 2: the general bundle tool moves to its own Intent row carrying traits.any_agent = true; agent-bundle-int… · finalises Oct 6, 6:57 PM CST · `select public.reverse_decision('64ff6ef4-6516-4af4-839f-1f8d974782a0','John','<why>');`
-- `61de6bec` · ship · `AGT-339` · AGT-339 shipped at v7.0.758 (e6be1568807cbecde5c032318a09f21fdaf12544) on verdict 2037cf33-0212-42b0-bf09-25f010f238f0 · finalises Oct 6, 7:17 PM CST · `select public.reverse_decision('61de6bec-5118-47f6-bac1-62b2c3e075a0','John','<why>');`
-- `ea233259` · john-ruling · `AGT-350` · John ruled AGT-350 done over the block verdict · finalises Oct 6, 7:19 PM CST · `select public.reverse_decision('ea233259-2d82-4d97-9349-641dd143e8a5','John','<why>');`
-- `a27a7cbe` · john-ruling · `AGT-338` · John 2026-10-03 "approved, build it": the Connect popup offers the team address under the agent's own URL box, with the… · finalises Oct 6, 7:20 PM CST · `select public.reverse_decision('a27a7cbe-58d8-405c-9097-2321d3ff7d58','John','<why>');`
-- `35a8983a` · design-kickoff · `DAT-004` · Kickoff designed for DAT-004 · finalises Oct 6, 7:43 PM CST · `select public.reverse_decision('35a8983a-24ba-475e-b4ab-1ff6df25a4f9','John','<why>');`
-- `378d9043` · design-kickoff · `AGT-345` · Kickoff designed for AGT-345 · finalises Oct 6, 7:43 PM CST · `select public.reverse_decision('378d9043-0663-4498-b9ac-81be66d46fe8','John','<why>');`
-- `2aaa466c` · classification · — · board ordered: 4 ticket(s) given an automation_rank · finalises Oct 7, 1:49 AM CST · `select public.reverse_decision('2aaa466c-4975-4688-bcaa-3ece4383f75c','John','<why>');`
-- `7b3fa7ba` · hygiene · `AGT-79` · Ticket Owner: 6 derivable cell fix(es) on 6 row(s) — cost 6 · claim 0 · type 0 · revalidation 0 · finalises Oct 7, 1:55 AM CST · `select public.reverse_decision('7b3fa7ba-013e-4f88-9ec3-9e61ce96b186','John','<why>');`
-- **25 removal-proposal decisions** finalising Oct 7, 1:55 AM CST → Oct 7, 1:55 AM CST · one batch, listed by query rather than one line each: `select id, backlog_id, summary, expires_at from public.runner_decisions where status='open' and kind='removal-proposal' order by expires_at;` · reverse any one with `select public.reverse_decision('<id>','John','<why>');`
-- `173c68a0` · ship · `AGT-304` · AGT-304 shipped at v7.0.777 (eb93fbe3969a893814c6cdbaf95ee1889decd1f5) on verdict 44e555a1-792b-4c42-a9ac-04d16ebe619a · finalises Oct 7, 2:42 AM CST · `select public.reverse_decision('173c68a0-758e-4a67-9fb6-d7761f448d28','John','<why>');`
-- `177f0976` · ship · `AGT-137` · AGT-137 shipped at v7.0.602 (b1725dd036af4a17c79f20a216c432a152f23cf2) on verdict 87fa103b-b472-4bf6-952e-4bdd6a58df19 · finalises Oct 7, 2:58 AM CST · `select public.reverse_decision('177f0976-d987-4276-8b7b-46ebf34fe9ca','John','<why>');`
-- `4662ce2a` · learning · `SES-159` · class-loop learning claims for P3 - Investor Value · finalises Oct 7, 3:02 AM CST · `select public.reverse_decision('4662ce2a-1db8-4ba1-9adc-08495f739c05','John','<why>');`
-- `640b3141` · ship · `AGT-304` · AGT-304 shipped at v7.0.778 (bc1c56bf40d38042d33c918940092a48e7e16c01) on verdict 6f354b11-ee8a-4c2a-9b6f-21fb52f71385 · finalises Oct 7, 3:46 AM CST · `select public.reverse_decision('640b3141-6679-4886-9ff3-ce9f7b6ab0aa','John','<why>');`
-- `16927962` · model-catalog · — · Model catalog: 20 Claude model rows checked · finalises Oct 7, 4:44 AM CST · `select public.reverse_decision('16927962-d65d-4873-ac2a-b3150a8dd217','John','<why>');`
-- `c063afc9` · model-catalog · — · Model catalog: 9 Claude model rows checked · finalises Oct 7, 4:49 AM CST · `select public.reverse_decision('c063afc9-a9c5-4d29-8d44-9609b3df671a','John','<why>');`
-- `6bb98a04` · model-keep · — · capability/bench-report-card keeps claude-sonnet-4-6 · finalises Oct 7, 4:49 AM CST · `select public.reverse_decision('6bb98a04-e3f6-44a8-82ea-4eb6d5f7eded','John','<why>');`
-- `f1a78dd8` · model-keep · — · capability/data-room-custody keeps claude-haiku-4-5-20251001 · finalises Oct 7, 4:49 AM CST · `select public.reverse_decision('f1a78dd8-a76f-4c33-bdc5-4fda7ceeaa0a','John','<why>');`
-- `f02ce306` · model-keep · — · lane/judgment keeps claude-fable-5-1 · finalises Oct 7, 4:49 AM CST · `select public.reverse_decision('f02ce306-4e0c-4e95-b24e-752f23d909ab','John','<why>');`
-- `eba63a6d` · model-keep · — · lane/mechanical keeps claude-sonnet-5 · finalises Oct 7, 4:49 AM CST · `select public.reverse_decision('eba63a6d-93e9-421f-9478-cf576796ab22','John','<why>');`
-- `123d74a7` · model-keep · — · lane/orchestrator keeps claude-opus-5 · finalises Oct 7, 4:49 AM CST · `select public.reverse_decision('123d74a7-d8e6-43d6-ae51-0cff2e3bd267','John','<why>');`
-- `928e8eba` · model-report · — · model-watch 2026-10-04: releases 0, retirements 9, watch reviewed 0, trials 0, switched 0, kept 5, reverted 0 · finalises Oct 7, 4:51 AM CST · `select public.reverse_decision('928e8eba-cd2c-40b1-a604-98fa961820bb','John','<why>');`
-- `5bea2b06` · design-kickoff · `AGT-348` · Kickoff designed for AGT-348 · finalises Oct 7, 7:46 PM CST · `select public.reverse_decision('5bea2b06-2f1e-48b3-8486-d6331133cb56','John','<why>');`
-- `f6323999` · classification · — · board ordered: 4 ticket(s) given an automation_rank · finalises Oct 8, 1:55 AM CST · `select public.reverse_decision('f6323999-e343-4e82-a9e9-b1d7c815e024','John','<why>');`
-- `0c14e92f` · hygiene · `AGT-79` · Ticket Owner: 23 derivable cell fix(es) on 23 row(s) — cost 0 · claim 0 · type 0 · revalidation 23 · finalises Oct 8, 2:05 AM CST · `select public.reverse_decision('0c14e92f-d875-48fc-a325-fc54bf3eb77d','John','<why>');`
-- `23d1f165` · removal-proposal · `SK-17` · SK-17 removal proposed: Dead by evidence: skill_profiles already has llm_provider, llm_model, max_tokens, api_key_sourc… · finalises Oct 8, 2:05 AM CST · `select public.reverse_decision('23d1f165-8b30-4ab8-9097-85d7f530054e','John','<why>');`
-- `fcc38a15` · removal-proposal · `SK-18` · SK-18 removal proposed: Dead by evidence: skill_profiles row execution-plan (the SP-PM-03 format skill) already holds t… · finalises Oct 8, 2:05 AM CST · `select public.reverse_decision('fcc38a15-4761-4e19-b935-34d7e3352407','John','<why>');`
-- `fa80c764` · leverage · — · AGT-238 leverage first: AGT-304 marked as leverage -- outranks project order · finalises Oct 8, 2:55 AM CST · `select public.reverse_decision('fa80c764-beb8-480a-8e4a-2877668af410','John','<why>');`
-- `366e8222` · concurrency · — · AGT-238 concurrency from the corpus: 4 project(s) executing in the order tooling, dev-manager-capabilities, mcp-poc, ag… · finalises Oct 8, 2:55 AM CST · `select public.reverse_decision('366e8222-d0a3-4fe2-957c-55cacbea29d3','John','<why>');`
-- `f476c81f` · ticket-status · `AGT-304` · Close-out: AGT-304 settles 'partial' · finalises Oct 8, 3:25 AM CST · `select public.reverse_decision('f476c81f-a6bd-45b8-ad37-38b4e2ceab4e','John','<why>');`
-- `93c60b47` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 8, 3:25 AM CST · `select public.reverse_decision('93c60b47-490c-49b7-8883-d409f28e95de','John','<why>');`
-- `de659c2d` · learning · `SES-159` · class-loop learning claims for P3 - Investor Value · finalises Oct 8, 3:56 AM CST · `select public.reverse_decision('de659c2d-61bc-4bb1-938a-67f9fa3f6eba','John','<why>');`
-- `bc9091dd` · ticket-scope · `AGT-304` · AGT-304 slice 5 is designed: v7.0.782 re-pins three regression arms (agt-135, agt-176b, agt-226) whose assertions were… · finalises Oct 8, 4:22 AM CST · `select public.reverse_decision('bc9091dd-ca71-4503-96a9-f47842c467da','John','<why>');`
-- `19990a75` · filing · — · Audit review 2026-W41: 58 findings → 16 tickets, 5 not-a-defect, 0 carried, 1 escalated · finalises Oct 8, 4:25 AM CST · `select public.reverse_decision('19990a75-4178-4a36-b5c9-6ffa95efd553','John','<why>');`
-- `c23feb06` · model-catalog · — · Model catalog: 20 Claude model rows checked · finalises Oct 8, 4:45 AM CST · `select public.reverse_decision('c23feb06-c3ed-40a9-8dff-023970ffb6fc','John','<why>');`
-- `d16eb172` · ticket-status · `AGT-304` · Close-out: AGT-304 settles 'partial' · finalises Oct 8, 4:46 AM CST · `select public.reverse_decision('d16eb172-d819-4209-954a-9a090fb07feb','John','<why>');`
-- `da434872` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 8, 4:46 AM CST · `select public.reverse_decision('da434872-47d4-41a6-9d96-eee6c974d84b','John','<why>');`
-- `6ea72343` · gate · — · Filed a defect finding: run-project's record_leverage fence refuses the manager's own pass-two write whenever the calli… · finalises Oct 8, 4:50 AM CST · `select public.reverse_decision('6ea72343-688a-4a9f-859e-7ceee970326c','John','<why>');`
-- `ae3feb07` · model-keep · — · capability/bench-report-card keeps claude-sonnet-4-6 · finalises Oct 8, 4:50 AM CST · `select public.reverse_decision('ae3feb07-c465-4e7b-a483-cb3917c9a32d','John','<why>');`
-- `04f1d539` · model-keep · — · capability/data-room-custody keeps claude-haiku-4-5-20251001 · finalises Oct 8, 4:50 AM CST · `select public.reverse_decision('04f1d539-dee4-4739-bbe7-264d8373701e','John','<why>');`
-- `0f8d2c06` · model-keep · — · lane/judgment keeps claude-fable-5-1 · finalises Oct 8, 4:50 AM CST · `select public.reverse_decision('0f8d2c06-e116-4187-ad02-f9bbb592a937','John','<why>');`
-- `370a8409` · model-keep · — · lane/mechanical keeps claude-sonnet-5 · finalises Oct 8, 4:50 AM CST · `select public.reverse_decision('370a8409-9e29-49f6-a7ff-1106328a0ad3','John','<why>');`
-- `3f471871` · model-keep · — · lane/orchestrator keeps claude-opus-5 · finalises Oct 8, 4:50 AM CST · `select public.reverse_decision('3f471871-cf40-4400-a9db-9b090d5f1a55','John','<why>');`
-- `fad99186` · model-report · — · model-watch 2026-10-05: releases 0, retirements 8, watch reviewed 0, trials 0, switched 0, kept 5, reverted 0 · finalises Oct 8, 4:51 AM CST · `select public.reverse_decision('fad99186-d8b1-450f-bb64-ef5a68acd1a5','John','<why>');`
-- `9101686e` · gate · — · Filed a defect finding: one delivered ticket whose latest verdict is a block now makes the all-or-nothing sweep_decisio… · finalises Oct 8, 5:05 AM CST · `select public.reverse_decision('9101686e-6058-439b-b98b-2e6137fae40e','John','<why>');`
-- `666e08f8` · leverage · — · AGT-238 leverage first: AGT-304, AGT-340, AGT-341 marked as leverage -- outranks project order · finalises Oct 8, 5:52 AM CST · `select public.reverse_decision('666e08f8-ba14-4d79-85f4-87c05aeb6ebe','John','<why>');`
-- `0faa4031` · concurrency · — · AGT-238 concurrency from the corpus: 1 project(s) executing in the order tooling, pausing agent-training · finalises Oct 8, 5:52 AM CST · `select public.reverse_decision('0faa4031-add7-40f1-97f5-f7518d2c9ef0','John','<why>');`
-- `37d6fa4b` · filing · — · Audit review 2026-W41: 118 findings → 13 tickets, 1 not-a-defect, 2 carried, 2 escalated · finalises Oct 8, 6:04 AM CST · `select public.reverse_decision('37d6fa4b-a528-495e-9041-98303fe118a6','John','<why>');`
-- `ed974c75` · audit-report · — · WAITING ON JOHN (rules): finding_routes has no row for source builder or session, so five defects I have no quarrel wit… · finalises Oct 8, 6:06 AM CST · `select public.reverse_decision('ed974c75-aabb-42c7-80b3-7d631bea6298','John','<why>');`
-- `5ce3a812` · ticket-status · `AGT-304` · Close-out: AGT-304 settles 'partial' · finalises Oct 8, 6:56 AM CST · `select public.reverse_decision('5ce3a812-0448-4e5e-9db2-42e9bbde4204','John','<why>');`
-- `b0e5b5ee` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 8, 6:56 AM CST · `select public.reverse_decision('b0e5b5ee-5164-421c-a1b0-4deb9051e275','John','<why>');`
-- `4ba5186b` · finding-route · `AGT-304` · Builder deviation on AGT-304 slice 6: the regression suite unshallows its own clone — CAPTURED as a finding, not fixed… · finalises Oct 8, 6:58 AM CST · `select public.reverse_decision('4ba5186b-1951-4234-b717-eb8851cf3127','John','<why>');`
-- `a862e547` · ship · `AGT-304` · AGT-304 shipped at v7.0.783 (9a95d9c76d9774c42718b0c9bd57c3151974ee56) on verdict 03b0fb08-9b41-4ac9-84e7-ac9e4a4f2e1b · finalises Oct 8, 7:00 AM CST · `select public.reverse_decision('a862e547-ec35-466d-b4a1-71fdec162645','John','<why>');`
-- `fc8b9f7c` · ship · `AGT-174` · AGT-174 shipped at v7.0.622 (1b422b277aff126b90960685a9d6b74dfcf78c24) on verdict 3da23932-b209-4008-92fe-709c4e056741 · finalises Oct 8, 7:13 AM CST · `select public.reverse_decision('fc8b9f7c-4579-41b2-a39b-0cb2d96cd803','John','<why>');`
-- `e868adb3` · design-kickoff · `AGT-348` · Kickoff designed for AGT-348 slice 2 · finalises Oct 8, 10:27 AM CST · `select public.reverse_decision('e868adb3-8b07-443e-8a33-a9d9d7b81891','John','<why>');`
-- `7e7f46a9` · design-kickoff · `AGT-348` · Kickoff designed for AGT-348 slice 3 · finalises Oct 8, 10:36 AM CST · `select public.reverse_decision('7e7f46a9-e8cc-47b9-b23b-032a2cb8f254','John','<why>');`
-- `94e820c3` · design-kickoff · `AGT-348` · Kickoff designed for AGT-348 slice 4 · finalises Oct 8, 10:55 AM CST · `select public.reverse_decision('94e820c3-eaa2-47a7-aa83-c936c3cfd92c','John','<why>');`
-- `64e6940c` · design-kickoff · `AGT-348` · Kickoff designed for AGT-348 slice 5 · finalises Oct 8, 11:05 AM CST · `select public.reverse_decision('64e6940c-f4c9-4cd4-b724-cbc4902b1050','John','<why>');`
-- `1f8d7302` · john-ruling · `AGT-384` · John named AGT-384's scope (Bench home, four cards, Connect to AI and Test AI pages, shared left nav with breadcrumb) a… · finalises Oct 8, 12:44 PM CST · `select public.reverse_decision('1f8d7302-9354-42f4-bf04-f99c5464c14a','John','<why>');`
-- `3fa088aa` · design-kickoff · `AGT-384` · Kickoff designed for AGT-384 · finalises Oct 8, 12:58 PM CST · `select public.reverse_decision('3fa088aa-d563-4a82-8d9e-c4d9a4f1af7c','John','<why>');`
-- `2ce24377` · ticket-status · `AGT-384` · Close-out: AGT-384 settles delivered (v7.0.788, on dev at d48ab2db). · finalises Oct 8, 1:41 PM CST · `select public.reverse_decision('2ce24377-3575-4f14-85b0-2110d8e71464','John','<why>');`
-- `d110e648` · john-ruling · `AGT-385` · John named AGT-385's scope (Connect to AI page redesign) and waived the three-file / four-task cap for this one ticket:… · finalises Oct 8, 6:01 PM CST · `select public.reverse_decision('d110e648-ac94-4442-9cdc-c6f0fc6bc846','John','<why>');`
-- `5a8dda85` · design-kickoff · `AGT-385` · Kickoff designed for AGT-385 · finalises Oct 8, 6:12 PM CST · `select public.reverse_decision('5a8dda85-de95-4db9-8679-4a4114170a05','John','<why>');`
-- `ce41396c` · requirement-check · `ZAGTVIC-1022652a` · AGT-281 list probe — the pass arm · finalises Oct 8, 6:28 PM CST · `select public.reverse_decision('ce41396c-a637-4667-9c75-6f96b0f9b237','John','<why>');`
-- `80cdb6e6` · removal-proposal · `ZAGTVIC-1022652b` · ZAGTVIC-1022652b removal proposed: no candidate record asks for this at all (regression fixture) · finalises Oct 8, 6:28 PM CST · `select public.reverse_decision('80cdb6e6-9732-4df2-aee1-3ba31b872d76','John','<why>');`
-- `2469b825` · ticket-scope · `AGT-385` · AGT-385 gains John's three round-two copy changes on the Connect page: a plain-text lead-in before the Claude link, a n… · finalises Oct 8, 6:28 PM CST · `select public.reverse_decision('2469b825-7d59-42f8-abf5-a108c6819d15','John','<why>');`
-- `c1f447c7` · design-kickoff · `AGT-386` · Kickoff designed for AGT-386 · finalises Oct 8, 6:31 PM CST · `select public.reverse_decision('c1f447c7-d80f-4f3f-894b-abc7c03cd3fc','John','<why>');`
-- `6897e61a` · ticket-status · `AGT-385` · Close-out: AGT-385 settles delivered (v7.0.789, on dev at bbce7080). · finalises Oct 8, 6:45 PM CST · `select public.reverse_decision('6897e61a-3600-431c-81a9-7446994b846a','John','<why>');`
-- `3c6bbe04` · scope-ruling · `AGT-387` · AGT-387 Company: record the AI tool name going forward · finalises Oct 8, 6:50 PM CST · `select public.reverse_decision('3c6bbe04-0092-428f-8703-53a3d826a833','John','<why>');`
-- `e2d4dd01` · john-ruling · `AGT-388` · John named AGT-388's scope: the Test AI page gets the Connect page's FAQ drawers, three of them, behind tool tabs. · finalises Oct 8, 6:56 PM CST · `select public.reverse_decision('e2d4dd01-152c-4250-b85d-d93b0cc352d9','John','<why>');`
-- `1e5b9b52` · design-kickoff · `AGT-388` · Kickoff designed for AGT-388 · finalises Oct 8, 7:06 PM CST · `select public.reverse_decision('1e5b9b52-0727-4dac-87c6-cc3b77d2a464','John','<why>');`
-- `20e5f7c2` · ticket-scope · `AGT-388` · AGT-388 gains John's styling change: on the Test AI page only, "Select your AI tool" under FAQ is drawn as instructiona… · finalises Oct 8, 7:18 PM CST · `select public.reverse_decision('20e5f7c2-f2cb-4fe0-bb7d-857a47cf2e25','John','<why>');`
-- `17df5eb1` · ticket-status · `AGT-386` · Close-out: AGT-386 settles delivered · finalises Oct 8, 7:18 PM CST · `select public.reverse_decision('17df5eb1-04d7-4748-a79d-d39f948389a5','John','<why>');`
-- `55f50b9b` · ticket-status · `AGT-388` · Close-out: AGT-388 settles delivered (v7.0.791, on dev at 7321b7e5). · finalises Oct 8, 7:36 PM CST · `select public.reverse_decision('55f50b9b-23fa-4216-923f-5b34b86d3b35','John','<why>');`
-- `74843236` · john-ruling · — · John's session brief, pasted 2026-10-05: "a user in an AI client (Claude, ChatGPT, Grok) can update the rules and knowl… · finalises Oct 8, 10:38 PM CST · `select public.reverse_decision('74843236-b407-4130-a349-a472da97468c','John','<why>');`
-- `526ce846` · requirement-check · `AGT-390` · A private agent's MCP address gets a "Teach <name>" tool: the connected AI client can add a rule (role prompt, guardrai… · finalises Oct 8, 10:40 PM CST · `select public.reverse_decision('526ce846-494b-478f-8cb7-e9fc93c06b85','John','<why>');`
-- `6eafed1b` · john-ruling · `AGT-390` · John 2026-10-05, verbatim: "need to make sure we tag knowledge - we know where it came from" -- every item or rule taug… · finalises Oct 8, 10:50 PM CST · `select public.reverse_decision('6eafed1b-9a2c-4ff5-86af-09450301778c','John','<why>');`
-- `75b989f0` · john-ruling · `AGT-390` · John 2026-10-05 "sure reactive": testjohn-w50rvr is reactivated as the second live example for AGT-390 (Brittany is the… · finalises Oct 8, 10:51 PM CST · `select public.reverse_decision('75b989f0-2e7a-4b2b-b8f0-b7bb0263d242','John','<why>');`
-- `60135230` · john-ruling · `AGT-390` · John 2026-10-05 "its fine it is there": the Teach tool may be listed on the admin address too. The visibility rule is u… · finalises Oct 8, 10:52 PM CST · `select public.reverse_decision('60135230-37f3-4d09-a72d-53877a366227','John','<why>');`
-- `0b2bd8e3` · john-ruling · `AGT-390` · John 2026-10-05 "yes, approved": a guardrail taught from an AI client is its own agent_configs row under Always or Neve… · finalises Oct 8, 10:59 PM CST · `select public.reverse_decision('0b2bd8e3-147f-4a7e-8769-59dabf4d83d5','John','<why>');`
-- `e7d32de3` · john-ruling · `AGT-390` · John 2026-10-05 "one build, waive the cap": AGT-390 ships as one build; the three-file / four-task cap is waived for th… · finalises Oct 8, 11:00 PM CST · `select public.reverse_decision('e7d32de3-7f74-40a3-a209-dc861bee05dc','John','<why>');`
-- `419d8ee2` · ticket-scope · `AGT-390` · AGT-390 description rewritten to the walkthrough's agreed scope: origin + date tag on every taught row, client guardrai… · finalises Oct 8, 11:01 PM CST · `select public.reverse_decision('419d8ee2-9618-413e-926b-af7f852ec02c','John','<why>');`
-- `83dbaa5f` · design-kickoff · `AGT-390` · Kickoff designed for AGT-390 · finalises Oct 8, 11:21 PM CST · `select public.reverse_decision('83dbaa5f-724c-4368-b356-84c55e8ee996','John','<why>');`
-- `a63986f4` · john-ruling · — · John 2026-10-05, verbatim: "i think we should only run regression once a week or after a push to production. We should… · finalises Oct 8, 11:34 PM CST · `select public.reverse_decision('a63986f4-08aa-4b80-bc76-889be5318bae','John','<why>');`
-- `e1a254d4` · requirement-check · `AGT-391` · Selective regression: a build runs its own test plus the related set; the full suite runs weekly and before a push to p… · finalises Oct 8, 11:36 PM CST · `select public.reverse_decision('e1a254d4-bbbc-49b1-b87e-7d910359fd0c','John','<why>');`
-- `ce3a13e8` · john-ruling · `AGT-391` · John 2026-10-05 "yes waive the cap, monday is fine": AGT-391 ships as one build with the three-file / four-task cap wai… · finalises Oct 8, 11:39 PM CST · `select public.reverse_decision('ce3a13e8-23ce-4469-8a86-e5c299b1ed84','John','<why>');`
-- `63e2ec07` · design-kickoff · `AGT-391` · Kickoff designed for AGT-391 · finalises Oct 9, 12:09 AM CST · `select public.reverse_decision('63e2ec07-6228-4076-970b-74493c5f1fb7','John','<why>');`
-- `4838c745` · john-ruling · `AGT-390` · John 2026-10-05 (late evening CDT), verbatim: "push dev to production once agt-390 is done" -- sign-off for the dev ->… · finalises Oct 9, 12:11 AM CST · `select public.reverse_decision('4838c745-6e4c-4c88-b755-270fc3a25dec','John','<why>');`
-- `e87ac5ef` · ticket-status · `AGT-390` · Close-out: AGT-390 settles 'delivered' · finalises Oct 9, 12:11 AM CST · `select public.reverse_decision('e87ac5ef-1b99-4cb5-a73e-6dd83b298a3a','John','<why>');`
-- `099b6352` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 9, 12:11 AM CST · `select public.reverse_decision('099b6352-98ea-4256-bcfe-ca19d1c6fc2e','John','<why>');`
-- `e904fc2f` · ticket-status · `AGT-390` · Close-out: AGT-390 settles done (v7.0.792, on dev at 9972b5fc; verifier APPROVE 830208ba, 0 newly red). · finalises Oct 9, 12:11 AM CST · `select public.reverse_decision('e904fc2f-c867-4ac7-af28-8320322df9e4','John','<why>');`
-- `c76fa5e7` · john-ruling · — · Released to production: dev f07d5514 (v7.0.792) merged into main as c3e6b66d, PR #15 (release/v7.0.792-mcp-teach), 2026… · finalises Oct 9, 12:14 AM CST · `select public.reverse_decision('c76fa5e7-9c62-4be1-97b1-9ba82fc8f3dd','John','<why>');`
-- `e1eb09e9` · agent-row · `AGT-391` · AGT-391: re-pin dm-knowledge-cycle-card 254dcbfa990f2bbf → 4fb23dcee4ee3b2e · finalises Oct 9, 12:28 AM CST · `select public.reverse_decision('e1eb09e9-5aef-4be3-9ae7-33fc83bfb1da','John','<why>');`
-- `0bce4c62` · agent-row · `AGT-391` · AGT-391 Skill-row edits (AGENT-ROW-AGREED-TICKET, john-named): bd-guardrails must[1], bd-build-intent.method and vf-kno… · finalises Oct 9, 12:31 AM CST · `select public.reverse_decision('0bce4c62-5c78-4ecf-8663-90d8bfc752e9','John','<why>');`
-- `f328ea68` · ticket-status · `AGT-391` · Close-out: AGT-391 settles 'delivered' · finalises Oct 9, 12:34 AM CST · `select public.reverse_decision('f328ea68-0d29-468b-8e4d-3dbe6d025206','John','<why>');`
-- `901f7648` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 9, 12:34 AM CST · `select public.reverse_decision('901f7648-4d9d-4f4b-8e3c-98df025f5e86','John','<why>');`
-- `f4550915` · ticket-status · `AGT-391` · Close-out: AGT-391 settles done (v7.0.793, on dev at eeda8f1f; verifier APPROVE d239b90a on the 118-test related set, 1… · finalises Oct 9, 12:34 AM CST · `select public.reverse_decision('f4550915-ff72-4727-9bcb-f79228e672c1','John','<why>');`
-- `9a6ff2d3` · classification · — · board ordered: 6 ticket(s) given an automation_rank · finalises Oct 9, 1:52 AM CST · `select public.reverse_decision('9a6ff2d3-2918-4034-b83a-723a6d48bfcc','John','<why>');`
-- `ae4e559c` · hygiene · `AGT-79` · Ticket Owner: 22 derivable cell fix(es) on 22 row(s) — cost 0 · claim 0 · type 0 · revalidation 22 · finalises Oct 9, 2:12 AM CST · `select public.reverse_decision('ae4e559c-0943-4097-844d-a07d07b59a38','John','<why>');`
-- `48f953b5` · removal-proposal · `AA-56` · AA-56 removal proposed: api/prompt/db-assembly.js:630 assemblePrompt already takes runtime_context (AA-136, rendered at… · finalises Oct 9, 2:12 AM CST · `select public.reverse_decision('48f953b5-1fc9-46a6-8aee-cc507ae0c86d','John','<why>');`
-- `04314733` · removal-proposal · `AI-42` · AI-42 removal proposed: Premise half-superseded: public write grants revoked platform-wide (DAT-18 v7.0.78, .claude/rul… · finalises Oct 9, 2:12 AM CST · `select public.reverse_decision('04314733-7a24-4d99-ac5b-0b9435e3a657','John','<why>');`
-- `1be5490b` · removal-proposal · `AI-45` · AI-45 removal proposed: Precondition AI-44 is not on the board; the row cannot say whether it shipped, so the pass cann… · finalises Oct 9, 2:12 AM CST · `select public.reverse_decision('1be5490b-dbc5-49d0-81f5-c102ee21ab90','John','<why>');`
-- `fc1e4a35` · ticket-status · `AGT-304` · Close-out: AGT-304 settles 'partial' · finalises Oct 9, 3:16 AM CST · `select public.reverse_decision('fc1e4a35-ab9d-4e62-9fde-571a85628a76','John','<why>');`
-- `8263b59a` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 9, 3:16 AM CST · `select public.reverse_decision('8263b59a-1d6e-4696-9079-b79da28aadf6','John','<why>');`
-- `0a59a431` · ship · `AGT-179` · AGT-179 shipped at v7.0.647 (7c9f2369b343aac0717d5848c1bf5efc7eb02fef) on verdict 42138283-f496-4947-9f12-16a74167d9b2 · finalises Oct 9, 3:34 AM CST · `select public.reverse_decision('0a59a431-b81d-4a7a-92e9-32ff715ddb8a','John','<why>');`
-- `f05fc6b4` · learning · `SES-159` · class-loop learning claims for P2 - Inventive · finalises Oct 9, 3:36 AM CST · `select public.reverse_decision('f05fc6b4-3cbb-472c-9250-824d4dc76acd','John','<why>');`
-- `cad2cc17` · design-ruling · `AGT-136` · Open questions ruled by cycle fe7448f5-480b-4f69-b13a-08c5ccf11887: 3 question(s) — {"no": 2, "yes": 1, "john": 0, "wit… · finalises Oct 9, 3:46 AM CST · `select public.reverse_decision('cad2cc17-89d1-4775-b66e-8a1995159139','John','<why>');`
-- `fb977117` · model-catalog · — · Model catalog: 20 Claude model rows checked · finalises Oct 9, 4:50 AM CST · `select public.reverse_decision('fb977117-2981-481e-86d1-2bfa7e0dd997','John','<why>');`
-- `87038e66` · model-catalog · — · Model catalog: 12 Claude model rows checked · finalises Oct 9, 4:59 AM CST · `select public.reverse_decision('87038e66-1306-4a20-8708-f00f89819084','John','<why>');`
-- `58fce9fd` · model-keep · — · capability/bench-report-card keeps claude-sonnet-4-6 · finalises Oct 9, 4:59 AM CST · `select public.reverse_decision('58fce9fd-4ff1-4150-b059-1f89082b317e','John','<why>');`
-- `6833e3bc` · model-keep · — · capability/data-room-custody keeps claude-haiku-4-5-20251001 · finalises Oct 9, 4:59 AM CST · `select public.reverse_decision('6833e3bc-4417-48ca-80c4-d656df17825a','John','<why>');`
-- `f63630b0` · model-keep · — · lane/judgment keeps claude-fable-5-1 · finalises Oct 9, 4:59 AM CST · `select public.reverse_decision('f63630b0-d236-4acf-881c-90df62e69728','John','<why>');`
-- `192c1e18` · model-keep · — · lane/mechanical keeps claude-sonnet-5 · finalises Oct 9, 4:59 AM CST · `select public.reverse_decision('192c1e18-c140-46e2-a5a3-d963b92a07c1','John','<why>');`
-- `359c7942` · model-keep · — · lane/orchestrator keeps claude-opus-5 · finalises Oct 9, 4:59 AM CST · `select public.reverse_decision('359c7942-1b8a-4c86-ac7a-820833caa9b0','John','<why>');`
-- `f89e122e` · model-report · — · model-watch 2026-10-06: releases 0, retirements 8, watch reviewed 0, trials 0, switched 0, kept 5, reverted 0 · finalises Oct 9, 5:01 AM CST · `select public.reverse_decision('f89e122e-c2c5-4fce-96da-61efe6a1ec9e','John','<why>');`
-- `7a1cb9f2` · reversal · `AGT-427` · reversal of ticket-scope decision adb146d5-cf1c-455e-b21f-6be12fa49c8a -- applied: 0 restored, 0 restored-unverified, 0… · finalises Oct 9, 12:42 PM CST · `select public.reverse_decision('7a1cb9f2-4318-4a9b-b2bf-2469978d47b9','John','<why>');`
-- `ab0824c4` · john-ruling · — · John's session brief, pasted 2026-10-06: decide what to build first from his analysis of what a DeepBench agent carries… · finalises Oct 9, 5:15 PM CST · `select public.reverse_decision('ab0824c4-6620-46f6-8981-699e94410663','John','<why>');`
-- `b5e7194d` · john-ruling · — · John 2026-10-06, verbatim: "there can't be data behind the scenes that is not visible in deepbench or secretly given to… · finalises Oct 9, 5:15 PM CST · `select public.reverse_decision('b5e7194d-e58a-49b6-835f-6fb2b5a17162','John','<why>');`
-- `4507195c` · requirement-check · `AGT-392` · Identity editor on the Resume tab: agent name, role, specialty and bio become editable, each edit tagged with who made… · finalises Oct 9, 5:17 PM CST · `select public.reverse_decision('4507195c-1c9c-4d75-8cd2-040c766dd000','John','<why>');`
-- `6253a366` · requirement-check · `AGT-393` · The Teach tool accepts specialty and bio from a connected AI client, tagged with the key that wrote them · finalises Oct 9, 5:17 PM CST · `select public.reverse_decision('6253a366-d679-4e23-8592-7bdc8871b36f','John','<why>');`
-- `bcf0c1b9` · requirement-check · `AGT-394` · AI Client's Instruction: a lead text the AI client reads first in every scaffold reply, and a per-agent answer mode (ag… · finalises Oct 9, 5:17 PM CST · `select public.reverse_decision('bcf0c1b9-f33a-4f85-ac92-afc704954cb6','John','<why>');`
-- `edbe57df` · requirement-check · `AGT-395` · The scaffold stops sending the Library block (catalog, records, tier, data rooms) and the per-item always flag to AI cl… · finalises Oct 9, 5:17 PM CST · `select public.reverse_decision('edbe57df-0318-46ed-8470-10c72b5a3552','John','<why>');`
-- `c8620f3a` · requirement-check · `AGT-396` · Remove the fixed ACTIVE badge from the Personnel header, roster card and profile heading · finalises Oct 9, 5:17 PM CST · `select public.reverse_decision('c8620f3a-8734-41a6-a76d-ae8fb6f1fea4','John','<why>');`
-- `3cf2a1cd` · requirement-check · `AGT-397` · Future View: a Personnel page that holds the 30 parked items (compensation, readiness, Library, mock lists, is_active,… · finalises Oct 9, 5:17 PM CST · `select public.reverse_decision('3cf2a1cd-d9fd-4f4c-afca-b3bfcd34991b','John','<why>');`
-- `5a4cbc85` · requirement-check · `AGT-398` · The badge number becomes the agent's id: one identifier shown on DeepBench and used in the MCP link; internal id retire… · finalises Oct 9, 5:17 PM CST · `select public.reverse_decision('5a4cbc85-1269-4d4b-9fa8-bfffbd870a21','John','<why>');`
-- `fae52230` · requirement-check · `AGT-399` · Every Skill an agent holds is visible on Personnel, read-only: all fields of every Skill, grouped by the six types, wit… · finalises Oct 9, 5:17 PM CST · `select public.reverse_decision('fae52230-32e8-4a14-acc2-bbe5e1ecf766','John','<why>');`
-- `a0cf2f1b` · requirement-check · `AGT-400` · Prompt assembler: role prompts rendered once, Behavior Skills render their own objective and method, and tone and outpu… · finalises Oct 9, 5:17 PM CST · `select public.reverse_decision('a0cf2f1b-cda7-416c-a8d3-9855f55fea39','John','<why>');`
-- `5c627aab` · requirement-check · `AGT-401` · Pull one live scaffold for Nathan and one for Brittany and record exactly what each AI client receives · finalises Oct 9, 5:17 PM CST · `select public.reverse_decision('5c627aab-dde2-42f8-a641-cb5acf9f7349','John','<why>');`
-- `c28a80f6` · requirement-check · `AGT-402` · Personnel page reads real facts where it shows constants: the Documents count, the YOUR TRAINEE badge, and the Bureau h… · finalises Oct 9, 5:43 PM CST · `select public.reverse_decision('c28a80f6-e9d2-41fe-bb49-437c20839b3d','John','<why>');`
-- `ab8c31f1` · design-kickoff · `AGT-397` · Kickoff designed for AGT-397 (slice 1 of 2: layout switch, Coming nav group, Future View tab with the parked cards relo… · finalises Oct 9, 6:41 PM CST · `select public.reverse_decision('ab8c31f1-dbc0-48cd-bdda-ef9e89556256','John','<why>');`
-- `5b3f8e58` · ship · `AGT-397` · AGT-397 slice 1 shipped to dev at 6d9749a7 (v7.0.795): the Current / Proposed layout switch and the Future View tab wit… · finalises Oct 9, 6:52 PM CST · `select public.reverse_decision('5b3f8e58-4893-4342-a24a-a98be0373163','John','<why>');`
-- `8dd9b994` · john-ruling · `AGT-397` · John 2026-10-06, verbatim: "yes one build" -- the 3-file / 4-task cap is waived for AGT-397 slice 2 together with AGT-3… · finalises Oct 9, 7:13 PM CST · `select public.reverse_decision('8dd9b994-b311-4823-b4a9-87eaaa409de6','John','<why>');`
-- `6dc81f0f` · design-kickoff · `AGT-397` · Kickoff designed for AGT-397 slice 2 with AGT-392 inside it (cap waived by John, ruling 8dd9b994): Proposed Resume with… · finalises Oct 9, 7:32 PM CST · `select public.reverse_decision('6dc81f0f-5c62-4df7-b7ff-195cb3e99f21','John','<why>');`
-- `b784da00` · ticket-status · `AGT-397` · AGT-397 and AGT-392 settle delivered at 44388846 (v7.0.796): the Proposed layout is complete and the Identity editor sh… · finalises Oct 9, 7:41 PM CST · `select public.reverse_decision('b784da00-15dc-425e-a023-fdeb6a8d988f','John','<why>');`
-- `5cc70632` · ticket-status · `AGT-397` · AGT-397 and AGT-392 settle done at 44388846 (v7.0.796) after verdicts 0dcb165c and 26ea78b1 approve and the live dev-ho… · finalises Oct 9, 7:46 PM CST · `select public.reverse_decision('5cc70632-411b-4c94-b4ab-a42250c4294c','John','<why>');`
-- `4a64afcd` · classification · — · board ordered: 14 ticket(s) given an automation_rank · finalises Oct 10, 2:00 AM CST · `select public.reverse_decision('4a64afcd-b48d-4f56-9346-3e8e407c17be','John','<why>');`
-- `0c208ff7` · hygiene · `AGT-79` · Ticket Owner: 26 derivable cell fix(es) on 26 row(s) — cost 1 · claim 0 · type 0 · revalidation 25 · finalises Oct 10, 2:00 AM CST · `select public.reverse_decision('0c208ff7-66b2-4c08-b0e9-4b6046266073','John','<why>');`
-- `230d6319` · leverage · — · AGT-238 leverage first: AGT-304, AGT-401 marked as leverage -- outranks project order · finalises Oct 10, 2:01 AM CST · `select public.reverse_decision('230d6319-b9c2-4fc1-923f-9d45e41c6a44','John','<why>');`
-- `1c754d26` · concurrency · — · AGT-238 concurrency from the corpus: 1 project(s) executing in the order tooling · finalises Oct 10, 2:01 AM CST · `select public.reverse_decision('1c754d26-5b7d-4c8e-84bf-b690c35ca7da','John','<why>');`
-- `4e5c99ae` · ship · `AGT-304` · AGT-304 shipped at v7.0.797 (00530272a2fb2d1008bac6eed284d8ad8d19e848) on verdict e2d2ddc8-09b9-4b2c-b8d4-89bc2806accd · finalises Oct 10, 2:45 AM CST · `select public.reverse_decision('4e5c99ae-c484-43a7-b45e-bdb41b0d6192','John','<why>');`
-- `ace8bdb0` · ticket-status · `AGT-304` · Close-out: AGT-304 settles 'partial' · finalises Oct 10, 2:45 AM CST · `select public.reverse_decision('ace8bdb0-38b1-4836-b3fb-c4080555bec0','John','<why>');`
-- `81c3aa79` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 10, 2:45 AM CST · `select public.reverse_decision('81c3aa79-752f-46c6-a7c8-b0b927db2df7','John','<why>');`
-- `10e0fadf` · rollback · — · Auto-rollback held: ci-red on 0053027 was not reverted (card-only) · finalises Oct 10, 2:51 AM CST · `select public.reverse_decision('10e0fadf-df5d-463e-8557-bcf687e9a72e','John','<why>');`
-- `019bcc24` · ticket-status · `SES-267` · SES-267 premise failed its first revalidation: removal proposed, not removed · finalises Oct 10, 2:54 AM CST · `select public.reverse_decision('019bcc24-0f29-46fb-bb9c-52356fb389e5','John','<why>');`
-- `ef07846f` · ship · `AGT-180` · AGT-180 shipped at v7.0.624 (46967fec62c103d7d7b5483f493852ffeb96ab74) on verdict bb24b6c0-c0e6-4e7c-b884-605917932337 · finalises Oct 10, 3:12 AM CST · `select public.reverse_decision('ef07846f-d767-4f97-812c-cf02af322c17','John','<why>');`
-- `77bc7f5d` · learning · `SES-159` · class-loop learning claims for P3 - Investor Value · finalises Oct 10, 3:20 AM CST · `select public.reverse_decision('77bc7f5d-7ca4-48cd-80cf-7d7d7f826fbf','John','<why>');`
-- `29c6e410` · design · `AGT-304` · Slice 9 designed: the kickoff for the derived release-pair oracle is the ticket's design of record. · finalises Oct 10, 4:42 AM CST · `select public.reverse_decision('29c6e410-aa93-4d29-b76a-56db3f9019a7','John','<why>');`
-- `744a0376` · model-catalog · — · Model catalog: 20 Claude model rows checked · finalises Oct 10, 4:47 AM CST · `select public.reverse_decision('744a0376-2494-41b3-8b8e-ffdbe5a98455','John','<why>');`
-- `904a79e1` · model-keep · — · capability/bench-report-card keeps claude-sonnet-4-6 · finalises Oct 10, 4:54 AM CST · `select public.reverse_decision('904a79e1-8d46-4e1f-90c2-d62c7c50de09','John','<why>');`
-- `cfa4aaf4` · model-keep · — · capability/data-room-custody keeps claude-haiku-4-5-20251001 · finalises Oct 10, 4:54 AM CST · `select public.reverse_decision('cfa4aaf4-9227-4775-8639-780692a11307','John','<why>');`
-- `1ee1833f` · model-catalog · — · Model catalog: 8 Claude model rows checked · finalises Oct 10, 4:54 AM CST · `select public.reverse_decision('1ee1833f-3e41-4333-8641-304d29624c07','John','<why>');`
-- `f1554570` · model-keep · — · lane/judgment keeps claude-fable-5-1 · finalises Oct 10, 4:54 AM CST · `select public.reverse_decision('f1554570-2781-4719-97a4-691251b83231','John','<why>');`
-- `f79ac146` · model-keep · — · lane/mechanical keeps claude-sonnet-5 · finalises Oct 10, 4:54 AM CST · `select public.reverse_decision('f79ac146-a1a0-48ba-a159-883f423a4b58','John','<why>');`
-- `604d07e3` · model-keep · — · lane/orchestrator keeps claude-opus-5 · finalises Oct 10, 4:54 AM CST · `select public.reverse_decision('604d07e3-48b9-4505-b039-47d121af6412','John','<why>');`
-- `06935fd7` · model-report · — · model-watch 2026-10-07: releases 0, retirements 8, watch reviewed 0, trials 0, switched 0, kept 5, reverted 0 · finalises Oct 10, 4:56 AM CST · `select public.reverse_decision('06935fd7-77ba-45fc-a121-8f05a794ab7c','John','<why>');`
-- `94951df2` · ticket-status · `AGT-304` · Close-out: AGT-304 settles 'partial' · finalises Oct 10, 5:08 AM CST · `select public.reverse_decision('94951df2-91ed-4bea-b6b5-99b28a1f40d5','John','<why>');`
-- `5e077fe6` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 10, 5:08 AM CST · `select public.reverse_decision('5e077fe6-b816-448e-8cc0-51478fb05b26','John','<why>');`
-- `2677f385` · ship · `AGT-304` · AGT-304 shipped at v7.0.798 (6fcfc811e4c94fc0faac8b26e6021bede1ef5707) on verdict 4dc1c95b-7798-4cb9-8c93-ed160d39d540 · finalises Oct 10, 5:08 AM CST · `select public.reverse_decision('2677f385-d337-4f0a-8ad8-68ba104e6d3c','John','<why>');`
-- `5eae6193` · rollback · — · Auto-rollback held: ci-red on 6fcfc81 was not reverted (card-only) · finalises Oct 10, 5:34 AM CST · `select public.reverse_decision('5eae6193-87fb-4b91-bbe3-762192d52a72','John','<why>');`
-- `d5a7ccf0` · design · `AGT-304` · Slice 10 designed: the live-pair-still-delivered kickoff is the ticket's design of record. · finalises Oct 10, 6:07 AM CST · `select public.reverse_decision('d5a7ccf0-3f26-450b-847f-de5c15d45c92','John','<why>');`
-- `a59363f6` · ticket-status · `AGT-304` · Close-out: AGT-304 settles 'partial' · finalises Oct 10, 6:35 AM CST · `select public.reverse_decision('a59363f6-bbc3-4e81-8371-7a8d982d422c','John','<why>');`
-- `71ca6f74` · ship · `AGT-304` · AGT-304 shipped at v7.0.799 (48e42108e7c2d2127fba6408a93f4799679a9c74) on verdict 36a61f7e-90b3-4ad2-8cb2-7022d0a9613c · finalises Oct 10, 6:35 AM CST · `select public.reverse_decision('71ca6f74-76c3-4404-9657-ca9dca8b1abd','John','<why>');`
-- `94f45326` · classification · — · board ordered: 13 ticket(s) given an automation_rank · finalises Oct 11, 1:54 AM CST · `select public.reverse_decision('94f45326-4d26-40ae-8872-46887f3616ec','John','<why>');`
-- `7113474b` · hygiene · `AGT-79` · Ticket Owner: 22 derivable cell fix(es) on 22 row(s) — cost 0 · claim 0 · type 0 · revalidation 22 · finalises Oct 11, 2:07 AM CST · `select public.reverse_decision('7113474b-2c77-4459-af8f-377c1b9fc825','John','<why>');`
-- `b4ae540f` · removal-proposal · `AGT-002` · AGT-002 removal proposed: Premise ("read by none of the harness consumers") no longer holds: lib/librarian.js reads dat… · finalises Oct 11, 2:07 AM CST · `select public.reverse_decision('b4ae540f-bede-4f25-bf5a-9bc1579cedea','John','<why>');`
-- `6c799c8d` · removal-proposal · `LOG-05` · LOG-05 removal proposed: AI-53 made displayed patterns log-driven (useAIActivity.js observedPatterns) and split documen… · finalises Oct 11, 2:07 AM CST · `select public.reverse_decision('6c799c8d-fb0a-4548-80b3-f9b8384638b8','John','<why>');`
-- `456746ba` · removal-proposal · `LOG-07` · LOG-07 removal proposed: The teardown drop the premise describes was closed by LOG-18 (lib/activity-log.js wraps the wr… · finalises Oct 11, 2:07 AM CST · `select public.reverse_decision('456746ba-e164-4312-a59a-50eda86c9afc','John','<why>');`
-- `62eb63a6` · reversal · `ZAGTJD-1` · reversal of requirement-check decision f6ac722c-5661-45e5-be47-f8b189cbf2c0 -- applied: 1 restored, 0 restored-unverifi… · finalises Oct 11, 2:38 AM CST · `select public.reverse_decision('62eb63a6-591d-4a99-99b1-df5a6a47356e','John','<why>');`
-- `8ad2f29f` · reversal · `ZAGTJD-1` · reversal of requirement-check decision 51169079-e589-4274-aed8-f4f843218677 -- applied: 1 restored, 0 restored-unverifi… · finalises Oct 11, 2:39 AM CST · `select public.reverse_decision('8ad2f29f-4db3-499c-b0e4-6d4f3485ecc5','John','<why>');`
-- `7cffdd27` · reversal · `ZAGTJD-1` · reversal of requirement-check decision 115d52cc-6e77-43f7-abc0-3afa4045c1af -- applied: 1 restored, 0 restored-unverifi… · finalises Oct 11, 2:40 AM CST · `select public.reverse_decision('7cffdd27-fcd4-4932-97d6-73976f078ea8','John','<why>');`
-- `a5f6fe70` · reversal · `ZAGTJD-1` · reversal of requirement-check decision 5c17c928-75aa-4258-b5d4-1be2082b3a18 -- applied: 1 restored, 0 restored-unverifi… · finalises Oct 11, 2:46 AM CST · `select public.reverse_decision('a5f6fe70-dbad-4b6b-90e2-3f4bf1c18cac','John','<why>');`
-- `da515aa3` · ticket-status · `AGT-304` · Close-out: AGT-304 settles 'partial' · finalises Oct 11, 2:51 AM CST · `select public.reverse_decision('da515aa3-9e18-4108-addc-6780852f74e5','John','<why>');`
-- `1a48590a` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 11, 2:51 AM CST · `select public.reverse_decision('1a48590a-78fa-4043-b898-93b8ad5c9afd','John','<why>');`
-- `dca5c972` · ticket-status · `AGT-401` · Close-out: AGT-401 settles 'delivered' · finalises Oct 11, 3:27 AM CST · `select public.reverse_decision('dca5c972-507d-4fe6-bf90-843a467b3fe2','John','<why>');`
-- `be9ec9e7` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 11, 3:27 AM CST · `select public.reverse_decision('be9ec9e7-f84d-45c8-8cdc-00ed82c1e656','John','<why>');`
-- `92c29016` · ticket-status · `AGT-401` · Close-out: AGT-401 settles 'delivered' · finalises Oct 11, 3:27 AM CST · `select public.reverse_decision('92c29016-3d82-4f81-8da3-9f3aeaf33746','John','<why>');`
-- `7f7c5e78` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 11, 3:27 AM CST · `select public.reverse_decision('7f7c5e78-5103-4e77-8273-236fce4f5886','John','<why>');`
-- `ff683264` · ticket-scope · `AGT-401` · Both defects the Builder surfaced outside the kickoff are CAPTURED as audit findings, not fixed in this cycle. · finalises Oct 11, 3:28 AM CST · `select public.reverse_decision('ff683264-0be0-438c-9855-1901062d053e','John','<why>');`
-- `b2801d4a` · ship · `AGT-401` · AGT-401 shipped at v7.0.820 (84ca8b02bda93e5c9bea916f8e0775a839b471dc) on verdict d1a969a4-3aee-4f8f-b8e3-273d4b373412 · finalises Oct 11, 3:29 AM CST · `select public.reverse_decision('b2801d4a-f09a-4215-a2df-5dd7b9516bcb','John','<why>');`
-- `dd8c3ce6` · rollback · — · Auto-rollback held: ci-red on 84ca8b0 was not reverted (card-only) · finalises Oct 11, 3:30 AM CST · `select public.reverse_decision('dd8c3ce6-ff7b-4232-8664-c1b8fb73ffb8','John','<why>');`
-- `a0bc7b49` · ticket-status · `SES-259` · Background revalidation sweep: SES-259's premise is alive, measured, so it keeps its slot with a fresh revalidated_at. · finalises Oct 11, 3:32 AM CST · `select public.reverse_decision('a0bc7b49-00c1-4643-b18a-061078ecd97c','John','<why>');`
-- `78ba8cff` · leverage · — · AGT-238 leverage first: AGT-398, AGT-340, AGT-341 marked as leverage -- outranks project order · finalises Oct 11, 4:01 AM CST · `select public.reverse_decision('78ba8cff-a043-4d85-b6fc-4a90704fd6ad','John','<why>');`
-- `2ecfe689` · concurrency · — · AGT-238 concurrency from the corpus: 4 project(s) executing in the order mcp-poc, tooling, dev-manager-capabilities, tr… · finalises Oct 11, 4:01 AM CST · `select public.reverse_decision('2ecfe689-93a1-47e5-871d-dffd2897e9e0','John','<why>');`
-- `891f8c63` · ticket-status · `AGT-304` · Close-out: AGT-304 settles 'partial' · finalises Oct 11, 4:43 AM CST · `select public.reverse_decision('891f8c63-21cf-433f-8320-c76e06395fd9','John','<why>');`
-- `9588f679` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 11, 4:43 AM CST · `select public.reverse_decision('9588f679-8a75-4128-8093-ba4e91200dd1','John','<why>');`
-- `4afc9234` · model-catalog · — · Model catalog: 21 Claude model rows checked · finalises Oct 11, 4:43 AM CST · `select public.reverse_decision('4afc9234-0f40-4ce6-b4ca-55eec3f9a4fd','John','<why>');`
-- `e35f784e` · finding-call · `AGT-304` · Builder-reported defect captured as a finding, not fixed in this slice · finalises Oct 11, 4:44 AM CST · `select public.reverse_decision('e35f784e-f370-4862-aefa-b766ed7e41e9','John','<why>');`
-- `a744505e` · model-catalog · — · Model catalog: 9 Claude model rows checked · finalises Oct 11, 4:51 AM CST · `select public.reverse_decision('a744505e-f85c-449d-a0c4-6213e061aa27','John','<why>');`
-- `5859010d` · model-keep · — · capability/bench-report-card keeps claude-sonnet-4-6 · finalises Oct 11, 4:51 AM CST · `select public.reverse_decision('5859010d-6795-4004-9391-2e3377820ecf','John','<why>');`
-- `88a47806` · model-keep · — · capability/data-room-custody keeps claude-haiku-4-5-20251001 · finalises Oct 11, 4:51 AM CST · `select public.reverse_decision('88a47806-9f75-4e20-b09a-465ce6574aac','John','<why>');`
-- `51ba9007` · model-keep · — · lane/judgment keeps claude-fable-5-1 · finalises Oct 11, 4:51 AM CST · `select public.reverse_decision('51ba9007-c7d2-4528-af66-b7230dad5ae0','John','<why>');`
-- `f9e49a2d` · model-keep · — · lane/mechanical keeps claude-sonnet-5 · finalises Oct 11, 4:51 AM CST · `select public.reverse_decision('f9e49a2d-7fb3-4f85-8bc5-7db3a86335d9','John','<why>');`
-- `850ddfeb` · model-keep · — · lane/orchestrator keeps claude-opus-5 · finalises Oct 11, 4:51 AM CST · `select public.reverse_decision('850ddfeb-fcab-4763-a3f3-60ba8130ec11','John','<why>');`
-- `f8019826` · model-report · — · model-watch 2026-10-08: releases 1, retirements 6, watch reviewed 0, trials 0, switched 0, kept 5, reverted 0 · finalises Oct 11, 4:53 AM CST · `select public.reverse_decision('f8019826-e6e1-475a-8761-b041585d93c6','John','<why>');`
-- `462a4a29` · ship · `AGT-304` · AGT-304 shipped at v7.0.821 (91126d2ebe1f04b52c27038238e1d0d950509cd5) on verdict b8ab59be-4e2f-45f5-9600-522e23feaf1f · finalises Oct 11, 4:56 AM CST · `select public.reverse_decision('462a4a29-7673-49b6-9c31-b7335f658129','John','<why>');`
-- `49fdc693` · finding-call · — · Step-9 tail: sweep_decision_windows() refused; filed as a finding rather than forced · finalises Oct 11, 4:58 AM CST · `select public.reverse_decision('49fdc693-c9f8-46b9-b029-b1b83265046e','John','<why>');`
-- `201762ea` · finding-call · — · Correction: the notes-guard finding filed this session overstated its cause · finalises Oct 11, 5:14 AM CST · `select public.reverse_decision('201762ea-c526-4a74-b5cc-2b216e365b84','John','<why>');`
-- `7573885a` · finding-call · `AGT-398` · Correction to gated card 74d03c69: auto_done false is not a ban on shipping · finalises Oct 11, 5:24 AM CST · `select public.reverse_decision('7573885a-dfec-457b-bc3f-540caecc0e0b','John','<why>');`
-- `27cec008` · ticket-status · `AGT-304` · Close-out: AGT-304 settles 'partial' · finalises Oct 11, 6:41 AM CST · `select public.reverse_decision('27cec008-a4bb-4fdb-9377-9afc78481152','John','<why>');`
-- `2646a144` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 11, 6:41 AM CST · `select public.reverse_decision('2646a144-0b1e-4875-a0cd-01850dcae8d2','John','<why>');`
-- `16c35cfa` · ship · `AGT-191` · AGT-191 shipped at v7.0.630 (f60f0ec627dd9584d95abf5917db3e75f01afbe2) on verdict 93e9db9b-e6e9-4825-949b-534108e9327f · finalises Oct 11, 7:00 AM CST · `select public.reverse_decision('16c35cfa-065a-46f0-ae3b-96dd6dd8a064','John','<why>');`
-- `ae8152cf` · agent-row · `AGT-393` · AGT-393 agent-teach-intent gains kinds specialty and bio · finalises Oct 11, 8:20 AM CST · `select public.reverse_decision('ae8152cf-f51c-4ee9-bcae-22918236e07e','John','<why>');`
-- **39 john-ruling decisions** finalising Oct 11, 6:55 PM CST → Oct 11, 11:43 PM CST · one batch, listed by query rather than one line each: `select id, backlog_id, summary, expires_at from public.runner_decisions where status='open' and kind='john-ruling' order by expires_at;` · reverse any one with `select public.reverse_decision('<id>','John','<why>');`
-- `db0c7149` · agent-row · — · Victoria: severity decision tree recorded as Knowledge (vc-john-severity-tree) on requirement-check, and the score defi… · finalises Oct 11, 6:55 PM CST · `select public.reverse_decision('db0c7149-5c8c-43c5-beee-aa44f8e3a13f','John','<why>');`
-- `74249df5` · agent-row · — · Victoria: severity tree gains HARM, NOT NON-ACTION, and SES-425 joins the severity 2 cases · finalises Oct 11, 7:06 PM CST · `select public.reverse_decision('74249df5-ce64-436b-90fe-b2b98d94efb6','John','<why>');`
-- `f04b93f2` · agent-row · — · Victoria: severity tree gains the 3-versus-4 boundary for AI-client data (AGT-340, pizzazz is a 3) · finalises Oct 11, 7:10 PM CST · `select public.reverse_decision('f04b93f2-71cd-44dd-9177-71e29aebf4ec','John','<why>');`
-- `3e9a704b` · agent-row · — · Victoria: severity tree gains RECENCY AND SPLITTING (AGT-159), and AGT-159 joins the severity 5 cases · finalises Oct 11, 7:23 PM CST · `select public.reverse_decision('3e9a704b-3bd9-4a55-8c1c-a4abc9ce29d8','John','<why>');`
-- `a43b0a8b` · agent-row · — · Victoria: severity tree gains PARKED = 0 (AGT-383) · finalises Oct 11, 7:31 PM CST · `select public.reverse_decision('a43b0a8b-f31e-4b29-8c3e-5625860d5d96','John','<why>');`
-- `bb8fb1c4` · agent-row · — · Victoria: severity tree gains where a parked ticket lives (a planned project name) · finalises Oct 11, 7:55 PM CST · `select public.reverse_decision('bb8fb1c4-4438-4e45-8809-2134ecf67619','John','<why>');`
-- `9abded56` · agent-row · — · Victoria: severity tree gains DEPENDENCY ON AN UNKNOWN (AGT-250 is a 1) · finalises Oct 11, 8:26 PM CST · `select public.reverse_decision('9abded56-fe0c-4fe0-a437-e3033e7e9f61','John','<why>');`
-- `0a70bd68` · synthesis · — · HANDOFF: Victoria calibration (session victoria-calibration-1008), state, how to test her, John's plan, open work · finalises Oct 11, 8:26 PM CST · `select public.reverse_decision('0a70bd68-877b-488e-8095-cc2cf0a9cc3a','John','<why>');`
-- `e7f08347` · agent-row · — · Victoria: severity tree gains IMPORTANT BUT NOT YET A PROBLEM (AGT-291 is a 3) · finalises Oct 11, 8:35 PM CST · `select public.reverse_decision('e7f08347-e596-4a4e-b369-d6bd4190fc70','John','<why>');`
-- `b84b059c` · agent-row · — · Victoria: severity tree gains NOT NEEDED FOR BETA = 1 (AGT-389 is a 1) · finalises Oct 11, 8:54 PM CST · `select public.reverse_decision('b84b059c-6363-4cac-ba33-059c58f48fb8','John','<why>');`
-- `db320f37` · agent-row · — · Victoria: severity tree gains SHOWS IMPROVED INTELLIGENCE = 3 (AGT-418 is a 3) · finalises Oct 11, 9:03 PM CST · `select public.reverse_decision('db320f37-8f45-4115-a8f8-16fe118ec754','John','<why>');`
-- `710b0400` · agent-row · — · Victoria: SHOWS IMPROVED INTELLIGENCE widened to content that exposes context to the end user or improves an agent's re… · finalises Oct 11, 9:08 PM CST · `select public.reverse_decision('710b0400-1f43-470a-91e5-c83fbb9490c9','John','<why>');`
-- `12a8886e` · agent-row · — · Victoria: severity tree PARKED = 0 gains AGT-252 (a 0 so it gets set up in a new or existing project) · finalises Oct 11, 9:11 PM CST · `select public.reverse_decision('12a8886e-16fd-4043-8951-6a9a9df5df23','John','<why>');`
-- `e7615ce0` · synthesis · — · HANDOFF 2: Victoria calibration (session victoria-calibration-1008), state after AGT-252; supersedes handoff 0a70bd68 f… · finalises Oct 11, 9:14 PM CST · `select public.reverse_decision('e7615ce0-99b5-4954-bb8a-02f4ab120d37','John','<why>');`
-- `b47c6473` · synthesis · — · CORRECTION to HANDOFF 2 (e7615ce0): her record count · finalises Oct 11, 9:16 PM CST · `select public.reverse_decision('b47c6473-594c-497c-be28-1046bd548b01','John','<why>');`
-- `6217b35c` · agent-row · — · Victoria: severity tree gains EXISTING WORK SIDE = 2 (AGT-39 is a 2) · finalises Oct 11, 9:56 PM CST · `select public.reverse_decision('6217b35c-65bc-4647-a20b-4ed28844fab5','John','<why>');`
-- `59ba9a8d` · agent-row · — · Victoria: weekly-list door vc-reorganize-intent score definitions rewritten around severity (step 3 and objective) · finalises Oct 11, 10:25 PM CST · `select public.reverse_decision('59ba9a8d-3c96-47c6-9199-acd973916c95','John','<why>');`
-- `eb0fed36` · synthesis · — · Victoria ordering test 2026-10-09: she put the finding that the routines must honour severity (5f5ace1d) FIRST of nine… · finalises Oct 11, 10:35 PM CST · `select public.reverse_decision('eb0fed36-4f49-4de9-83db-4c62a69902ad','John','<why>');`
-- `37747a39` · agent-row · — · Victoria: Knowledge row vc-prioritization-duty added to requirement-check (ten scored 3 or greater per active project,… · finalises Oct 11, 11:13 PM CST · `select public.reverse_decision('37747a39-2a4d-4dee-98ba-afd4d66b39b5','John','<why>');`
-- `4cf535a1` · agent-row · — · Victoria: agreed cases added under their levels in the severity tree; a parked ticket is scored 1 (below the pick line)… · finalises Oct 11, 11:18 PM CST · `select public.reverse_decision('4cf535a1-9845-4aa7-89fb-5f13b150c849','John','<why>');`
-- **25 requirement-check decisions** finalising Oct 11, 11:33 PM CST → Oct 11, 11:34 PM CST · one batch, listed by query rather than one line each: `select id, backlog_id, summary, expires_at from public.runner_decisions where status='open' and kind='requirement-check' order by expires_at;` · reverse any one with `select public.reverse_decision('<id>','John','<why>');`
-- `585d2158` · agent-row · — · Victoria: NOT NEEDED FOR BETA = 1 gains its exception (pizzazz or improved intelligence is a 3) · finalises Oct 12, 12:02 AM CST · `select public.reverse_decision('585d2158-7124-42b2-a3fb-f009dbe9628f','John','<why>');`
-- `5822d0bb` · agent-row · — · Victoria: severity tree gains AUTO INTELLIGENCE (what an agent derives is a 3; uploading documents is a feature enhance… · finalises Oct 12, 12:04 AM CST · `select public.reverse_decision('5822d0bb-0f55-45dc-a638-d094679a6fe0','John','<why>');`
-- `47106f43` · agent-row · — · Victoria: EXISTING WORK SIDE = 2 gains its boundary with the 4 rule (a beta user's report or request raises it) · finalises Oct 12, 12:06 AM CST · `select public.reverse_decision('47106f43-95e5-4d7d-8801-8e539938c62a','John','<why>');`
-- `5b4f3dd2` · agent-row · — · DeepBench north star: Knowledge row deepbench-north-star added and linked to the capabilities of the 11 builder agents · finalises Oct 12, 1:17 AM CST · `select public.reverse_decision('5b4f3dd2-d072-434f-bef4-edfc7494812e','John','<why>');`
-- `ac131956` · stall-report · — · 10 open cycle rows went quiet at the SAME last_step — one defect, not 10 separate stalls · finalises Oct 12, 1:43 AM CST · `select public.reverse_decision('ac131956-3a96-4bae-bba8-cce5cdc6e828','John','<why>');`
-- `f219b61f` · classification · — · board ordered: 8 ticket(s) given an automation_rank · finalises Oct 12, 2:02 AM CST · `select public.reverse_decision('f219b61f-5c0b-40e2-bf98-bfd2296ea0bd','John','<why>');`
-- `11020d48` · hygiene · `AGT-79` · Ticket Owner: 22 derivable cell fix(es) on 22 row(s) — cost 1 · claim 0 · type 0 · revalidation 21 · finalises Oct 12, 2:07 AM CST · `select public.reverse_decision('11020d48-71a1-4000-b056-2939977587f4','John','<why>');`
-- `be6dc558` · removal-proposal · `AGT-024` · AGT-024 removal proposed: Dead: lib/librarian.js now carries promoted_from_reasoning_id on every promote (LOO-23, DAT-0… · finalises Oct 12, 2:07 AM CST · `select public.reverse_decision('be6dc558-12a9-4a5a-832c-604b8f32b149','John','<why>');`
-- `f4a2ae3a` · removal-proposal · `DAT-002` · DAT-002 removal proposed: Dead: api/_lib/handlers/reasoning-write.js no longer defaults to []; HAR-21 and AGT-37 resolv… · finalises Oct 12, 2:07 AM CST · `select public.reverse_decision('f4a2ae3a-fab9-4488-b4a3-81a2c173986b','John','<why>');`
-- `3d132d43` · removal-proposal · `LOG-11` · LOG-11 removal proposed: Dead: shared/ai-patterns.js shows all three mismatches fixed; AI-53 split document-extraction,… · finalises Oct 12, 2:07 AM CST · `select public.reverse_decision('3d132d43-060e-40c0-a553-2ed441790dae','John','<why>');`
-- `c8f4d8f5` · removal-proposal · `RO-16` · RO-16 removal proposed: Dead blocker: useAgents() now returns useRoster().agents from Supabase with is_active carried,… · finalises Oct 12, 2:07 AM CST · `select public.reverse_decision('c8f4d8f5-b4e2-41cb-8fc2-e9f59e4a6822','John','<why>');`
-- `399283ea` · gate · — · Gate cards ruled by cycle bb848b5a-2f3b-48f7-8bb7-e89aa0702ab4: 9 card(s) — {"john": 1, "accept": 3, "rework": 4, "reti… · finalises Oct 12, 2:15 AM CST · `select public.reverse_decision('399283ea-dc72-4026-97e2-d379ac77c383','John','<why>');`
-- `61f75f06` · learning · `SES-159` · class-loop learning claims for P2 - Inventive · finalises Oct 12, 2:25 AM CST · `select public.reverse_decision('61f75f06-a9ef-4d14-b552-2a5ab171fe72','John','<why>');`
-- `ce91f507` · design-ruling · `AGT-136` · Open questions ruled by cycle bb848b5a-2f3b-48f7-8bb7-e89aa0702ab4: 4 question(s) — {"no": 3, "yes": 0, "john": 1, "wit… · finalises Oct 12, 2:33 AM CST · `select public.reverse_decision('ce91f507-8560-464b-b41a-a709ae76214f','John','<why>');`
-- `c58dd0be` · filing · — · Audit review 2026-W41: 92 findings → 24 tickets, 4 not-a-defect, 2 carried, 0 escalated · finalises Oct 12, 2:54 AM CST · `select public.reverse_decision('c58dd0be-fc43-4e27-aa2d-f2c26128459b','John','<why>');`
-- `77677bec` · ticket-status · `AGT-427` · Close-out: AGT-427 settles 'partial' · finalises Oct 12, 3:56 AM CST · `select public.reverse_decision('77677bec-2006-4e1d-8a12-3d05772873b3','John','<why>');`
-- `303c7d43` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 12, 3:56 AM CST · `select public.reverse_decision('303c7d43-3c7d-4d2b-a0bf-7d743d7f1b80','John','<why>');`
-- `6b12ead6` · model-catalog · — · Model catalog: 23 Claude model rows checked · finalises Oct 12, 4:49 AM CST · `select public.reverse_decision('6b12ead6-98ad-4913-ae81-45394ccbcf7a','John','<why>');`
-- `8808ab89` · model-catalog · — · Model catalog: 10 Claude model rows checked · finalises Oct 12, 5:02 AM CST · `select public.reverse_decision('8808ab89-915e-4747-bd07-7701222eb9c8','John','<why>');`
-- `11028118` · model-keep · — · capability/bench-report-card keeps claude-sonnet-4-6 · finalises Oct 12, 5:02 AM CST · `select public.reverse_decision('11028118-3f0a-46f8-92f6-7f00605227bb','John','<why>');`
-- `9669c56e` · model-keep · — · capability/data-room-custody keeps claude-haiku-4-5-20251001 · finalises Oct 12, 5:02 AM CST · `select public.reverse_decision('9669c56e-20c8-41f1-a107-2ebb5f220512','John','<why>');`
-- `558a70d4` · model-keep · — · lane/judgment keeps claude-fable-5-1 · finalises Oct 12, 5:02 AM CST · `select public.reverse_decision('558a70d4-4a10-4354-aa29-ac8467231d19','John','<why>');`
-- `b70a6911` · model-keep · — · lane/mechanical keeps claude-sonnet-5 · finalises Oct 12, 5:02 AM CST · `select public.reverse_decision('b70a6911-5ca1-4ca2-861c-d64a92482b41','John','<why>');`
-- `66015143` · model-keep · — · lane/orchestrator keeps claude-opus-5 · finalises Oct 12, 5:02 AM CST · `select public.reverse_decision('66015143-4029-4ad0-a560-11da1c27b59a','John','<why>');`
-- `192b3489` · model-report · — · model-watch 2026-10-09: releases 2, retirements 8, watch reviewed 0, trials 0, switched 0, kept 5, reverted 0 · models:… · finalises Oct 12, 5:04 AM CST · `select public.reverse_decision('192b3489-75b5-455f-b554-8398cb00ad92','John','<why>');`
-- `c5f3f421` · requirement-check · `AGT-252` · Susan reports back: what she built, what the documents did not cover, and her questions for the user · finalises Oct 12, 5:32 AM CST · `select public.reverse_decision('c5f3f421-70cd-481b-a7fc-2138fae54fc9','John','<why>');`
-- `1307f86c` · requirement-check · `AGT-383` · One DeepBench connection per user, with sign-in, so DeepBench can be listed in the ChatGPT app directory and Claude con… · finalises Oct 12, 5:32 AM CST · `select public.reverse_decision('1307f86c-bc76-4f99-8cb8-19a65a76036b','John','<why>');`
-- `163805a5` · rollback · — · Auto-rollback held: ci-red on 0f9dee5 was not reverted (card-only) · finalises Oct 12, 5:39 AM CST · `select public.reverse_decision('163805a5-bcf5-4353-bd7e-5a7e19bbff74','John','<why>');`
-- `c7da5fd2` · ticket-status · `AGT-433` · Close-out: AGT-433 settles 'partial' · finalises Oct 12, 5:44 AM CST · `select public.reverse_decision('c7da5fd2-743f-4acc-88e3-262429067f88','John','<why>');`
-- `51ae5ca6` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 12, 5:44 AM CST · `select public.reverse_decision('51ae5ca6-cd7a-4500-abfc-681bf2e9a368','John','<why>');`
-- `e2385957` · directive-routing · `AGT-433` · Directive 2458c24b returned to queued, not closed: slice 2 of its mission is still owed · finalises Oct 12, 5:47 AM CST · `select public.reverse_decision('e2385957-439d-4dda-9537-cc4928bc1da9','John','<why>');`
-- `87f5a14a` · ticket-status · `AGT-432` · Close-out: AGT-432 settles 'delivered' · finalises Oct 12, 7:08 AM CST · `select public.reverse_decision('87f5a14a-7f81-4eb3-89fa-568a215ac275','John','<why>');`
-- `0faef853` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 12, 7:08 AM CST · `select public.reverse_decision('0faef853-0a45-4c85-b212-1454f52e07e2','John','<why>');`
-- `0dc6b346` · directive-routing · `AGT-434` · Directive 3c1cc23d returned to queued, not closed: its mission is built but its migration could not be applied · finalises Oct 12, 8:02 AM CST · `select public.reverse_decision('0dc6b346-d06f-4742-8ad8-b98aaa47fea8','John','<why>');`
-- `511ee111` · ticket-status · `AGT-341` · Close-out: AGT-341 settles 'partial' · finalises Oct 12, 10:12 AM CST · `select public.reverse_decision('511ee111-a536-4ccd-8c8c-5f5134ba099f','John','<why>');`
-- `2d2759fa` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 12, 10:12 AM CST · `select public.reverse_decision('2d2759fa-6f4f-4b0a-90fb-7413c9c9a94a','John','<why>');`
-- `2b1b41b9` · design-kickoff · `AGT-445` · Kickoff designed for AGT-445 · finalises Oct 12, 10:58 AM CST · `select public.reverse_decision('2b1b41b9-1456-4397-ad53-81256ac09e8d','John','<why>');`
-- `e0b4fafe` · rule · `AGT-445` · DRAIN-CAP-SPLIT: property 5 scoped exception · finalises Oct 12, 11:03 AM CST · `select public.reverse_decision('e0b4fafe-b342-460e-afec-ae72b0254f86','John','<why>');`
-- `4dda526c` · ticket-status · `AGT-445` · Close-out: AGT-445 settles delivered (v7.0.836, on dev at 09ef65cd; verifier APPROVE 371c1a46) · finalises Oct 12, 11:09 AM CST · `select public.reverse_decision('4dda526c-e069-40af-a90e-87adffc86915','John','<why>');`
-- `33b7334a` · ticket-scope · `AGT-446` · cap ruling: waive AGT-446 for one build · finalises Oct 12, 11:20 AM CST · `select public.reverse_decision('33b7334a-aac2-4a24-9567-e229f5f30df8','John','<why>');`
-- `066d5eca` · design-kickoff · `AGT-446` · Kickoff designed for AGT-446 · finalises Oct 12, 11:20 AM CST · `select public.reverse_decision('066d5eca-9548-4889-89f8-63958008f5ec','John','<why>');`
-- `7f833f55` · agent-row · `AGT-446` · ds-, dm- and bd-knowledge-patterns re-rendered for pattern:172 · finalises Oct 12, 11:23 AM CST · `select public.reverse_decision('7f833f55-1d6e-487e-9129-52903a0ae083','John','<why>');`
-- `c516c633` · rule · `AGT-446` · CAP-SCOPE-FILES, CAP-SESSION-SPLIT-SIGNS: cap waiver is the Development Manager's (pattern:172) · finalises Oct 12, 11:27 AM CST · `select public.reverse_decision('c516c633-be18-4fb9-a59e-c4502027da6d','John','<why>');`
-- `29987ef8` · ticket-status · `AGT-446` · Close-out: AGT-446 settles delivered (v7.0.837, on dev at efe78242; verifier BLOCK d83bca18) · finalises Oct 12, 11:33 AM CST · `select public.reverse_decision('29987ef8-0534-4391-ab30-6648137644f7','John','<why>');`
-- `bd037547` · design-kickoff · `AGT-447` · Kickoff designed for AGT-447 · finalises Oct 12, 11:43 AM CST · `select public.reverse_decision('bd037547-31d6-41d8-8e0e-21369dd33d7d','John','<why>');`
-- `4cffe9d8` · agent-row · `AGT-447` · dm-guardrails gains the cap-ruling duty and its scope; dm-knowledge-cycle-card re-pinned · finalises Oct 12, 11:46 AM CST · `select public.reverse_decision('4cffe9d8-951d-4511-b22f-0504b8ba63a6','John','<why>');`
-- `c6707c8f` · ticket-status · `AGT-447` · Close-out: AGT-447 settles delivered (v7.0.838, on dev at e3149066; verifier BLOCK be790085) · finalises Oct 12, 11:54 AM CST · `select public.reverse_decision('c6707c8f-c7ea-478c-b287-21beb4b8d4ad','John','<why>');`
-- `cee5ae1f` · design-kickoff · `AGT-448` · Kickoff designed for AGT-448 · finalises Oct 12, 12:08 PM CST · `select public.reverse_decision('cee5ae1f-b538-4282-b401-1c9ceeefd249','John','<why>');`
-- `46f9853b` · agent-row · `AGT-448` · ds-guardrails gains the cap-case stop; card re-pinned · finalises Oct 12, 12:11 PM CST · `select public.reverse_decision('46f9853b-2e1e-43f4-86fe-5f6d33550dca','John','<why>');`
-- `0bcda13f` · ticket-status · `AGT-448` · Close-out: AGT-448 settles done (v7.0.839, on dev at ecb398ec; verifier APPROVE abd92f41, 0 newly red) · finalises Oct 12, 12:18 PM CST · `select public.reverse_decision('0bcda13f-2822-42e4-bed3-1821fde914f0','John','<why>');`
-- `f32f0802` · design-kickoff · `AGT-449` · Kickoff designed for AGT-449 · finalises Oct 12, 12:35 PM CST · `select public.reverse_decision('f32f0802-8714-40bd-a358-a90e0ad5840c','John','<why>');`
-- `6ee431f9` · agent-row · `AGT-449` · devmanager gains rule-cap-case · finalises Oct 12, 12:40 PM CST · `select public.reverse_decision('6ee431f9-a04b-4315-b71b-1ef7a09d7c96','John','<why>');`
-- `18b868e9` · ticket-status · `AGT-449` · Close-out: AGT-449 settles done (v7.0.840, on dev at fe5b580f; verifier APPROVE 2d6564ac, 0 newly red) · finalises Oct 12, 12:49 PM CST · `select public.reverse_decision('18b868e9-0da3-4b4c-bf38-815feea9a567','John','<why>');`
-- `f79721e9` · requirement-check · `AGT-427` · The pick does not sort by severity as John defined it, and the order's keys live only in the database so no test or rea… · finalises Oct 12, 1:30 PM CST · `select public.reverse_decision('f79721e9-e2b1-4d60-9868-8ad419f0b854','John','<why>');`
-- `22842c41` · ticket-scope · `AGT-427` · home AGT-427 into the Tooling epic (executing project) so the pick can build slice 2 · finalises Oct 12, 1:31 PM CST · `select public.reverse_decision('22842c41-0690-4d96-9655-be16100efed7','John','<why>');`
-- `27077718` · design-kickoff · `AGT-427` · Kickoff designed for AGT-427 slice 2 · finalises Oct 12, 1:39 PM CST · `select public.reverse_decision('27077718-2514-40bc-9636-82dccbb3d6da','John','<why>');`
-- `d44dfc79` · ship · `AGT-427` · AGT-427 slice 2 shipped v7.0.841 (7c4b261e): severity is the first pick key · finalises Oct 12, 2:03 PM CST · `select public.reverse_decision('d44dfc79-29dc-4805-8558-05b62ee7f9c6','John','<why>');`
-- `5498b8d9` · john-ruling · — · John 2026-10-09: get the directives complete, each following the rules the previous created, and test and fix every blo… · finalises Oct 12, 2:04 PM CST · `select public.reverse_decision('5498b8d9-6dcd-4bce-abfb-e3ef798cf35f','John','<why>');`
-- `31f281cf` · requirement-check · `AGT-450` · A fix to the pick, gate or runner found by the product team has no door into an executing project, so it waits in a par… · finalises Oct 12, 2:05 PM CST · `select public.reverse_decision('31f281cf-8270-4c81-bd7f-e7957fefbc5c','John','<why>');`
-- `d2688d47` · gate · — · Gate cards ruled by design-self-completion-1009: 4 card(s) — {"john": 0, "accept": 0, "rework": 4, "retired": 0, "needs… · finalises Oct 12, 2:12 PM CST · `select public.reverse_decision('d2688d47-215a-4d55-949a-6cdf3fce3b17','John','<why>');`
-- `70d89b9e` · requirement-check · `AGT-433` · A parked ticket cannot be scored 0: the check, the writer and both validators all refuse the value Victoria's own rules… · finalises Oct 12, 2:13 PM CST · `select public.reverse_decision('70d89b9e-339e-4fd9-a963-995255f5b080','John','<why>');`
-- `1ad2550a` · requirement-check · `AGT-434` · A Skill every agent in a set must know has to be pinned to each of their capabilities: 48 rows for 11 agents, and it ca… · finalises Oct 12, 2:13 PM CST · `select public.reverse_decision('1ad2550a-3870-4664-b981-7fc5e4a87ff3','John','<why>');`
-- `5cb7ccd3` · ticket-scope · `AGT-433` · home AGT-433 and AGT-434 into the Tooling epic (executing project) · finalises Oct 12, 2:13 PM CST · `select public.reverse_decision('5cb7ccd3-5c49-4df4-9862-306239ad84c7','John','<why>');`
-- `8346a1c5` · requirement-check · `AGT-451` · A build is held at a gate card for reds that were already there, because the kickoff's baseline was measured without cr… · finalises Oct 12, 2:14 PM CST · `select public.reverse_decision('8346a1c5-e233-42c9-b2e9-216ba82eff41','John','<why>');`
-- `d0d5d40f` · ticket-scope · `AGT-433` · chain AGT-433 behind AGT-451 (credentialed related-set baseline) · finalises Oct 12, 2:14 PM CST · `select public.reverse_decision('d0d5d40f-5421-4dcf-871f-cfe197cafd59','John','<why>');`
-- `1f455cab` · requirement-check · `AGT-452` · The repo has no copy of Victoria's prioritization rows, so her rules can drift from the database and nothing in the rep… · finalises Oct 12, 2:33 PM CST · `select public.reverse_decision('1f455cab-0474-47e7-9ed6-11a6e2fc5396','John','<why>');`
-- `4d400f14` · requirement-check · `AGT-453` · The test that pins Victoria's requirement-check bindings asserts a list that no longer exists, so it cannot catch a bin… · finalises Oct 12, 2:33 PM CST · `select public.reverse_decision('4d400f14-2492-4e96-b1c5-a77852e23fdc','John','<why>');`
-- `510a01fb` · requirement-check · `AGT-454` · A directive stays open after the tickets it names are done, because nothing connects the directive row to its tickets a… · finalises Oct 12, 2:33 PM CST · `select public.reverse_decision('510a01fb-c70c-484f-9685-c9d997531c6a','John','<why>');`
-- `1fa2cd7c` · requirement-check · `AGT-455` · A drain John declares cannot build a ticket he named if it scores under 3, because the scored-3-or-higher gate from AGT… · finalises Oct 12, 2:34 PM CST · `select public.reverse_decision('1fa2cd7c-a548-4427-8091-7bd1481904e2','John','<why>');`
-- `fb18810c` · directive · — · John 2026-10-09: the routines deliver directives 3-5 and their blocker fixes in order, nothing else, then resume normal · finalises Oct 12, 2:34 PM CST · `select public.reverse_decision('fb18810c-895b-439e-b90f-d3907a7b1be3','John','<why>');`
-- `8e2266e8` · john-ruling · — · John 2026-10-09: the routines deliver the directives in succession order with their blocker fixes, nothing else is pick… · finalises Oct 12, 2:35 PM CST · `select public.reverse_decision('8e2266e8-0a65-43f7-97c7-0b0e259e9689','John','<why>');`
-- `98951be0` · requirement-check · `AGT-456` · A drain John declares does not hold the pick: when one of its tickets is blocked or carries a gate card the cycle falls… · finalises Oct 12, 2:36 PM CST · `select public.reverse_decision('98951be0-6aef-4d04-8f19-830f8025fcfb','John','<why>');`
-- `d4b34cd4` · directive · `AGT-456` · AGT-456 becomes the head of the directive drain; description gains the add-a-blocker route · finalises Oct 12, 2:36 PM CST · `select public.reverse_decision('d4b34cd4-c3c1-4030-9759-74412b40ab1f','John','<why>');`
-- `dbbed20b` · concurrency · `AGT-349` · Test line 5 -> 4 (down): reading 3510 is amber · finalises Oct 12, 5:26 PM CST · `select public.reverse_decision('dbbed20b-c6e5-47c2-824a-eca9f38d4fa3','John','<why>');`
-- `faddf3e1` · concurrency · `AGT-349` · Test line 4 -> 3 (down): reading 3514 is amber · finalises Oct 12, 5:46 PM CST · `select public.reverse_decision('faddf3e1-a226-41ac-8973-a28416af1050','John','<why>');`
-- `2976620d` · classification · — · board ordered: 10 ticket(s) given an automation_rank · finalises Oct 13, 1:49 AM CST · `select public.reverse_decision('2976620d-aa31-4cb5-85f8-cc605ead8174','John','<why>');`
-- `0d485859` · hygiene · `AGT-79` · Ticket Owner: 5 derivable cell fix(es) on 5 row(s) — cost 5 · claim 0 · type 0 · revalidation 0 · finalises Oct 13, 1:56 AM CST · `select public.reverse_decision('0d485859-ff01-4b6c-bb62-b2187581c19c','John','<why>');`
-- **46 removal-proposal decisions** finalising Oct 13, 1:56 AM CST → Oct 13, 4:29 AM CST · one batch, listed by query rather than one line each: `select id, backlog_id, summary, expires_at from public.runner_decisions where status='open' and kind='removal-proposal' order by expires_at;` · reverse any one with `select public.reverse_decision('<id>','John','<why>');`
-- `66109eee` · ticket-status · `AGT-456` · Close-out: AGT-456 settles 'delivered' · finalises Oct 13, 2:51 AM CST · `select public.reverse_decision('66109eee-6b33-4aa5-9556-d95fd898f0ba','John','<why>');`
-- `479f42d5` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 13, 2:51 AM CST · `select public.reverse_decision('479f42d5-9149-41a9-b030-8c2b43be94d6','John','<why>');`
-- `9cc8dd89` · ticket-status · `AGT-456` · Close-out: AGT-456 settles 'delivered' · finalises Oct 13, 2:51 AM CST · `select public.reverse_decision('9cc8dd89-75a8-477b-b8fa-ec1f12915182','John','<why>');`
-- `9ee11e00` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 13, 2:51 AM CST · `select public.reverse_decision('9ee11e00-6e63-48d6-8beb-a93cd3622b85','John','<why>');`
-- `87a4b7d0` · ship · `AGT-195` · AGT-195 shipped at v7.0.632 (312a607591de64560808fd975de34859fb326350) on verdict 97e3c37f-6e98-4fb3-b089-86a7ee872fa7 · finalises Oct 13, 3:08 AM CST · `select public.reverse_decision('87a4b7d0-f91f-4fcf-9e2a-93e31bce1557','John','<why>');`
-- `426b8f5f` · learning · `SES-159` · class-loop learning claims for P3 - Investor Value · finalises Oct 13, 3:14 AM CST · `select public.reverse_decision('426b8f5f-9f22-429a-ba25-74d4ae74e886','John','<why>');`
-- **219 requirement-check decisions** finalising Oct 13, 4:06 AM CST → Oct 13, 4:29 AM CST · one batch, listed by query rather than one line each: `select id, backlog_id, summary, expires_at from public.runner_decisions where status='open' and kind='requirement-check' order by expires_at;` · reverse any one with `select public.reverse_decision('<id>','John','<why>');`
-- `77f8041e` · agent-row · `AGT-451` · AGT-451: re-pin dm-knowledge-cycle-card 08f5dedc2b9c494a → f5a94cd242c3a70f · finalises Oct 13, 4:09 AM CST · `select public.reverse_decision('77f8041e-95a7-4c7a-bbd2-d5e3abeecd24','John','<why>');`
-- `c847db23` · filing · — · Audit review 2026-W41: 74 findings → 10 tickets, 0 not-a-defect, 1 carried, 2 escalated · finalises Oct 13, 4:14 AM CST · `select public.reverse_decision('c847db23-2a2e-4765-9000-ae56f3501168','John','<why>');`
-- `9491ad35` · ticket-status · `AGT-451` · Close-out: AGT-451 settles 'delivered' · finalises Oct 13, 4:23 AM CST · `select public.reverse_decision('9491ad35-7c3b-412b-81b5-aee3ad42c97d','John','<why>');`
-- `4dcd83b3` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 13, 4:23 AM CST · `select public.reverse_decision('4dcd83b3-b5cb-4571-9344-19d838641441','John','<why>');`
-- `e9bfa673` · resolve · `AGT-451` · Builder deviation 4 CAPTURED as a finding rather than fixed now · finalises Oct 13, 4:24 AM CST · `select public.reverse_decision('e9bfa673-64d6-4634-a545-5f02b3c05c1e','John','<why>');`
-- `4fc9f822` · ship · `AGT-196` · AGT-196 shipped at v7.0.633 (45e2541de6ded1bf0528fb54a543619a4bb949c3) on verdict d2cb9e24-7a9a-4378-b374-0cafb6be2e28 · finalises Oct 13, 4:37 AM CST · `select public.reverse_decision('4fc9f822-e0a4-4315-93a9-97b3cef216b8','John','<why>');`
-- `77da64b3` · model-catalog · — · Model catalog: 23 Claude model rows checked · finalises Oct 13, 4:45 AM CST · `select public.reverse_decision('77da64b3-2d2a-45a2-887b-322f9e2d128b','John','<why>');`
-- `6871267c` · model-catalog · — · Model catalog: 9 Claude model rows checked · finalises Oct 13, 4:51 AM CST · `select public.reverse_decision('6871267c-0b4d-4816-becd-4854ea65813f','John','<why>');`
-- `8c98169b` · model-keep · — · lane/orchestrator keeps claude-opus-5 · finalises Oct 13, 4:51 AM CST · `select public.reverse_decision('8c98169b-09a9-4711-89c0-74c1b6822399','John','<why>');`
-- `9ae4e5ea` · model-keep · — · lane/judgment keeps claude-fable-5-1 · finalises Oct 13, 4:51 AM CST · `select public.reverse_decision('9ae4e5ea-d023-4401-b63f-52bef2113262','John','<why>');`
-- `62ca6c43` · model-keep · — · capability/data-room-custody keeps claude-haiku-4-5-20251001 · finalises Oct 13, 4:51 AM CST · `select public.reverse_decision('62ca6c43-2883-46ff-b177-f71f3eb30c26','John','<why>');`
-- `675aad56` · model-keep · — · capability/bench-report-card keeps claude-sonnet-4-6 · finalises Oct 13, 4:51 AM CST · `select public.reverse_decision('675aad56-70dd-4324-b16b-09ecaa343d47','John','<why>');`
-- `46c7048a` · model-keep · — · lane/mechanical keeps claude-sonnet-5 · finalises Oct 13, 4:51 AM CST · `select public.reverse_decision('46c7048a-4820-4f73-8d57-d9ce2861d2e4','John','<why>');`
-- `a7c7c84c` · model-report · — · model-watch 2026-10-10: releases 0, retirements 8, watch reviewed 0, trials 0, switched 0, kept 5, reverted 0 · finalises Oct 13, 4:52 AM CST · `select public.reverse_decision('a7c7c84c-5e07-42e3-92fa-66cb19ab0350','John','<why>');`
-- `3216728d` · ticket-status · `AGT-433` · Close-out: AGT-433 settles 'partial' · finalises Oct 13, 5:04 AM CST · `select public.reverse_decision('3216728d-0a94-42fc-862b-7d35ff91e4e6','John','<why>');`
-- `ab27b025` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 13, 5:04 AM CST · `select public.reverse_decision('ab27b025-acc2-42ba-8036-abeffa027e13','John','<why>');`
-- `3e7e84f3` · gate · — · Gate cards ruled by cycle e29beb51-6765-412c-b25b-25c7b1619c2b: 1 card(s) — {"john": 0, "accept": 0, "rework": 1, "reti… · finalises Oct 13, 6:02 AM CST · `select public.reverse_decision('3e7e84f3-2baf-45fa-b9e1-176e7678fe96','John','<why>');`
-- `93355944` · design-ruling · `AGT-136` · Open questions ruled by cycle e29beb51-6765-412c-b25b-25c7b1619c2b: 6 question(s) — {"no": 3, "yes": 3, "john": 0, "wit… · finalises Oct 13, 6:23 AM CST · `select public.reverse_decision('93355944-79f8-443a-92a1-d689157fb3cb','John','<why>');`
-- `30728b30` · ticket-status · `AGT-433` · Close-out: AGT-433 settles 'delivered' · finalises Oct 13, 7:35 AM CST · `select public.reverse_decision('30728b30-7546-4b69-8c99-9bf269b18489','John','<why>');`
-- `63ce3c30` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 13, 7:35 AM CST · `select public.reverse_decision('63ce3c30-16f0-426f-b785-b8c4b980b013','John','<why>');`
-- `387724ff` · ship · `AGT-433` · AGT-433 shipped at v7.0.845 (a472ff7bfbbb0604d642ba0bc7534647aa0df909) on verdict c43b2d72-bd92-47c7-a119-e20bb4fa6e2e · finalises Oct 13, 7:36 AM CST · `select public.reverse_decision('387724ff-da9d-4d17-9040-618c8c900f9e','John','<why>');`
-- `64b00b06` · finding-triage · `AGT-433` · Three defects found during AGT-433 slice 3 were captured as findings, not fixed in this ship · finalises Oct 13, 7:43 AM CST · `select public.reverse_decision('64b00b06-ee3f-4999-a07e-2a6ec9462a27','John','<why>');`
-- `dde78dc0` · john-ruling · — · John 2026-10-09: let Victoria re-score on Tuesday rather than change the routine prompt; accepted that her list tool ma… · finalises Oct 13, 11:53 PM CST · `select public.reverse_decision('dde78dc0-6d79-4cf1-b2ab-00ad843b7db6','John','<why>');`
-- `a62e03c7` · john-ruling · — · John 2026-10-09: not worried about the service key appearing in this session's transcript; no rotation · finalises Oct 13, 11:54 PM CST · `select public.reverse_decision('a62e03c7-4a3e-4a62-a6db-12f1201067b5','John','<why>');`
-- `ea159a49` · john-ruling · — · John 2026-10-09: the install sentence is added to the victoria-reorg routine prompt · finalises Oct 13, 11:56 PM CST · `select public.reverse_decision('ea159a49-0353-4455-b28f-7b1957100b4d','John','<why>');`
-- `11d2ef15` · john-ruling · — · John 2026-10-09: add the repo copy of Victoria's rows and the re-pin of the agt-281 test to the third directive · finalises Oct 13, 11:58 PM CST · `select public.reverse_decision('11d2ef15-8918-47c2-bc2a-c3dc56115e57','John','<why>');`
-- `b8b03b75` · john-ruling · `AGT-251` · John 2026-10-09: what an agent derives is auto intelligence to keep striving for (a 3); uploading training documents is… · finalises Oct 14, 12:04 AM CST · `select public.reverse_decision('b8b03b75-ea61-41a0-826d-cbda1903ad2a','John','<why>');`
-- `e8b56bfb` · john-ruling · — · John 2026-10-09: queue the Development Manager's gate-card ruling ahead of the other directives; directive a738da38 que… · finalises Oct 14, 12:10 AM CST · `select public.reverse_decision('e8b56bfb-40ca-4b71-be31-29b5b3bfe904','John','<why>');`
-- `43dd5415` · john-ruling · — · John 2026-10-09: the pick-fix gate is lowered from 5 buildable tickets to 3 · finalises Oct 14, 12:11 AM CST · `select public.reverse_decision('43dd5415-ea97-40e3-ac4f-8c9718bca5c3','John','<why>');`
-- `eb97f1fe` · john-ruling · `AGT-393` · John 2026-10-09: release the stale claim on AGT-393 so the builders can pick it tonight · finalises Oct 14, 12:12 AM CST · `select public.reverse_decision('eb97f1fe-7aeb-40d2-9dab-18caba82962d','John','<why>');`
-- `5e01fa9d` · john-ruling · — · John 2026-10-09: he will attend a session tomorrow for the needs-desktop tickets AGT-237, AGT-304 and AGT-251 · finalises Oct 14, 12:13 AM CST · `select public.reverse_decision('5e01fa9d-55f3-48c4-8cd4-c3f6e153374e','John','<why>');`
-- `b1914cbd` · classification · — · board ordered: 1 ticket(s) given an automation_rank · finalises Oct 14, 1:49 AM CST · `select public.reverse_decision('b1914cbd-155e-4402-9783-9ae0ebecfc7a','John','<why>');`
-- `3eec3b42` · hygiene · `AGT-79` · Ticket Owner: 3 derivable cell fix(es) on 3 row(s) — cost 3 · claim 0 · type 0 · revalidation 0 · finalises Oct 14, 1:55 AM CST · `select public.reverse_decision('3eec3b42-60f3-441d-a481-18492eeed4f0','John','<why>');`
-- **25 removal-proposal decisions** finalising Oct 14, 1:55 AM CST → Oct 14, 1:55 AM CST · one batch, listed by query rather than one line each: `select id, backlog_id, summary, expires_at from public.runner_decisions where status='open' and kind='removal-proposal' order by expires_at;` · reverse any one with `select public.reverse_decision('<id>','John','<why>');`
-- `20eb2f5b` · ticket-status · `AGT-450` · Close-out: AGT-450 settles 'delivered' · finalises Oct 14, 2:46 AM CST · `select public.reverse_decision('20eb2f5b-9273-4e59-80ed-06501b2a78e0','John','<why>');`
-- `944c7f51` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 14, 2:46 AM CST · `select public.reverse_decision('944c7f51-2850-4424-b194-e2fea7bd5757','John','<why>');`
-- `a0ea0f9a` · gate · — · Gate cards ruled by cycle 1bd5f619-bfa3-4ac0-92de-68b3601e8871: 1 card(s) — {"john": 0, "accept": 1, "rework": 0, "reti… · finalises Oct 14, 3:56 AM CST · `select public.reverse_decision('a0ea0f9a-c013-4f78-a4d7-f7aa83615346','John','<why>');`
-- `48479996` · ticket-status · `AGT-455` · Close-out: AGT-455 settles 'delivered' · finalises Oct 14, 3:57 AM CST · `select public.reverse_decision('48479996-0c7d-4307-ad7a-0835fd0008db','John','<why>');`
-- `a9c2651e` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 14, 3:57 AM CST · `select public.reverse_decision('a9c2651e-c7f3-4178-8846-1cac7a997898','John','<why>');`
-- `92f62594` · ticket-status · `AGT-452` · Close-out: AGT-452 settles 'delivered' · finalises Oct 14, 4:37 AM CST · `select public.reverse_decision('92f62594-2c77-4ce4-b299-5b0f84cc39c0','John','<why>');`
-- `6fd207d5` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 14, 4:37 AM CST · `select public.reverse_decision('6fd207d5-834d-41d9-ae03-c6299d089ca2','John','<why>');`
-- `86070bd6` · model-catalog · — · Model catalog: 27 Claude model rows checked · finalises Oct 14, 4:50 AM CST · `select public.reverse_decision('86070bd6-cfd5-4077-bd8e-df3703b1dbd7','John','<why>');`
-- `44ca55d8` · model-catalog · — · Model catalog: 14 Claude model rows checked · finalises Oct 14, 4:53 AM CST · `select public.reverse_decision('44ca55d8-44ca-4d72-ad8d-db2f4463f052','John','<why>');`
-- `86b31e50` · model-keep · — · capability/bench-report-card keeps claude-sonnet-4-6 · finalises Oct 14, 4:53 AM CST · `select public.reverse_decision('86b31e50-8ad3-4c58-944c-921fb584425a','John','<why>');`
-- `72f95c8a` · model-keep · — · capability/data-room-custody keeps claude-haiku-4-5-20251001 · finalises Oct 14, 4:53 AM CST · `select public.reverse_decision('72f95c8a-7f77-461b-9bc3-004688734d22','John','<why>');`
-- `8457b48d` · model-keep · — · lane/judgment keeps claude-fable-5-1 · finalises Oct 14, 4:53 AM CST · `select public.reverse_decision('8457b48d-cb36-4056-847d-a1c3beeb2ce4','John','<why>');`
-- `b060949f` · model-keep · — · lane/mechanical keeps claude-sonnet-5 · finalises Oct 14, 4:53 AM CST · `select public.reverse_decision('b060949f-3f34-4091-aea8-67a689f20ea3','John','<why>');`
-- `8c8792a2` · model-keep · — · lane/orchestrator keeps claude-opus-5 · finalises Oct 14, 4:53 AM CST · `select public.reverse_decision('8c8792a2-f9fc-4cf4-a3c9-aca4eaaf4c47','John','<why>');`
-- `2e5d4d1e` · model-report · — · model-watch 2026-10-11: releases 4, retirements 16, watch reviewed 0, trials 0, switched 0, kept 5, reverted 0 · finalises Oct 14, 4:54 AM CST · `select public.reverse_decision('2e5d4d1e-5ca9-42be-b9e4-b34766db37ba','John','<why>');`
-- `e189c66d` · ticket-status · `AGT-453` · Close-out: AGT-453 settles 'delivered' · finalises Oct 14, 5:09 AM CST · `select public.reverse_decision('e189c66d-8288-4b84-8b82-7163472063a7','John','<why>');`
-- `519487be` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Oct 14, 5:09 AM CST · `select public.reverse_decision('519487be-d5dc-449b-9dfe-d6c221f24853','John','<why>');`
-- `fb1c4198` · ticket-scope · `AGT-434` · cap ruling: waive AGT-434 for one build · finalises Oct 14, 5:27 AM CST · `select public.reverse_decision('fb1c4198-6557-4528-9096-626d95b823b1','John','<why>');`
-- `b5135e1c` · agent-row · `AGT-434` · AGT-434 Part 1: the north star Skill is pinned once per agent (agent_skill_pins, 11 rows) instead of being linked to ev… · finalises Oct 14, 5:59 AM CST · `select public.reverse_decision('b5135e1c-1526-4fb2-9046-a2910518ac6c','John','<why>');`
-- `83504586` · agent-row · `AGT-434` · 49 north-star links removed; pin replaces them · finalises Oct 14, 6:04 AM CST · `select public.reverse_decision('83504586-864f-45b1-99b8-a6d5ed8a75d6','John','<why>');`
-- **126 requirement-check decisions** finalising Oct 14, 6:06 AM CST → Oct 14, 6:17 AM CST · one batch, listed by query rather than one line each: `select id, backlog_id, summary, expires_at from public.runner_decisions where status='open' and kind='requirement-check' order by expires_at;` · reverse any one with `select public.reverse_decision('<id>','John','<why>');`
-- `0e5e2e04` · filing · — · Audit review 2026-W41: 21 findings → 6 tickets, 1 not-a-defect, 0 carried, 0 escalated · finalises Oct 14, 6:07 AM CST · `select public.reverse_decision('0e5e2e04-5993-4db3-b0bd-70531e77ec1d','John','<why>');`
+- `669ac20f` · ship · `AGT-642` · AGT-642 shipped at v7.0.1004 (52ea169f) attended: a blocked ticket stops the line · finalises Nov 14, 1:08 PM CST · `select public.reverse_decision('669ac20f-61c9-4f2f-ab92-040213bee765','John','<why>');`
+- `44cdbab0` · gate · — · Gate cards ruled by cycle e2ea2888-31ff-4be8-93f3-5120d24f94d0: 1 card(s) — {"john": 0, "accept": 0, "rework": 1, "reti… · finalises Nov 20, 1:55 AM CST · `select public.reverse_decision('44cdbab0-aeba-42f9-8043-c1c1a40e67ac','John','<why>');`
+- `3581d572` · ticket-status · `SES-349` · Close-out: SES-349 settles 'partial' · finalises Nov 20, 3:29 AM CST · `select public.reverse_decision('3581d572-69fc-4f52-b04d-050f1996b347','John','<why>');`
+- `9cc9e824` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Nov 20, 3:29 AM CST · `select public.reverse_decision('9cc9e824-5d4a-401c-99fa-294064ffe45c','John','<why>');`
+- `99773f18` · card-retire · — · Stale ship cards retired as receipts: 2 card(s) -- 2 on done, 0 on removed. · finalises Nov 20, 3:29 AM CST · `select public.reverse_decision('99773f18-096a-4fb0-b361-363338f2ca67','John','<why>');`
+- `2f9077ef` · synthesis · — · Three cycles went silent at step 3e (attended build) — stalled 14h33m, reported once, not closed · finalises Nov 20, 3:45 AM CST · `select public.reverse_decision('2f9077ef-be99-4dbf-aa42-cb2eb3fe7a81','John','<why>');`
+- `15aa38d3` · ticket-scope · `DAT-29` · cap ruling: waive DAT-29 for one build · finalises Nov 20, 3:59 AM CST · `select public.reverse_decision('15aa38d3-6fe2-4716-86f4-86a787d8abc2','John','<why>');`
+- `6c12cdcd` · gate · — · Gate cards ruled by cycle a2976724-7700-4a13-8c27-5bfc23319e9f: 1 card(s) — {"john": 0, "accept": 0, "rework": 1, "reti… · finalises Nov 20, 4:51 AM CST · `select public.reverse_decision('6c12cdcd-f8fb-4384-82ac-a7519fd5fb29','John','<why>');`
+- `873f444f` · requirement-check · `AGT-699` · Both board checks re-fingerprint an unchanged cluster every week, so a recurring board defect never matures · finalises Nov 20, 4:56 AM CST · `select public.reverse_decision('873f444f-4fcd-45d3-ba13-d9051e3d22c3','John','<why>');`
+- `4a4d1139` · requirement-check · `AGT-700` · AGT-564 re-pointed five of its twenty-six live-census arms and closed delivered, so twenty-one still grade the world · finalises Nov 20, 4:56 AM CST · `select public.reverse_decision('4a4d1139-b67a-4d2b-8229-389a576280b9','John','<why>');`
+- `3cd91bd7` · requirement-check · `AGT-701` · A regression arm's live read is capped at 1,000 rows, so a well-formed board reads as a defect · finalises Nov 20, 4:56 AM CST · `select public.reverse_decision('3cd91bd7-3d81-45bb-8fb6-131a5780f964','John','<why>');`
+- `24c33ec5` · requirement-check · `AGT-702` · Three pick-order arms still grade leverage-first across the whole queue after a migration put project priority first · finalises Nov 20, 4:56 AM CST · `select public.reverse_decision('24c33ec5-f314-45ac-94cd-59f682aaffc3','John','<why>');`
+- `693988f9` · requirement-check · `AGT-703` · Audit cleanup 2026-W47: 15 one-line fixes · finalises Nov 20, 4:56 AM CST · `select public.reverse_decision('693988f9-11a8-4ae3-8f27-8cb8c911e439','John','<why>');`
+- `3ca378b0` · requirement-check · `AGT-704` · No lane can move to a cheaper current model, because the trial harness cannot grade the replay the move needs · finalises Nov 20, 4:56 AM CST · `select public.reverse_decision('3ca378b0-12d1-4e20-b2a9-96a0955b6186','John','<why>');`
+- `91772136` · requirement-check · `AGT-706` · A re-grade's record names neither the verdict it supersedes nor the test that was red · finalises Nov 20, 4:56 AM CST · `select public.reverse_decision('91772136-f17c-467d-8718-521e62ee9a2c','John','<why>');`
+- `15637567` · requirement-check · `AGT-710` · A routine that stops firing leaves no record, so the model watch has been silent for ten days unnoticed · finalises Nov 20, 4:56 AM CST · `select public.reverse_decision('15637567-ca99-4696-8546-5a670b3fb419','John','<why>');`
+- `ffed4f7a` · requirement-check · `AGT-711` · Two delivered tickets ship less than their own text asks, and the remainder is recorded as a decision instead of a row · finalises Nov 20, 4:56 AM CST · `select public.reverse_decision('ffed4f7a-0757-41ee-aff5-842e8b53a6ab','John','<why>');`
+- `658ecd13` · requirement-check · `AGT-705` · The live Auditor routine prompt and its canonical repo block disagree on the STEP 0 weekly meter stop · finalises Nov 20, 4:58 AM CST · `select public.reverse_decision('658ecd13-e4fc-4f20-bdd3-ed0187574368','John','<why>');`
+- `4eb09123` · requirement-check · `AGT-707` · Two runbooks still describe the old finish line after AGT-291 shipped its sensor · finalises Nov 20, 4:58 AM CST · `select public.reverse_decision('4eb09123-fc54-4b6a-a910-dec921ba274c','John','<why>');`
+- `011a9d16` · requirement-check · `AGT-708` · The redesign door has the cycle mark itself first, which makes the pickup skip the ticket it was told to take · finalises Nov 20, 4:58 AM CST · `select public.reverse_decision('011a9d16-8eae-4afe-8aee-42083c5c0f57','John','<why>');`
+- `afe6951a` · requirement-check · `AGT-709` · The two capabilities every build cycle runs have no catalog entry, so their mandatory log row is refused · finalises Nov 20, 4:58 AM CST · `select public.reverse_decision('afe6951a-2423-4252-bcf6-63eb1df6706f','John','<why>');`
+- `9640c601` · classification · — · board ordered: 60 ticket(s) given an automation_rank · finalises Nov 20, 5:49 AM CST · `select public.reverse_decision('9640c601-916f-4344-a16e-3d6e73d52513','John','<why>');`
+- `9b0be882` · design-ruling · `AGT-136` · Open questions ruled by cycle 6441c3b6-d3bf-47aa-bd44-38fe92c5eb57: 1 question(s) — {"no": 0, "yes": 0, "john": 1, "wit… · finalises Nov 20, 6:02 AM CST · `select public.reverse_decision('9b0be882-88a9-4b9a-b549-88507fc7556e','John','<why>');`
+- `88d59695` · filing · — · Audit review 2026-W47: 10 findings → 0 tickets, 0 not-a-defect, 1 carried, 0 escalated · finalises Nov 20, 6:12 AM CST · `select public.reverse_decision('88d59695-38e4-4141-a6b8-aeaddf55cde3','John','<why>');`
+- `194d79c5` · ticket-status · `AGT-317` · Close-out: AGT-317 settles 'delivered' · finalises Nov 20, 7:18 AM CST · `select public.reverse_decision('194d79c5-e669-4e85-8e1d-f28f75592791','John','<why>');`
+- `98c40049` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Nov 20, 7:18 AM CST · `select public.reverse_decision('98c40049-1d2d-4295-96ed-97ed8e8fb822','John','<why>');`
+- `cbd1f5a4` · ship · `AGT-317` · AGT-317 shipped at v7.0.1049 (e1b45ccdc6a339ae2d8f1066093d8cbb001dcb3b) on verdict a59e2df3-da1c-4e93-91bf-58570d2d6f44 · finalises Nov 20, 7:18 AM CST · `select public.reverse_decision('cbd1f5a4-bc4b-4507-a295-33881cd8d45c','John','<why>');`
+- `8e8bb437` · concurrency · `AGT-317` · Close-out: AGT-317's claim released by this cycle · finalises Nov 20, 7:23 AM CST · `select public.reverse_decision('8e8bb437-c6be-4a84-ae33-b3b53ef3ff0c','John','<why>');`
+- `706a8f2c` · design-ruling · `AGT-136` · Open questions ruled by cycle 29ddc7d2-d65a-4745-8f0b-3b46842ed518: 1 question(s) — {"no": 0, "yes": 0, "john": 1, "wit… · finalises Nov 20, 7:29 AM CST · `select public.reverse_decision('706a8f2c-eced-4ab0-8447-578918c20cfe','John','<why>');`
+- `f96ed57c` · filing · — · Audit review 2026-W47: 6 findings → 4 tickets, 0 not-a-defect, 1 carried, 0 escalated · finalises Nov 20, 7:37 AM CST · `select public.reverse_decision('f96ed57c-71dc-48da-a7ee-24d46bb1260a','John','<why>');`
+- `21f735bf` · concurrency · `AGT-637` · Close-out: AGT-637's claim released by this cycle · finalises Nov 20, 8:23 AM CST · `select public.reverse_decision('21f735bf-04de-441e-98d1-7e9cf6aec517','John','<why>');`
+- `a04d4d5d` · filing · — · Audit review 2026-W47: 4 findings → 0 tickets, 0 not-a-defect, 1 carried, 0 escalated · finalises Nov 20, 8:41 AM CST · `select public.reverse_decision('a04d4d5d-7f47-46af-a6f6-00430c669998','John','<why>');`
+- `e1858f98` · gate · — · Gate cards ruled by cycle 34f63045-3277-4273-ba0f-64723d97b767: 1 card(s) — {"john": 0, "accept": 0, "rework": 1, "reti… · finalises Nov 20, 8:53 AM CST · `select public.reverse_decision('e1858f98-89c2-4f74-9133-e2c5b52de571','John','<why>');`
+- `56cea3ed` · synthesis · — · Stall tripwire: cycle 2555f5f1 went quiet 53 minutes ago at "step 3e — verifier approve; QA spot check PASS" · finalises Nov 20, 10:49 AM CST · `select public.reverse_decision('56cea3ed-3feb-4714-8dcc-0cefe372383a','John','<why>');`
+- `ba5e65a5` · ticket-status · `AGT-637` · Close-out: AGT-637 settles 'delivered' · finalises Nov 20, 10:55 AM CST · `select public.reverse_decision('ba5e65a5-bfcb-4f54-975f-c891edee45cc','John','<why>');`
+- `f68fecdf` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Nov 20, 10:55 AM CST · `select public.reverse_decision('f68fecdf-e0fd-48c6-b9d7-fec7fcfa2a30','John','<why>');`
+- `a2a541e1` · card-retire · — · Stale ship cards retired as receipts: 1 card(s) -- 1 on done, 0 on removed. · finalises Nov 20, 10:55 AM CST · `select public.reverse_decision('a2a541e1-2e6e-44be-af3b-515bf50990bd','John','<why>');`
+- `e42b0548` · ship · `AGT-637` · AGT-637 shipped at v7.0.1050 (a00ae893a74db14ff111134508d55531c42f68e6) on verdict 08dbf375-d3d0-407a-8294-4ab88f767ad3 · finalises Nov 20, 10:56 AM CST · `select public.reverse_decision('e42b0548-9707-40d3-a259-b2b787c9c500','John','<why>');`
+- `4ef9cab0` · concurrency · `AGT-637` · Close-out: AGT-637's claim released by this cycle · finalises Nov 20, 10:56 AM CST · `select public.reverse_decision('4ef9cab0-d45e-46d0-ac41-e8493bd665c1','John','<why>');`
+- `f5b9cb33` · design-ruling · `AGT-136` · Open questions ruled by cycle 785d7b9b-d11d-45a9-b155-5614ef7f538c: 1 question(s) — {"no": 0, "yes": 0, "john": 1, "wit… · finalises Nov 20, 11:20 AM CST · `select public.reverse_decision('f5b9cb33-1cd0-4e9f-9198-870e8676f220','John','<why>');`
+- `0ed3528d` · filing · — · Audit review 2026-W47: 16 findings → 1 tickets, 2 not-a-defect, 1 carried, 0 escalated · finalises Nov 20, 11:35 AM CST · `select public.reverse_decision('0ed3528d-0fd8-49f1-835a-c1c05dd6d1ed','John','<why>');`
+- `f229084b` · john-ruling · — · John named Laura (CW-01, she/her), a personal-lane Career Writer for LinkedIn & resume: walkthrough Q1-Q5 approved 2026… · finalises Nov 20, 4:55 PM CST · `select public.reverse_decision('f229084b-37f4-4708-bbb0-7bba47d5ad49','John','<why>');`
+- `ed11cb7b` · requirement-check · `AGT-721` · Laura (CW-01) and her store: writing_records table and the agent seed, switched off · finalises Nov 20, 4:58 PM CST · `select public.reverse_decision('ed11cb7b-b72b-44ba-89f9-240b913dcf8a','John','<why>');`
+- `8561539c` · requirement-check · `AGT-722` · Laura's call path: writing store in personal-agent.js, the write guard, the career-writer runbook with three routine bl… · finalises Nov 20, 4:58 PM CST · `select public.reverse_decision('8561539c-5b65-4ae3-a3a2-628fa9d2274a','John','<why>');`
+- `19b806ab` · requirement-check · `AGT-723` · Laura's first monthly trade-press watch and the Career Desk page (attended) · finalises Nov 20, 4:58 PM CST · `select public.reverse_decision('19b806ab-2659-47b6-95da-4ebeb95b6010','John','<why>');`
+- `28639e62` · requirement-check · `AGT-724` · Laura's blind tryout (attended): three writing tasks against plain Claude with the same items · finalises Nov 20, 4:58 PM CST · `select public.reverse_decision('28639e62-44dd-4cdf-ab90-2fbb3adc8677','John','<why>');`
+- `92b3ef1b` · john-ruling · `AGT-724` · John hired Laura (CW-01) after her blind tryout ("Yes, hire Laura", 2026-11-17): agents.is_active = true and her three… · finalises Nov 20, 7:07 PM CST · `select public.reverse_decision('92b3ef1b-a59d-48df-819d-71b741e9c955','John','<why>');`
+- `cc8f011b` · requirement-check · `AGT-725` · Laura always reads the confirmed facts, the current LinkedIn text and the master resume in full, outside the ranked Lib… · finalises Nov 20, 7:15 PM CST · `select public.reverse_decision('cc8f011b-0267-4b24-b5a7-047ac0efce66','John','<why>');`
+- `3138b758` · classification · — · board ordered: 60 ticket(s) given an automation_rank · finalises Nov 21, 1:48 AM CST · `select public.reverse_decision('3138b758-2fff-4df5-a22d-bbfe1ff36a8e','John','<why>');`
+- `e4e37a32` · learning · `SES-159` · class-loop learning claims for P3 - Investor Value · finalises Nov 21, 2:06 AM CST · `select public.reverse_decision('e4e37a32-f4c8-44b8-aaa6-4e0af1f40252','John','<why>');`
+- `952f9c58` · design-ruling · `AGT-136` · Open questions ruled by cycle c162d8c3-4d64-4bfd-a1d7-dc08cf362825: 1 question(s) — {"no": 0, "yes": 0, "john": 1, "wit… · finalises Nov 21, 2:09 AM CST · `select public.reverse_decision('952f9c58-2325-48fc-a943-beb0b5a5a057','John','<why>');`
+- `7f1dc43f` · filing · — · Audit review 2026-W47: 14 findings → 5 tickets, 1 not-a-defect, 1 carried, 0 escalated · finalises Nov 21, 2:37 AM CST · `select public.reverse_decision('7f1dc43f-9c05-4652-9ca5-559e9e1ee971','John','<why>');`
+- `cb488f5d` · gate · — · Gate cards ruled by cycle f61c82ab-6383-4e4d-a83d-5c4992ea447e: 1 card(s) — {"john": 1, "accept": 0, "rework": 0, "reti… · finalises Nov 21, 2:57 AM CST · `select public.reverse_decision('cb488f5d-a701-447e-a6b2-8e4ba079f55e','John','<why>');`
+- `c268993c` · ticket-status · `AGT-673` · Close-out: AGT-673 settles 'delivered' · finalises Nov 21, 4:19 AM CST · `select public.reverse_decision('c268993c-e8a2-4ed3-848a-06882d193a2c','John','<why>');`
+- `31b1f7df` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Nov 21, 4:19 AM CST · `select public.reverse_decision('31b1f7df-6a55-457a-bca1-167566b810e7','John','<why>');`
+- `a3c2f4ad` · card-retire · — · Stale ship cards retired as receipts: 1 card(s) -- 1 on done, 0 on removed. · finalises Nov 21, 4:19 AM CST · `select public.reverse_decision('a3c2f4ad-c165-4ba3-8525-a4fd7a8e0f33','John','<why>');`
+- `17f41c0c` · synthesis · — · A peer went silent at the very step this cycle just fixed, and CI's red on this ship was disproved as this ship's fault. · finalises Nov 21, 4:22 AM CST · `select public.reverse_decision('17f41c0c-8826-4a2c-975c-5e626fede133','John','<why>');`
+- `3d10f392` · requirement-check · `AGT-728` · Two arms of flow-nothing-produced can never clear: 'done' is counted from a phrase no writer writes, and a delivered dr… · finalises Nov 21, 4:53 AM CST · `select public.reverse_decision('3d10f392-2e0d-408e-9a79-3bd751ee8651','John','<why>');`
+- `68d34239` · requirement-check · `AGT-716` · A cycle spends 55 tool calls and 422 seconds before it claims its ticket: steps 1-5 re-derive by hand what one call alr… · finalises Nov 21, 4:56 AM CST · `select public.reverse_decision('68d34239-5194-4e7d-a614-80bbd7e92462','John','<why>');`
+- `6386699c` · requirement-check · `AGT-717` · No stored number says what a run's output tokens were: the sweep keeps the total and throws the text away · finalises Nov 21, 4:56 AM CST · `select public.reverse_decision('6386699c-6cb9-43ab-af94-29fb3009a594','John','<why>');`
+- `fa800062` · requirement-check · `AGT-718` · A finding handed through a harvest reaches nothing: no step between kickoff and close-out checks that it was filed into… · finalises Nov 21, 4:56 AM CST · `select public.reverse_decision('fa800062-bdbd-4d74-add8-871bfdbd541b','John','<why>');`
+- `bbf078f7` · requirement-check · `AGT-719` · ai_activity_log names the lane's model, not the model that served the turn: 248 rows say claude-fable-5-1 and no stored… · finalises Nov 21, 4:56 AM CST · `select public.reverse_decision('bbf078f7-f31a-476c-840a-9d32fa3f96ac','John','<why>');`
+- `81f9e10f` · requirement-check · `AGT-720` · Step 7's kickoff check supersedes an uncredentialed BASELINE block but refuses a credentialed one that is merely narrow… · finalises Nov 21, 4:56 AM CST · `select public.reverse_decision('81f9e10f-9bc1-4b95-9c41-8e01a2359eba','John','<why>');`
+- `9dea592c` · requirement-check · `AGT-732` · Time-boxed trial: run one capability of one agent on an off-the-shelf agent harness and measure it against the runner · finalises Nov 21, 4:56 AM CST · `select public.reverse_decision('9dea592c-b5b8-4b4a-afed-4e1f16967daa','John','<why>');`
+- `26196513` · fit-stamp · `AGT-729` · AGT-729 fits no active project (charters 5152dbd35fb269f5399602544fc90338) · finalises Nov 21, 4:56 AM CST · `select public.reverse_decision('26196513-eced-4f5e-9078-c59c5dc6b5b2','John','<why>');`
+- `458b29ba` · fit-stamp · `AGT-730` · AGT-730 fits no active project (charters 5152dbd35fb269f5399602544fc90338) · finalises Nov 21, 4:56 AM CST · `select public.reverse_decision('458b29ba-8cf4-4d89-8296-8b90d9885685','John','<why>');`
+- `e8ead7b3` · fit-stamp · `AGT-731` · AGT-731 fits no active project (charters 5152dbd35fb269f5399602544fc90338) · finalises Nov 21, 4:56 AM CST · `select public.reverse_decision('e8ead7b3-a9ad-4386-8c75-5a5e214c3e4a','John','<why>');`
+- `e8ca1750` · placement · `AGT-731` · One agent, many clients: nothing partitions an owner's agent by client, and the Library's by-id read drops the tenant f… · finalises Nov 21, 4:56 AM CST · `select public.reverse_decision('e8ca1750-a03d-4088-a1ab-97ccb8b1ec0d','John','<why>');`
+- `084eac64` · synthesis · — · victoria-daily-20261114: 25 new waiting tickets named, 23 put to a turn across 3 lists, 14 passes / 9 no-fit / 0 turned… · finalises Nov 21, 5:09 AM CST · `select public.reverse_decision('084eac64-6b21-4160-910e-7a7ed4b718f9','John','<why>');`
+- `fb18b38b` · synthesis · — · Three defects in how this platform grades its own work, each hit live this cycle and none of them AGT-367's. · finalises Nov 21, 5:14 AM CST · `select public.reverse_decision('fb18b38b-68a7-462c-991b-3fec07383f60','John','<why>');`
+- `a75484f1` · ticket-status · `AGT-680` · Close-out: AGT-680 settles 'delivered' · finalises Nov 21, 5:40 AM CST · `select public.reverse_decision('a75484f1-f6f1-4501-9987-810444c6e3db','John','<why>');`
+- `a90e5c35` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Nov 21, 5:40 AM CST · `select public.reverse_decision('a90e5c35-db8a-41ec-a3e6-76e8f386b6ea','John','<why>');`
+- `5b439571` · concurrency · `AGT-680` · Close-out: AGT-680's claim released by this cycle · finalises Nov 21, 5:46 AM CST · `select public.reverse_decision('5b439571-413f-4cdd-81b8-bf4058a17942','John','<why>');`
+- `74164d06` · ticket-status · `AGT-625` · Close-out: AGT-625 settles 'delivered' · finalises Nov 21, 6:16 AM CST · `select public.reverse_decision('74164d06-3856-4ba5-b2fb-afa1ef44b887','John','<why>');`
+- `1c98ea65` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Nov 21, 6:16 AM CST · `select public.reverse_decision('1c98ea65-17ba-4db7-8530-6ba68f61bfb0','John','<why>');`
+- `453c5af3` · concurrency · `AGT-625` · Close-out: AGT-625's claim released by this cycle · finalises Nov 21, 6:19 AM CST · `select public.reverse_decision('453c5af3-9e28-45e5-a850-7a7e9708ecc0','John','<why>');`
+- `b94f8368` · ship · `SES-401` · SES-401 shipped at v7.0.497 (ea337053d734c387bb2670db31034f6e8b45ba6f) on verdict f85470f8-20f0-41ef-a131-9bb69a28cfe0 · finalises Nov 21, 6:25 AM CST · `select public.reverse_decision('b94f8368-beae-4272-b005-a5d8ccab8fff','John','<why>');`
+- `7108a3ad` · learning · `SES-159` · class-loop learning claims for P2 - Inventive · finalises Nov 22, 2:10 AM CST · `select public.reverse_decision('7108a3ad-7565-436c-866f-fd050e00bf16','John','<why>');`
+- `db01fa65` · synthesis · — · AGT-017 build: the Builder's one in-span comment replacement ruled fix-now, not a capture · finalises Nov 22, 2:26 AM CST · `select public.reverse_decision('db01fa65-ef16-4b24-a880-ca7ff2b30a9a','John','<why>');`
+- `6fac5a3b` · classification · — · board ordered: 60 ticket(s) given an automation_rank · finalises Nov 22, 3:48 AM CST · `select public.reverse_decision('6fac5a3b-8d51-446b-815c-d2a90390745f','John','<why>');`
+- `e41535d2` · removal-proposal · `ZFIX-64653` · ZFIX-64653 removal proposed: Premise is empty and names no work; title 'ses-424g dependent', null type and a filed_at o… · finalises Nov 22, 3:50 AM CST · `select public.reverse_decision('e41535d2-2e66-405d-a7e6-1201846024d5','John','<why>');`
+- `1947658a` · ticket-status · `AGT-522` · Close-out: AGT-522 settles 'partial' · finalises Nov 22, 4:09 AM CST · `select public.reverse_decision('1947658a-0568-4158-a5c6-2561beabf50b','John','<why>');`
+- `536aed6f` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · finalises Nov 22, 4:09 AM CST · `select public.reverse_decision('536aed6f-e336-4e1a-b32a-e39559ba2460','John','<why>');`
+- `6ec0fe88` · card-retire · — · Stale ship cards retired as receipts: 1 card(s) -- 1 on done, 0 on removed. · finalises Nov 22, 4:09 AM CST · `select public.reverse_decision('6ec0fe88-327d-4c5d-9cb1-9e1df87c5d8e','John','<why>');`
+- `baf6e4e0` · ticket-scope · `AGT-471` · cap ruling: waive AGT-471 for one build · finalises Nov 22, 4:54 AM CST · `select public.reverse_decision('baf6e4e0-2647-454c-8b60-1d66d3b89e28','John','<why>');`
+- `850bf503` · synthesis · — · dev-mgr-findings (--new-only): 3 new waiting tickets graded — AGT-690 (4), AGT-689 (2), AGT-691 (2); 0 turned down, 0 m… · finalises Nov 22, 4:55 AM CST · `select public.reverse_decision('850bf503-c81b-49a3-8b10-36c807209644','John','<why>');`
+- `df77281c` · agent-row · `AGT-734` · Created agent Paul (paul-dy86jo) active and public, with two model-running capabilities, under John's 2026-11-19 ruling · finalises Nov 22, 3:24 PM CST · `select public.reverse_decision('df77281c-217f-4aa6-ad0f-afb4828abb2b','John','<why>');`
+- `9838d8d6` · rollback · — · Auto-rollback held: ci-red on 369060e was not reverted (card-only) · finalises Nov 22, 5:14 PM CST · `select public.reverse_decision('9838d8d6-b104-44c5-85da-14b355cf0ca0','John','<why>');`
+- `5a7a0c49` · rollback · — · Auto-rollback held: ci-red on 369060e was not reverted (card-only) · finalises Nov 22, 5:16 PM CST · `select public.reverse_decision('5a7a0c49-c1b3-4676-9762-d58d69b0f079','John','<why>');`
+- `c3401798` · agent-row · `AGT-738` · Added three TRIAL match capabilities to Paul (paul-dy86jo) for John's matching test; paul-match-contracts untouched · finalises Nov 22, 5:18 PM CST · `select public.reverse_decision('c3401798-d9c4-459b-9fde-c5ba7b602865','John','<why>');`
+- `fc70736d` · leverage · — · AGT-238 leverage first: AGT-552, AGT-328, AGT-331, AGT-617, AGT-620, AGT-672 marked as leverage -- outranks project ord… · finalises Nov 22, 5:20 PM CST · `select public.reverse_decision('fc70736d-2c04-40e3-a868-14cde106be30','John','<why>');`
+- `26d05021` · concurrency · — · AGT-238 concurrency from the corpus: 2 project(s) executing in the order dev-manager-capabilities, tooling, pausing gov… · finalises Nov 22, 5:20 PM CST · `select public.reverse_decision('26d05021-4192-4abc-b110-143bdfd61a3d','John','<why>');`
+- `2f929760` · agent-row · `AGT-739` · Added permanent capability paul-match-contracts-fit to Paul and removed trial capabilities paul-match-trial-mid and pau… · finalises Nov 22, 5:24 PM CST · `select public.reverse_decision('2f929760-c3e7-459b-95be-96e5a5a36b30','John','<why>');`
+- `170443c6` · agent-row · `AGT-739` · Removed the last AGT-738 trial capability paul-match-fit-trial-mid after paul-match-contracts-fit was proven · finalises Nov 22, 5:24 PM CST · `select public.reverse_decision('170443c6-1f10-477b-b7dc-c97febc3e4c2','John','<why>');`
+- `85c46c0a` · synthesis · — · victoria-daily 2026-11-16: new_waiting arm — graded the 5 new dev-mgr-findings tickets (5 passes, 0 turned down), homed… · finalises Nov 23, 4:56 AM CST · `select public.reverse_decision('85c46c0a-9731-499f-a230-3f95fe9c87f2','John','<why>');`
+- `9b3d68c6` · synthesis · — · Daily check: 13 new waiting tickets graded across auditor-findings (9) and dev-mgr-findings (4), 0 turned down, 0 moved… · finalises Nov 24, 4:59 AM CST · `select public.reverse_decision('9b3d68c6-721f-412a-90ef-1439a6ab99b8','John','<why>');`
+- `ebfce315` · synthesis · — · No list door run: both executing projects were already above the floor of ten countable tickets scored 3 or greater, so… · finalises Nov 24, 5:06 AM CST · `select public.reverse_decision('ebfce315-13d7-4c62-8c15-370e20ec5039','John','<why>');`
+- `74f72358` · synthesis · — · Victoria daily 2026-11-18: graded all 10 new waiting tickets across auditor-findings (1) and dev-mgr-findings (9); 7 pa… · finalises Nov 25, 4:57 AM CST · `select public.reverse_decision('74f72358-54b5-4a5e-9cbd-d2593786663e','John','<why>');`
+- `b5ddbc6b` · gated-before-build · `AGT-160` · AGT-160 redesign attempt 1 designed and committed, build gated: it would answer John's own unanswered card 98137400 by… · finalises Nov 27, 11:09 AM CST · `select public.reverse_decision('b5ddbc6b-b2f4-43e3-a7aa-93d8fb791106','John','<why>');`
+- `517b6ebe` · routine · — · Created and enabled routine victoria-daily-check (trig_01M1rsFP6HHYxELMr8JdhDg5), daily 10:50Z = 4:50 AM CST, under Joh… · finalises Dec 3, 8:55 AM CST · `select public.reverse_decision('517b6ebe-b75f-437d-b285-9c9770d1c9c1','John','<why>');`
+- `cca362ab` · synthesis · — · AGT-610 attempt 1 refused by a consent prompt on apply_migration — the clause-5 refusal data, recorded here because the… · finalises Dec 7, 6:29 AM CST · `select public.reverse_decision('cca362ab-69a4-4b30-85e1-b2312ff7d23d','John','<why>');`
 
-**0 final this week, 891 reversed this week** — *this week* is a **rolling 7 days** back from the stamp, not a calendar week and not a Friday-07:00Z reset: no such weekly-reset helper exists in this file or anywhere in `scripts/`, so a rolling window is what is used and is labelled as one. A reversal is the strongest negative signal the ladder takes (`M6-07`), so the second number is the one to read first.
+**1000 final this week, 250 reversed this week** — *this week* is a **rolling 7 days** back from the stamp, not a calendar week and not a Friday-07:00Z reset: no such weekly-reset helper exists in this file or anywhere in `scripts/`, so a rolling window is what is used and is labelled as one. A reversal is the strongest negative signal the ladder takes (`M6-07`), so the second number is the one to read first.
 
-**Decided for you** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* What the runner DECIDED on your behalf, by CST day (`governance_rules.MANAGER-DECIDES-BY-DEFAULT`: *a daily list of what was decided, not questions*), with the questions that reached you anyway counted beside it — target zero. Not the `Open decisions` group above: that one is the undo list and drops a decision the moment it finalises; this one is the record of the day and keeps it. **105 decided on 2026-11-02**; **0 question(s) reached you in the last 7 days — target zero**; 0 still open.
+**Decided for you** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* What the runner DECIDED on your behalf, by CST day (`governance_rules.MANAGER-DECIDES-BY-DEFAULT`: *a daily list of what was decided, not questions*), with the questions that reached you anyway counted beside it — target zero. Not the `Open decisions` group above: that one is the undo list and drops a decision the moment it finalises; this one is the record of the day and keeps it. **71 decided on 2026-11-19**; **2 question(s) reached you in the last 7 days — target zero**; 2 still open.
 
 | CST day | decided | reversed | questions to you |
 |---|---:|---:|---:|
-| `2026-11-02` | 105 | 48 | 0 |
-| `2026-11-01` | 0 | 0 | 0 |
-| `2026-10-31` | 253 | 108 | 0 |
-| `2026-10-30` | 625 | 279 | 0 |
-| `2026-10-29` | 0 | 0 | 0 |
-| `2026-10-28` | 17 | 8 | 0 |
-| `2026-10-27` | 0 | 0 | 0 |
+| `2026-11-19` | 71 | 27 | 0 |
+| `2026-11-18` | 117 | 45 | 1 |
+| `2026-11-17` | 119 | 36 | 0 |
+| `2026-11-16` | 66 | 13 | 0 |
+| `2026-11-15` | 79 | 18 | 0 |
+| `2026-11-14` | 96 | 18 | 0 |
+| `2026-11-13` | 222 | 93 | 1 |
 
-**The 105 decided on 2026-11-02** — newest first.
+- *2 decision(s) were read but fall outside the table:* the read window is a rolling 7×24h back from the stamp, the table is the seven CST days ending `2026-11-19`, and any render after CST midnight sees the gap between them. They are in no column above.
 
-- `fec0e633` · ticket-validation · `ZAGTVL-1` · ZAGTVL-1 validated: confirmed · open
-- `70ce84bf` · requirement-check · `ZAGTVL-1` · AGT-493 validation probe 1 · open
-- `a45a18e5` · resolve · — · Close-out cost resolved: cost_usd=0, cost_basis=subscription-lane · open
-- `aee7974b` · ticket-status · `AGT-550` · Close-out: AGT-550 settles 'delivered' · open
-- `c44df6a1` · reversal · `ZAGTPK-1` · reversal of requirement-check decision f4b5d9b0-0a57-4caf-bd8c-0899364e448d -- applied: 1 restored, 0 restored-unverifi… · open
-- `f4b5d9b0` · requirement-check · `ZAGTPK-1` · AGT-490 parked-home probe 1 · reversed
-- `7fbc82ff` · reversal · `ZAGTPK-2` · reversal of placement decision 7e36531a-2804-4273-8dd3-0e0febbb93bd -- applied: 1 restored, 0 restored-unverified, 0 re… · open
-- `7e36531a` · placement · `ZAGTPK-2` · AGT-490 parked-home probe 2 · reversed
-- `89990344` · reversal · `ZAGTPK-1` · reversal of placement decision 370a1916-173f-4a43-92e1-c5c4e1f7fffc -- applied: 1 restored, 0 restored-unverified, 0 re… · open
-- `370a1916` · placement · `ZAGTPK-1` · AGT-490 parked-home probe 1 · reversed
-- `f207936a` · reversal · `ZAGTVL-1` · reversal of requirement-check decision e9efe329-dd8a-414b-85dd-41b93ff5780e -- applied: 1 restored, 0 restored-unverifi… · open
-- `6e1720ec` · reversal · `ZAGTVL-1` · reversal of ticket-validation decision 79103002-2090-494e-b499-1c53dfdef406 -- applied: 1 restored, 0 restored-unverifi… · open
-- `67a00ff9` · reversal · `ZAGTVL-1` · reversal of placement decision fc07827b-0acc-485d-8c6d-ed3b1fadcc0b -- applied: 1 restored, 0 restored-unverified, 0 re… · open
-- `e36bc5bb` · reversal · `ZAGTVL-2` · reversal of requirement-check decision e69944f2-3ffe-43b6-af5d-c17155bf3222 -- applied: 1 restored, 0 restored-unverifi… · open
-- `f06825da` · reversal · `ZAGTVL-2` · reversal of ticket-validation decision d667c918-80b6-4f4e-b497-54903dc3f938 -- applied: 1 restored, 0 restored-unverifi… · open
-- `35b915a1` · reversal · `ZAGTVL-3` · reversal of ticket-validation decision 2e6183af-9f4b-42c6-973d-97b1a9a92ddd -- applied: 1 restored, 0 restored-unverifi… · open
-- `2e6183af` · ticket-validation · `ZAGTVL-3` · ZAGTVL-3 validated: not-real · reversed
-- `d667c918` · ticket-validation · `ZAGTVL-2` · ZAGTVL-2 validated: revised · reversed
-- `e69944f2` · requirement-check · `ZAGTVL-2` · AGT-493 validation probe 2 · reversed
-- `fc07827b` · placement · `ZAGTVL-1` · AGT-493 validation probe 1 · reversed
-- `79103002` · ticket-validation · `ZAGTVL-1` · ZAGTVL-1 validated: confirmed · reversed
-- `e9efe329` · requirement-check · `ZAGTVL-1` · AGT-493 validation probe 1 · reversed
-- `f419c3a4` · reversal · `ZAGTVL-1` · reversal of requirement-check decision 81beb923-3938-47ad-abdc-1d15c8647ca3 -- applied: 1 restored, 0 restored-unverifi… · open
-- `2a56188e` · reversal · `ZAGTVL-1` · reversal of ticket-validation decision 52125dbb-3c85-491f-8c55-e7bed367044d -- applied: 1 restored, 0 restored-unverifi… · open
-- `a2261fd3` · reversal · `ZAGTVL-1` · reversal of placement decision da2cb54f-76a4-4d50-adab-c18c38ec8165 -- applied: 1 restored, 0 restored-unverified, 0 re… · open
-- …and 80 more decided that day · `select id, kind, backlog_id, summary, status from public.runner_decisions where (decided_at at time zone 'America/Chicago')::date = '2026-11-02' order by decided_at desc;`
+**The 71 decided on 2026-11-19** — newest first.
 
-**Judgment classes** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* What the corpus currently holds per pull test, live from `public.judgment_class_census` (`SES-84`; the same view `SES-159` reads). Ratification is a standing metric (John, 2026-08-23: a class is never finished being learned), never a finish line.
+- `8aba70a3` · john-ruling · — · Limits lifted until midnight CT (John 2026-11-19 ~5:24 PM CT: "lift everything until 12 am, then set everything back to… · final
+- `170443c6` · agent-row · `AGT-739` · Removed the last AGT-738 trial capability paul-match-fit-trial-mid after paul-match-contracts-fit was proven · open
+- `2f929760` · agent-row · `AGT-739` · Added permanent capability paul-match-contracts-fit to Paul and removed trial capabilities paul-match-trial-mid and pau… · open
+- `26d05021` · concurrency · — · AGT-238 concurrency from the corpus: 2 project(s) executing in the order dev-manager-capabilities, tooling, pausing gov… · open
+- `fc70736d` · leverage · — · AGT-238 leverage first: AGT-552, AGT-328, AGT-331, AGT-617, AGT-620, AGT-672 marked as leverage -- outranks project ord… · open
+- `c3401798` · agent-row · `AGT-738` · Added three TRIAL match capabilities to Paul (paul-dy86jo) for John's matching test; paul-match-contracts untouched · open
+- `5a7a0c49` · rollback · — · Auto-rollback held: ci-red on 369060e was not reverted (card-only) · open
+- `9838d8d6` · rollback · — · Auto-rollback held: ci-red on 369060e was not reverted (card-only) · open
+- `8a615e35` · john-ruling · — · max_lanes 1 -> 4 (John 2026-11-19 ~5:07 PM CT: "kick off all the routines that generally wait until there is room. Allo… · final
+- `df77281c` · agent-row · `AGT-734` · Created agent Paul (paul-dy86jo) active and public, with two model-running capabilities, under John's 2026-11-19 ruling · open
+- `baf6e4e0` · ticket-scope · `AGT-471` · cap ruling: waive AGT-471 for one build · open
+- `a90010c7` · reversal · `ZAGTVL-1` · reversal of requirement-check decision 0acfb3a0-50d7-47c4-9e27-108d98b6dd17 -- applied: 1 restored, 0 restored-unverifi… · final
+- `741f54e0` · reversal · `ZAGTVL-1` · reversal of ticket-validation decision 28321c64-a5bc-4322-9912-9f301a113d3b -- applied: 1 restored, 0 restored-unverifi… · final
+- `b8b7e365` · reversal · `ZAGTVL-1` · reversal of placement decision dc4a40fa-268f-4817-b0cb-68c0bf8ec919 -- applied: 1 restored, 0 restored-unverified, 0 re… · final
+- `9eaa129e` · reversal · `ZAGTVL-2` · reversal of requirement-check decision b5b7850e-3e99-454c-b04c-90e047d864fb -- applied: 1 restored, 0 restored-unverifi… · final
+- `179b3bed` · reversal · `ZAGTVL-2` · reversal of ticket-validation decision 5c15e675-9055-4fa8-bf62-bcbf2acc5aa6 -- applied: 1 restored, 0 restored-unverifi… · final
+- `fefb1fa2` · reversal · `ZAGTVL-3` · reversal of ticket-validation decision d517046d-f53b-4163-9ef7-9f6dbf8e3222 -- applied: 1 restored, 0 restored-unverifi… · final
+- `d517046d` · ticket-validation · `ZAGTVL-3` · ZAGTVL-3 validated: not-real · reversed
+- `5c15e675` · ticket-validation · `ZAGTVL-2` · ZAGTVL-2 validated: revised · reversed
+- `b5b7850e` · requirement-check · `ZAGTVL-2` · AGT-493 validation probe 2 · reversed
+- `dc4a40fa` · placement · `ZAGTVL-1` · AGT-493 validation probe 1 · reversed
+- `28321c64` · ticket-validation · `ZAGTVL-1` · ZAGTVL-1 validated: confirmed · reversed
+- `0acfb3a0` · requirement-check · `ZAGTVL-1` · AGT-493 validation probe 1 · reversed
+- `1b5de89b` · reversal · `ZAGTPK-1` · reversal of requirement-check decision 679880f8-f149-4797-8ad7-c909256c3061 -- applied: 1 restored, 0 restored-unverifi… · final
+- `679880f8` · requirement-check · `ZAGTPK-1` · AGT-490 parked-home probe 1 · reversed
+- …and 46 more decided that day · `select id, kind, backlog_id, summary, status from public.runner_decisions where (decided_at at time zone 'America/Chicago')::date = '2026-11-19' order by decided_at desc;`
+
+**Judgment classes** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* What the corpus currently holds per pull test, live from `public.judgment_class_census` (`SES-84`; the same view `SES-159` reads). Ratification is a standing metric (John, 2026-08-23: a class is never finished being learned), never a finish line.
 
 | class | ratified | proposed | rejected | total |
 |---|---:|---:|---:|---:|
 | `P1 - Improves John's Skills` | 7 | 31 | 6 | 44 |
-| `P2 - Inventive` | 0 | 128 | 16 | 144 |
-| `P3 - Investor Value` | 0 | 127 | 7 | 134 |
+| `P2 - Inventive` | 0 | 151 | 16 | 167 |
+| `P3 - Investor Value` | 0 | 148 | 7 | 155 |
 | `P4 - New Customers` | 1 | 37 | 3 | 41 |
 | `neutral` | 0 | 87 | 30 | 117 |
 
@@ -625,21 +249,21 @@
 - Newest proposed root claim for P3: `VC-SYN-001` — Investor value is the least-defined product goal because nobody has yet said what an investor would check. The drafts agree on one reading: the buyer is a skep…
 - Newest proposed root claim for P4: `VC-ROOT-004` — New features that win new customers. The bar is buy-pull — functionality that makes a customer say "I have to buy this." Administrative capability (accounts, b…
 
-**John-model** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* How often a decision that leaned on a standing pattern of John's stood unreversed through its window, live from `public.john_model_signal` (`SES-004`; the criteria are `public.decision_patterns`, exported from `docs/JOHN-DECISION-PATTERNS.md`). A rate binds only from 30 finalised-or-reversed decisions (M7 gate, ruling iii).
+**John-model** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* How often a decision that leaned on a standing pattern of John's stood unreversed through its window, live from `public.john_model_signal` (`SES-004`; the criteria are `public.decision_patterns`, exported from `docs/JOHN-DECISION-PATTERNS.md`). A rate binds only from 30 finalised-or-reversed decisions (M7 gate, ruling iii).
 
-- **99% agreement** over 705 finalised-or-reversed decisions (698 finalised unreversed, 7 reversed; 818 still open, 1523 citing in total). A reversal is the strongest negative signal the ladder takes, so the second number is the one to read first.
+- **99.6% agreement** over 1925 finalised-or-reversed decisions (1917 finalised unreversed, 8 reversed; 49 still open, 1974 citing in total). A reversal is the strongest negative signal the ladder takes, so the second number is the one to read first.
 
 | criterion | citing | final unreversed | reversed | open | rate |
 |---|---:|---:|---:|---:|---:|
-| `pattern:0` No standing pattern applied -- new judgment. | 799 | 348 | 2 | 449 | 99.4% |
-| `pattern:9` Never spend a model call where a deterministic mechanism serves. | 221 | 94 | 0 | 127 | 100% |
-| `pattern:14` When two code paths compute the same thing, build one shared core they both cal… | 204 | 84 | 0 | 120 | 100% |
-| `pattern:92` Persist every finding and decision where a cold future session will find it — r… | 162 | 56 | 2 | 104 | 96.6% |
-| `pattern:167` The staff decide (fix now / later with a home / drop with evidence); John keeps… | 156 | 35 | 1 | 120 | 97.2% |
+| `pattern:0` No standing pattern applied -- new judgment. | 996 | 975 | 2 | 19 | 99.8% |
+| `pattern:9` Never spend a model call where a deterministic mechanism serves. | 337 | 319 | 1 | 17 | 99.7% |
+| `pattern:14` When two code paths compute the same thing, build one shared core they both cal… | 277 | 270 | 0 | 7 | 100% |
+| `pattern:162` A check grades the change, never the live world. | 211 | 208 | 1 | 2 | 99.5% |
+| `pattern:167` The staff decide (fix now / later with a home / drop with evidence); John keeps… | 210 | 203 | 1 | 6 | 99.5% |
 
 - A per-pattern `—` is not a zero: that criterion has not reached 30 finalised-or-reversed citations of its own, so it carries counts and no rate.
 
-**Invention in use** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* Criterion 7 (`docs/SELFBUILD-CHARTER.md`): at least one platform-originated feature — the Bench Report Card judge (`LOG-143`) — is measurably used by real visitors, live from `public.report_card_usage`. Counts only, never a rate.
+**Invention in use** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* Criterion 7 (`docs/SELFBUILD-CHARTER.md`): at least one platform-originated feature — the Bench Report Card judge (`LOG-143`) — is measurably used by real visitors, live from `public.report_card_usage`. Counts only, never a rate.
 
 - **7d:** 0 judge runs, 0 by real visitors (0 distinct).
 - **30d:** 0 judge runs, 0 by real visitors (0 distinct).
@@ -647,7 +271,7 @@
 
 - *no real-visitor use yet.*
 
-**Board by served class** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* Which class each open ticket SERVES under the served-class test (`VC-MISSION-033`), ruled by The Prioritizer's `classify-ticket` and stored on `backlog_items.supports_class` — a ticket's own class is a different question and is not restated here.
+**Board by served class** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* Which class each open ticket SERVES under the served-class test (`VC-MISSION-033`), ruled by The Prioritizer's `classify-ticket` and stored on `backlog_items.supports_class` — a ticket's own class is a different question and is not restated here.
 
 | serves | open tickets |
 |---|---:|
@@ -656,94 +280,194 @@
 | `P3 - Investor Value` | 3 |
 | `P4 - New Customers` | 1 |
 | `P7 - Agent Creation` | 1 |
-| *serves none* | 548 |
+| *serves none* | 577 |
 
 - *Negative ranks are John's own automation queue, seeded to sort ahead of anything assigned later (`SES-86`). The nightly re-rank writes 1..N and therefore sits below them — intended precedence, not a re-rank that failed.*
 
 - **Top 5 by `automation_rank`:**
   -35. `SES-288` — A schema-range red can never be auto-reverted: one refused down-migration disables rollba… *(serves none)*
-  1. `AGT-439` — Three market objections and the acts-or-answers question are answered with nobody: the mi… *(serves none)*
-  1. `AGT-426` — The citation guard writes a verdict id into the one column the ledger renderer refuses ra… *(serves none)*
-  1. `AGT-308` — A ticket gated at step 5 with no card and no design_status stays at queue #1 and is re-pi… *(serves none)*
+  1. `AGT-498` — You retype the same morning ask every day because the run-report-and-queue view has no sa… *(serves none)*
   1. `AGT-340` — A private agent's MCP address answers "what were you taught about X?" lookups and logs th… *(serves none)*
+  1. `AGT-439` — Three market objections and the acts-or-answers question are answered with nobody: the mi… *(serves none)*
+  1. `AGT-308` — A ticket gated at step 5 with no card and no design_status stays at queue #1 and is re-pi… *(serves none)*
 
-- Last scheduled re-rank: Nov 2, 3:47 PM CST.
+- Last scheduled re-rank: Nov 19, 3:46 AM CST.
 
-**Governance agents, last 7 days** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* Whether the platform's own agents (`agents.lane = 'governance'`) are doing the development work, live from `public.governance_agent_usage` and `public.ship_handoff_census` (`SES-360`). A **rolling 7 days** back from render time, like the decision counts above. Counts and token sums only, never a rate.
+**Governance agents, last 7 days** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* Whether the platform's own agents (`agents.lane = 'governance'`) are doing the development work, live from `public.governance_agent_usage` and `public.ship_handoff_census` (`SES-360`). A **rolling 7 days** back from render time, like the decision counts above. Counts and token sums only, never a rate.
 
 | role | source | calls | input tokens | output tokens |
 |---|---|---:|---:|---:|
-| Governance — Development Manager | `session` | 24 (24 untokened) | 0 | 0 |
+| Governance — Development Manager | `session` | 21 (21 untokened) | 0 | 0 |
 | Governance — Researcher | `session` | 1 (1 untokened) | 0 | 0 |
-| Governance — Prioritizer | `session` | 10 (5 untokened) | 0 | 0 |
-| Governance — Prioritizer | *unlabelled* | 89 (89 untokened) | 0 | 0 |
-| Governance — Designer | `session` | 38 (38 untokened) | 0 | 0 |
-| Governance — Builder | `session` | 25 (25 untokened) | 0 | 0 |
-| Governance — Verifier | *no calls in the window* | 0 | — | — |
-| Governance — Auditor | `session` | 5 (5 untokened) | 0 | 0 |
-| Governance — Ticket Owner | `session` | 5 | 0 | 0 |
-| Governance — Architect | `session` | 5 (5 untokened) | 0 | 0 |
+| Governance — Prioritizer | `session` | 15 (8 untokened) | 0 | 0 |
+| Governance — Prioritizer | *unlabelled* | 27 (27 untokened) | 0 | 0 |
+| Governance — Designer | `session` | 60 (58 untokened) | 197492 | 342402 |
+| Governance — Builder | `session` | 19 (19 untokened) | 0 | 0 |
+| Governance — Verifier | `session` | 1 (1 untokened) | 0 | 0 |
+| Governance — Auditor | `session` | 18 (5 untokened) | 138017 | 40745 |
+| Governance — Ticket Owner | `session` | 7 | 0 | 0 |
+| Governance — Architect | `session` | 18 (17 untokened) | 278321 | 0 |
 
-- **Ships with all four handoff rows: 6 of 7** ships in the window (`SES-345`'s four: `automation_rank`, `kickoff_link`, a per-ticket push sha, a verdict row). Missing per leg: kickoff_link 0, per-ticket sha 1, automation_rank 0, verdict 1.
+- **Ships with all four handoff rows: 16 of 28** ships in the window (`SES-345`'s four: `automation_rank`, `kickoff_link`, a per-ticket push sha, a verdict row). Missing per leg: kickoff_link 0, per-ticket sha 1, automation_rank 12, verdict 0.
 - *unlabelled* is a NULL `call_source` — the pre-attribution unknown, never read as automation (`LOG-128`); `untokened` rows carry no token counts at all (deterministic handler rows), so a large call count beside a small token sum is that, not a cheap model.
 
-**Auditor's ledger** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* What `public.audit_findings` (`AGT-70`) holds and what has left it for the board. Counts only, never a rate. Latest week 2026-W45: **12 findings (11 open · 0 resolved · 1 not a defect)** — **0 ruled** open findings (a ruled, open, `high` row is what `tripwire-to-backlog.js --from-ledger` files, at most 3 per ISO week); **0 filed** to the board from the ledger so far (`source_file = 'audit-ledger'`).
+**Auditor's ledger** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* What `public.audit_findings` (`AGT-70`) holds and what has left it for the board. Counts only, never a rate. Latest week 2026-W47: **199 findings (28 open · 0 resolved · 13 not a defect)** — **0 ruled** open findings (a ruled, open, `high` row is what `tripwire-to-backlog.js --from-ledger` files, at most 3 per ISO week); **0 filed** to the board from the ledger so far (`source_file = 'audit-ledger'`).
 
 | fingerprint | kind | confidence | fact | ruled |
 |---|---|---|---|---|
-| `0d27f95d9c68f060` | other | high | Ticket Owner check delivered-unaccepted holds open judgment rows a capability m… | — |
-| `2186a662fa7abc8f` | other | high | Ticket Owner check cycles-over-quote holds open judgment rows a capability must… | — |
-| `33650fe844321886` | other | high | Ticket Owner check verdict-missing holds open judgment rows a capability must d… | — |
-| `4ef4d206ac2df52f` | other | high | Ticket Owner check designed-closed holds open judgment rows a capability must d… | — |
-| `6f28fb48e11b22f9` | other | high | Ticket Owner check type-off-taxonomy holds open judgment rows a capability must… | — |
-| `9fbe7ac6a400bb2b` | other | high | RUNNER_BUDGET HAS NO MONTHLY ROLLOVER, SO THE FIRST FIRE OF EVERY MONTH REFUSES… | — |
-| `be357147648b9773` | other | high | Ticket Owner check remainder-stranded holds open judgment rows a capability mus… | — |
-| `c016f5878302309f` | other | high | Ticket Owner check claim-expired holds open judgment rows a capability must dec… | — |
-| `da23e674ed040a29` | other | high | Ticket Owner check size-missing holds open judgment rows a capability must deci… | — |
-| `e106db10a9abb8b8` | other | high | build needed a fact the kickoff did not carry | — |
-| `e2c2c390f2a15ef7` | other | high | Ticket Owner check quote-missing holds open judgment rows a capability must dec… | — |
+| `147a90b8209a0105` | contradiction | high | The live briefing page's build date is stated two ways in one record: PAGE_BUIL… | — |
+| `1674a31c5714720e` | other | high | The procurement lane cannot be entered without a login and an upload, and the a… | — |
+| `247ac4ce3f4affde` | contradiction | high | tests/regression/agt-642-blocked-first.test.mjs ends with selfRun(import.meta.u… | — |
+| `3a2e629ddafa8dac` | other | high | Ticket Owner check type-off-taxonomy holds open judgment rows a capability must… | — |
+| `53bde7329f0f46de8339af1fbda3e8bc` | other | high | Measured 2026-11-19 against the live Anthropic API. MODELS.SONNET is claude-son… | — |
+| `64cbf82da79fe010` | contradiction | high | A chained continuation cannot boot while max_lanes is 1, because the pre-boot g… | — |
+| `7909fb35ed1cb194` | other | high | No reference a buyer can check: one client-shareable record of one real run is… | — |
+| `7c91f56e4b72a22a` | other | high | build needed a fact the kickoff did not carry | — |
+| `7fbbc8422ad01916` | stale-or-irrelevant | high | docs/design/agt-570-own-row-exemption.sql claims it was applied by a cycle, and… | — |
+| `7fe82f421577b215` | other | high | Per-answer cost is a missing unit, not a broken measurement: the session lane p… | — |
+| `886f5ba98d23aede` | contradiction | high | scripts/redesign-pickup.js:267 prescribes the Designer's mandatory Layer-3 log… | — |
+| `8e28674045c808fb4f38ceaab57b050b` | other | high | A caller key's spend cap is a lifetime total, not a monthly one. A site that is… | — |
+| `8ee9c2d1fa8db142` | other | high | The platform cannot say what one answer cost: every priced log row is an embedd… | — |
+| `95ab59bde213340d` | other | high | There is no tenant boundary to prove: the one visibility check is dormant becau… | — |
+| `b111251c6cc5d19a` | contradiction | high | This cycle claimed v7.0.1054 and labelled its commit with it, yet the version f… | — |
+| `b771d81c1dfe5f97` | other | high | build needed a fact the kickoff did not carry | — |
+| `bd5b056a3141be1e` | other | high | A procurement flag recommends action on an unsourced 15-25% claim typed into th… | — |
+| `c088d60e038b9eb4` | duplicate | high | The door (d) marker-order defect this run filed as new is already ticketed: AGT… | — |
+| `c9674a521959ac4d` | other | high | A day with nothing pickable, no drain retiring, no ticket done and no builder c… | — |
+| `ce510fe5c1aa2493` | other | high | A taught entry can be edited or deleted with nothing recorded and nothing to re… | — |
+| `d3e5bdb553ebfe5d` | other | high | baseline block header named a script path before the instrument line, so the pr… | — |
+| `d90bbbacefbea9d9` | stale-or-irrelevant | high | The AGT-570 migration file says it was applied, and the database holds no such… | — |
+| `e2f31fda5d2edb30` | contradiction | high | The 24-hour redesign cooldown lives only in runner_cycles.last_step, and this c… | — |
+| `fbac8ed20e28abc8` | other | high | An agent has a mouth and no hands: no outbound action path and nowhere to hold… | — |
+| `295f70353af18811` | contradiction | medium | The close-out commit 439ec59 changed only the backlog snapshot; CLAUDE-STATE.md… | — |
+| `9ac53354228a326c` | contradiction | medium | One of AGT-250's two redesign attempts is now recorded against a ticket that wa… | — |
+| `e80105d31b2d6f86` | duplicate | medium | AGT-250's gate card 22f4bd43 was accepted on 2026-10-03 for an attended build;… | — |
+| `fee45a54250e14ee` | stale-or-irrelevant | medium | A claim from 2026-09-27 still sits on a removed ticket and is returned by every… | — |
 
 - *A finding leaves this table only by John's ruling — `resolved`, `not-a-defect`, or ruled and left `open` to file. Candidates a run found but nobody ingested live in `docs/audits/<week>-candidates.json`, not here.*
 
-**Ticket hygiene, last night** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* What the Ticket Owner (`AGT-79`) left on the board: `public.ticket_owner_findings` open rows by check, the newest `hygiene` decision and the newest nightly cycle row. Counts only, never a rate. **287 open findings** across 9 check(s).
+**Ticket hygiene, last night** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* What the Ticket Owner (`AGT-79`) left on the board: `public.ticket_owner_findings` open rows by check, the newest `hygiene` decision and the newest nightly cycle row. Counts only, never a rate. **377 open findings** across 10 check(s).
 
 | check | open | oldest | nights open |
 |---|---:|---|---:|
-| `delivered-unaccepted` | 73 | Sep 12, 10:31 PM CST | 50 |
-| `verdict-missing` | 66 | Sep 12, 10:31 PM CST | 50 |
-| `type-off-taxonomy` | 49 | Sep 12, 10:31 PM CST | 50 |
-| `designed-closed` | 46 | Sep 23, 7:50 PM CST | 39 |
-| `size-missing` | 25 | Sep 12, 10:31 PM CST | 50 |
-| `remainder-stranded` | 12 | Sep 18, 5:38 AM CST | 45 |
-| `cycles-over-quote` | 9 | Sep 12, 10:31 PM CST | 50 |
-| `quote-missing` | 4 | Sep 12, 10:31 PM CST | 50 |
-| `claim-expired` | 3 | Oct 2, 1:57 AM CST | 31 |
+| `verdict-missing` | 90 | Sep 12, 10:31 PM CST | 67 |
+| `delivered-unaccepted` | 77 | Sep 12, 10:31 PM CST | 67 |
+| `pick-blocked-field` | 60 | Nov 7, 1:46 AM CST | 12 |
+| `designed-closed` | 50 | Sep 23, 7:50 PM CST | 56 |
+| `type-off-taxonomy` | 50 | Sep 12, 10:31 PM CST | 67 |
+| `size-missing` | 23 | Sep 12, 10:31 PM CST | 67 |
+| `remainder-stranded` | 11 | Sep 18, 5:38 AM CST | 62 |
+| `cycles-over-quote` | 9 | Sep 12, 10:31 PM CST | 67 |
+| `quote-missing` | 4 | Sep 21, 10:50 AM CST | 59 |
+| `claim-expired` | 3 | Oct 2, 1:57 AM CST | 48 |
 
-- Last run: `e8e1267c` · shipped · Nov 2, 3:54 PM CST · 1091 rows · 312 findings (25 derivable · 287 judgment) · behind the fences: quote 335 · size 310 · cost 45 · verdict 97 · unrevalidated>30d 27 · attended-actual null 475 · revalidation 27 left (batch 25, carried 0) · retired 1 check / 195 rows · fixed 25 · findings +0 ~287 −0 · decision 8ab396ac-16eb-459d-90dd-813111971206 — reversible until 2026-11-05T21:54:01.291858+00:00 · judged 25/3/0 on claude-fable-5-1
+- Last run: `48619ee4` · shipped · Nov 19, 3:50 AM CST · 1193 rows · 378 findings (0 derivable · 378 judgment) · behind the fences: quote 334 · size 309 · cost 45 · verdict 97 · unrevalidated>30d 1 · attended-actual null 547 · revalidation 1 left (batch 1, carried 0) · retired 1 check / 257 rows · fixed 0 · proposed 1 · findings +4 ~373 −1 · no decision (nothing to fix) · judged 0/11/0 on claude-fable-5-1
 - Judgment: **the newest night was judged** — 0 unjudged nights on top, over the newest 14 on record.
-- Decision `8ab396ac` · open · Ticket Owner: 25 derivable cell fix(es) on 25 row(s) — cost 0 · claim 0 · type 0 · revalidation 25 · finalises Nov 5, 3:54 PM CST · `select public.reverse_decision('8ab396ac-16eb-459d-90dd-813111971206','John','<why>');`
+- Decision `58ec087d` · final · Ticket Owner: 7 derivable cell fix(es) on 7 row(s) — cost 1 · claim 5 · type 0 · revalidation 1 · scope rationale 0 · finalises Nov 17, 1:49 AM CST · `select public.reverse_decision('58ec087d-d761-41de-9b6a-2e8aa7ad967c','John','<why>');`
 
-**Victoria's lists, last Tuesday** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* What the weekly list reorganization (`AGT-281`) ruled: the newest 2 ended `public.runner_cycles` rows whose `notes` carry `SCHEDULED-AGENT: victoria-reorg`, each printing its own run line. One row per LIST, so a Tuesday that ruled both lists shows two. **2 run(s)** on record.
+**Victoria's lists, last Tuesday** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* What the weekly list reorganization (`AGT-281`) ruled: the newest 2 ended `public.runner_cycles` rows whose `notes` carry `SCHEDULED-AGENT: victoria-reorg`, each printing its own run line. One row per LIST, so a Tuesday that ruled both lists shows two. **2 run(s)** on record.
 
-- tooling: 14 items into 0 needs, 0 turned down; top 3: none · Oct 27, 5:18 AM CST
-- dev-manager-capabilities: 2 items into 0 needs, 0 turned down; top 3: none · Oct 27, 5:16 AM CST
+- dev-mgr-findings: 9 items into 5 needs, 0 turned down; top 3: AGT-716(4), AGT-718(4), AGT-719(3) · Nov 18, 4:56 AM CST
+- auditor-findings: 1 items into 1 needs, 0 turned down; top 3: AGT-728(3) · Nov 18, 4:53 AM CST
 
 - **0 ticket(s) turned down** across those run(s) — each one sits on `removal proposed` in John's waiting room under its own `removal-proposal` decision, and one `reverse_decision()` returns it to the drain. Nothing on this path ever writes `removed` (`SES-113`).
 
-**Staff watch** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* What the Development Manager (`SES-378`) recorded about the runner's own agents: `public.runner_staff_findings` rows per `agent_id`, with the distinct fingerprints and the distinct CYCLES behind them. Counts only, never a rate. **245 finding(s)** across 2 agent(s).
+**Staff watch** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* What the Development Manager (`SES-378`) recorded about the runner's own agents: `public.runner_staff_findings` rows per `agent_id`, with the distinct fingerprints and the distinct CYCLES behind them. Counts only, never a rate. **322 finding(s)** across 2 agent(s).
 
 | agent | findings | distinct fingerprints | distinct cycles | newest |
 |---|---:|---:|---:|---|
-| `designer` | 223 | 82 | 129 | Nov 2, 4:46 PM CST |
-| `devmanager` | 22 | 7 | 22 | Oct 30, 10:27 AM CST |
+| `designer` | 293 | 123 | 170 | Nov 19, 4:10 AM CST |
+| `devmanager` | 29 | 7 | 29 | Nov 8, 4:41 AM CST |
 
-**Human gates** — *as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST).* The two reads that say whether anything is waiting on a human: open `backlog_items` carrying `design_status = 'needs-john'`, and `gated_before_build` `runner_items` left with `decision IS NULL` (`M6-01`). Board state, written by no code in this repo — which is why it is REPORTED here and not asserted as a gate by the regression suite. **1 open `needs-john` ticket(s)**, **2 undecided `gated_before_build` card(s)**.
+**Stalled cycles** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* The permission-stalls step 0b's tripwire (`SES-103`) claimed into `runner_cycles.stall_notified_at` — a ROW, never a push (`JOHN-0925-NOTIFICATIONS-OFF`). `frozen since` is `coalesce(heartbeat_at, started_at)`, the same basis the 20-minute detector and `stall_watchdog()` use (`SES-104`), so a cycle that never reported a heartbeat still reads as a time rather than a blank. **10 reported stall(s)**, 0 still open.
+
+| cycle | ticket | last step | frozen since | reported | state |
+|---|---|---|---|---|---|
+| `2555f5f1` | AGT-665 | step 3e — verifier approve; QA spot check PASS | Nov 13, 9:56 AM CST | Nov 13, 10:49 AM CST | failed |
+| `c3628a63` | AGT-650 | step 3e — attended build | Nov 12, 1:12 PM CST | Nov 13, 3:45 AM CST | failed |
+| `9779f12b` | AGT-649 | step 3e — attended build | Nov 12, 1:12 PM CST | Nov 13, 3:45 AM CST | failed |
+| `b64d31f9` | AGT-651 | step 3e — attended build | Nov 12, 1:12 PM CST | Nov 13, 3:45 AM CST | failed |
+| `b522456c` | AGT-538 | step 9 (6) — closing the row | Nov 11, 4:00 AM CST | Nov 11, 3:57 AM CST | shipped |
+| `ada86ade` | AGT-444 | 6 — designer: design-kickoff AGT-444 (sub-agent running ~20… | Nov 6, 6:16 AM CST | Nov 7, 2:44 AM CST | failed |
+| `88d7db54` | AGT-572 | 7a — verdict approve | Nov 6, 2:55 AM CST | Nov 6, 2:43 AM CST | shipped |
+| `78a89a90` | AGT-570 | step 6 — designer running for AGT-570 | Nov 4, 9:05 AM CST | Nov 4, 9:42 AM CST | failed |
+| `96f8b76c` | AA-169 | 6 — designer: design-kickoff re-assembly after cap waiver | Nov 4, 6:09 AM CST | Nov 4, 6:42 AM CST | failed |
+| `527a2664` | — | 7a — related suite 55/55 green on the shipped AGT-460 tree;… | Nov 3, 5:54 AM CST | Nov 3, 2:45 PM CST | failed |
+
+**Wasted cycles** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* The last 7 days of `runner_cycles` with the cause on each row, counted per cause by `runner_waste_by_cause()`. The cause is DERIVED (`runner_cycle_causes`), never a written column, so it is right for the rows already filed; the vocabulary is DATA (`runner_waste_causes`), so `counts as waste` and `candidate` are an INSERT and not a ship. A cycle that MOVED a ticket, a scheduled routine and a run still going are NOT waste -- folding them into one rate is what made `audit_flow_checks()` arm (c)'s old percentage unreadable. **308 cycle(s) in the last 7 days, 34 moved a ticket, 249 wasted (80.8%).**
+
+| cause | cycles | counts as waste | candidate |
+|---|---|---|---|
+| `weekly_pace` | 125 | yes | — |
+| `moved` | 34 | no | — |
+| `gated` | 29 | yes | AGT-308 |
+| `lanes_full_self` | 28 | yes | — |
+| `weekly_wall` | 26 | yes | — |
+| `lanes_full` | 23 | yes | — |
+| `routine_run` | 23 | no | — |
+| `unattributed` | 16 | yes | — |
+| `in_progress` | 2 | no | — |
+| `lanes_full:_the_one_live_lane_is_this_continuation_row_itself` | 1 | yes | — |
+| `lanes_full:_this_continuation_row_is_the_live_lane` | 1 | yes | — |
+
+**Redesign after refusal** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* The attempt ledger (`runner_refusal_attempts`, AGT-610, John's standing decision 6e94edcb): a ticket the platform's safety check refused is redesigned by the team at most twice, then diagnosed and parked; every row here is information, never a card you must act on. **26 ticket(s) in the ledger, 12 parked after two attempts.**
+
+| ticket | attempts | state | last refusal | feedback |
+|---|---|---|---|---|
+| DAT-30 | 2 | redesign open | (none — no bracketed label; an MCP inte… Nov 16, 11:30 AM CST | — |
+| AGT-570 | 2 | redesign open | [Production Deploy] Nov 13, 6:11 AM CST | — |
+| ADM-2 | 0 | parked (attended-only) | —  | — |
+| AGT-017 | 1 | redesign open | —  | — |
+| AGT-160 | 0 | parked (attended-only) | —  | — |
+| AGT-168 | 1 | redesign open | —  | — |
+| AGT-232 | 1 | redesign open | —  | — |
+| AGT-237 | 0 | parked (attended-only) | —  | — |
+| AGT-250 | 1 | redesign open | —  | — |
+| AGT-251 | 0 | parked (attended-only) | —  | — |
+| AGT-252 | 0 | parked (attended-only) | —  | — |
+| AGT-291 | 1 | shipped | —  | — |
+| AGT-459 | 1 | shipped | —  | — |
+| AGT-466 | 1 | shipped | —  | — |
+| AGT-471 | 0 | parked (attended-only) | —  | — |
+| AGT-517 | 1 | redesign open | —  | — |
+| AGT-549 | 0 | parked (attended-only) | —  | — |
+| AGT-567 | 1 | shipped | —  | — |
+| AGT-577 | 1 | shipped | —  | — |
+| AGT-590 | 1 | shipped | —  | — |
+| AGT-705 | 0 | parked (attended-only) | —  | — |
+| DAT-23 | 0 | parked (attended-only) | —  | — |
+| DAT-29 | 0 | parked (attended-only) | —  | — |
+| SES-237 | 0 | parked (attended-only) | —  | — |
+| SES-349 | 1 | redesign open | —  | — |
+| SES-361 | 0 | parked (attended-only) | —  | — |
+
+**Secret age** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* `runner_secrets` by NAME and `updated_at`; no value is read. **Oldest row: 91 days (`ANTHROPIC_API_KEY`)**, 5 of 12 at or past 90 days.
+
+| key | row last written | days | state |
+|---|---|---|---|
+| `ANTHROPIC_API_KEY` | Aug 19, 10:14 PM CST | 91 | **at or past 90** |
+| `SUPABASE_SERVICE_KEY` | Aug 19, 10:14 PM CST | 91 | **at or past 90** |
+| `SUPABASE_URL` | Aug 19, 10:14 PM CST | 91 | **at or past 90** |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Aug 19, 10:14 PM CST | 91 | **at or past 90** |
+| `VERCEL_TOKEN` | Aug 19, 11:21 PM CST | 91 | **at or past 90** |
+| `SCRATCH_SUPABASE_SERVICE_KEY` | Aug 28, 3:27 PM CST | 83 | under 90 |
+| `MCP_API_KEY` | Sep 9, 7:25 PM CST | 70 | under 90 |
+| `YAHOO_IMAP_APP_PASSWORD` | Sep 25, 2:37 PM CST | 55 | under 90 |
+| `YAHOO_IMAP_USER` | Sep 25, 2:38 PM CST | 55 | under 90 |
+| `MCP_KEY_interviewquestions` | Oct 23, 1:41 PM CST | 27 | under 90 |
+| `OPENAI_API_KEY` | Nov 12, 4:11 PM CST | 7 | under 90 |
+| `MCP_KEY_maricopa_dashboard` | Nov 19, 3:25 PM CST | 0 | under 90 |
+
+- `updated_at` is whatever the last writer of the row left: nothing moves it when a value changes, and no column tells a key from an address or a username.
+- GitHub Actions secrets are not in this table.
+
+**Human gates** — *as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST).* The two reads that say whether anything is waiting on a human: open `backlog_items` carrying `design_status = 'needs-john'`, and `gated_before_build` `runner_items` left with `decision IS NULL` (`M6-01`). Board state, written by no code in this repo — which is why it is REPORTED here and not asserted as a gate by the regression suite. **1 open `needs-john` ticket(s)**, **2 undecided `gated_before_build` card(s)**.
 
 - **`needs-john` (1):** `AGT-110`
-- **Undecided gated cards (2):** `19f96333-6301-45a6-ba79-9e208a2ac809`, `16bd6514-fe49-42d5-88cf-ef1e5a962a6d`
+- **Undecided gated cards (2):** `b766a84f-92ec-4ab0-81cf-f8136ffb3982`, `ac761ce2-0612-4ab5-9704-0763df7b351d`
 - *Open is not wrong.* A card nobody has answered yet is a real board state; what it is NOT is a regression, so nothing in the suite goes red for it.
 
-*Provenance: 1000 board rows, payload `sha256:f9371ae72eb81f57`, as of 2026-11-02 22:52Z (Nov 2, 4:52 PM CST). The stamp says when this was last read; the sha says whether it still matches the tables. `--check` compares the sha, never the stamp — a refreshed stamp over identical facts is not drift.*
+*Provenance: 1000 board rows, payload `sha256:24f11abc8eb716f6`, as of 2026-11-19 23:29Z (Nov 19, 5:29 PM CST). The stamp says when this was last read; the sha says whether it still matches the tables. `--check` compares the sha, never the stamp — a refreshed stamp over identical facts is not drift.*
 <!-- END GENERATED — scripts/render-standing-brief.js -->
 
 **Next session:** none required — the runner is live and works **John's automation queue** (canonical: `docs/RUNNER-GOV-0820-REQUIREMENTS.md`): the queue is the board's leading sort key, not a list to read (`automation_rank`, v7.0.133) — `ORDER BY queue` already honours it. Classes are always written named, **`P1 - Improves John's Skills` → `P10 - Tooling`**; outcomes as plain words (“did not run”, “gated before build”); budget is two-track (API dollars + token governor). John judges from the briefing page. Runner pause: disable `deepbench-runner` at claude.ai/code/routines. **Board census measured 2026-08-23T12:5xZ by runner cycle `363b5138`, taken from the board after its own close-out recompute rather than carried forward:** **561 open tickets, 561 numbered, 0 open-but-unnumbered**, 611 rows total, **the standing Automation drain now has a FIXED finish line** — from `v7.0.179` (`SES-142`) it works the **18 members John named** on directive `b74009ea`, stored as `runner_drain_scope` FK rows, and a ticket filed into the epic *after* that naming **never joins it**: it queues normally and waits for him. The live `now` tier had already drifted to 19 against his 18. `drain_epic_next()` retires when those 18 are `done`/`removed`, and returns the new outcome **`unscoped`** — never a live-tier fallback — for any future drain declared without a list. Queue/drain state as of **v7.0.196** (2026-08-23 ~17:00Z, `successional-review` close-out, 561 rows renumbered): `SES-140` — *the successor fire is refused by the platform* and `SES-151` — *the scheduler runs on John's clock grid* are both **`done`**; the drain's nearest open member `SES-84` — *the vision corpus* (`needs-john`) waits on John's briefing decisions, so cycles step past it (`SES-114`) and work the board (`SES-121` — *shrink the `.claude/`-mutable surface* went `done` at v7.0.198; procedure text now lives in `docs/runbooks/`, cycle-writable). **The board's `title` column is trustworthy for display for the first time** (`SES-91`, v7.0.177): 98 rows that held a bare priority-class string now carry a real authored title, and the only `^P[0-9]+ - ` title left is `ADM-1`, whose title is a real sentence behind a stale class prefix and is deliberately left for `SES-117` to **accommodate** rather than repair. `SES-119` is now `done` (v7.0.184 + v7.0.185): the briefing renders `public.backlog_display_title(title, description)` rather than the read-time `gist` workaround, and **`runner-cycle.md`'s Language block now requires a ticket's title wherever John reads its ID**. Step 5's `gist` expression deliberately stays — it is still correct for any future row filed the old way, and 50 of 562 open numbered tickets still fall back to it. **From v7.0.195 the chain runs IN-SESSION (`SES-140` FINAL)** — a cycle that actually ran one (`shipped`/`gated_before_build`/`reverted`) and whose drain still returns `pick` opens its next `runner_cycles` row (trigger `chained (drain continuation)`) **in the same session** and re-enters the runbook at step 1; session-spawning is retired as platform-unsupported (`runner-cycle.md` tail step (8) carries the evidence). A **wall-stopped cycle continues nothing**, which keeps the budget wall a brake rather than a metronome. Proven live 2026-08-23: cycles `1fcd687e` → `a11c94d2`, the first chained row in the runner's life. **The briefing-redesign epic is finished** — `SES-129`, its last member, shipped in cycle `ed1a5eb3`. **A new filing rule binds from this version:** `runner_items.backlog_id` takes a **bare** ticket id or NULL and is enforced by `ck_runner_items_backlog_id_bare`; the display string belongs in `display_ref`, and the briefing's id chip reads `coalesce(backlog_id, display_ref)` (`SES-116`, v7.0.174 — `runner-cycle.md` step 9). **`design_status` reads for selection (`SES-114`, v7.0.165); among OPEN tickets measured at the v7.0.198 close-out:** 16 `designed` (incl. `SES-101`, flipped from `needs-desktop` — its one remaining edit now lives in `docs/runbooks/session-setup.md` step 3c, cycle-writable), **0 `needs-desktop`**, **1 `needs-john`** (`SES-84`), 546 `NULL` = not yet triaged, deliberately not guessed to `auto`. Measured at the v7.0.198 close-out: **11 of John's 18 named members remain open** (`SES-121` retired from the list by going `done` this session); the only `needs-john` member is `SES-84` — the rest are buildable, the drain reaches them and can retire on them. **`CHI-89`** still holds its queue slot with its removal card undecided — visible to John and skipped by cycles, exactly as `SES-113` intended. **`SES-133` is still open at `partial`** — the other half of John's 2026-08-23 emergencies directive; it sits at queue 251 rather than at the top, because the drain reads the Automation epic's `now` tier in queue order and `SES-133` is not in that epic. **From v7.0.182 John's own switches govern the cadence** (`SES-143`): the briefing's **§2b Automation panel** carries a scheduler checkbox + an every-N-hours box (the generated block above is the only home for their live values — it renders `runner_settings` row 1 fresh each cycle, `SES-151`) and a drain checkbox, and `runner-cycle.md`'s **new step 1b** calls `public.scheduler_gate()` before anything else — a scheduled cycle arriving early closes `did_not_run` with *"paced by your scheduler setting"*, and with the scheduler off it closes *"scheduler off"*. **The cron is John's own routine switch** — a cycle cannot edit its own routine — and **from v7.0.196 (`SES-151`) the gate paces by John's clock grid**: a scheduled fire runs iff its row's `started_at` falls in an America/Chicago hour divisible by `runner_settings.interval_hours` — row 1, read live, never a number written here — and the routine's cron fires in that hour (DST-proof; the mixed-clock elapsed test that wrongly paced 3 of 9 hourly fires is dead, `q-hourly-interval-boundary` answered by ship). Two consequences worth knowing before reading a quiet night as a stall: the gate **fails open** on every unknown, and it governs **scheduled** fires only, so a standing drain's chained continuation cycles run regardless — while the Automation drain stands, **the chain and not the interval is what actually sets the pace**. A manual fire (off the cron grid) is never paced; whether that is what John wants is the one thing the spec leaves open, asked as `q-manual-fire-pacing`. **From v7.0.188 that gate actually fires** (`SES-146`): until then `scheduler_gate()` matched the trigger by exact equality against the bare word `scheduled`, so a cycle passing the verbatim line step 1b asks for — `trigger: scheduled` — fell through to *"not a scheduled cycle"* and skipped **both** the pacing branch and the `scheduler_on = false` branch, and the grid test compared `now()`-at-step-1b rather than the fire time against a hardcoded ±2. Both failed open, so the panel looked live and bound nothing. The trigger is now normalised, the grid is anchored to the cycle row's own `started_at`, and the tolerance is the column `runner_settings.grid_tolerance_min` (10). **Silence is not a “no”** on any open question. **From v7.0.183 the board's open status is `open`, never `missing`** (`SES-118`): `backlog_items_status_check` now allows exactly `('open','partial','done','removal proposed','removed')` and the retired value raises `23514` — 510 rows renamed, `updated_at` deliberately untouched so step 8c's 30-day revalidation sweep still sees the sinking tail. **That consequence closed at v7.0.189** (attended session `ses118-gated`, 2026-08-23): step 3c's INSERT now writes `'open'`, zero `'missing'` literals remain under `.claude/`, and `SES-118` is `done` — its gated card `76564dde` awaits John's decision on the briefing page.

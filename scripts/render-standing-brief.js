@@ -1,4 +1,29 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1063 | scripts/render-standing-brief.js | DAT-30 -- Secret age: an eleventh group,
+// every row of `runner_secrets` by NAME and the day that row was last written. Measured before this
+// ship (2026-11-19): 12 rows, oldest `updated_at` 91 days old, 5 rows at or past 90 -- and the brief
+// showed NONE of it, so nothing John reads said how old the platform's stored credentials are.
+//
+// NO VALUE IS READ, ANYWHERE. The read names `name` and `updated_at` and nothing else, so no secret
+// can reach this file, the rendered brief, a log line or a commit. That is the one clause in here
+// that may never be relaxed for convenience.
+//
+// THE AGE IS WHOLE DAYS SINCE `updated_at`, LABELLED AS THAT AND NEVER AS ROTATION. Nothing moves
+// `updated_at` when a value changes, and no column tells a key from an address or a username, so the
+// group prints both sentences in its own body rather than letting a reader infer a rotation date
+// that does not exist. The real rotation stamp -- a `rotated_at` column, a cadence column, a
+// stamping trigger -- is DDL on the table that holds every credential, and it is BLOCKED and NOT
+// BUILT here (`DAT-30` D1, the action attempt 1 was refused on). This group reads the two columns
+// that already exist and is undone by `git revert`.
+//
+// SECRET_ROTATION_DAYS IS ONE CONSTANT, 90, the ticket's own number: no per-row cadence exists, so
+// an address and a username are counted like keys and the body says so. GitHub Actions secrets are
+// not in this table and the group says that too, rather than reading as a complete inventory.
+//
+// ABSENT IS NOT ZERO, the three branches every group above it keeps: a non-array renders "was not
+// read", `[]` renders a measured zero, and the two sentences never overlap. Outside factsSha()
+// deliberately (`AGT-281`'s rule, the call AGT-610/AGT-367/AGT-607 each made): the age advances with
+// the clock, so hashing it would report drift on every single run.
 // DeepBench v7.0.977 | scripts/render-standing-brief.js | AGT-610 -- Redesign after refusal: the attempt ledger, displayed; outside factsSha like Stalled and Wasted cycles.
 // DeepBench v7.0.976 | scripts/render-standing-brief.js | AGT-367 -- a tenth group, `Wasted cycles`:
 // the last 7 days of `runner_cycles` with the CAUSE on each row, counted per cause by
@@ -1712,6 +1737,31 @@ export function asOf(nowIso) {
 }
 
 /**
+ * FEATURE: DAT-30 -- the secret ledger's AGE, by name. Pure: (secrets, stamp, nowIso) in, markdown
+ * out, driven from fixtures by tests/regression/dat-30-secret-age.test.mjs. The clock is an
+ * ARGUMENT, never read in here, so the guard can assert the 90/89/0 boundary exactly.
+ *
+ * The query names its two columns -- a `value` never enters this process. SECRET_AGE_QUERY lives
+ * here, once, and fetchFacts() takes it from this constant so the claim the body prints and the
+ * read that backs it cannot drift apart.
+ */
+export const SECRET_ROTATION_DAYS = 90;
+export const SECRET_AGE_QUERY = "runner_secrets?select=name,updated_at&order=updated_at.asc,name.asc";
+export function renderSecretAge(secrets, stamp, nowIso) {
+  const lead = `**Secret age** — *${stamp}.* \`runner_secrets\` by NAME and \`updated_at\`; no value is read.`;
+  if (!Array.isArray(secrets)) return `${lead}\n\n- *The secret ledger was not read for this render.*\n`;
+  if (!secrets.length) return `${lead}\n\n- **No stored key — a measured zero.**\n`;
+  const rows = secrets.map(r => ({ ...r, age: Math.floor((new Date(nowIso) - new Date(r.updated_at)) / 86400000) }));
+  const old = rows.reduce((m, r) => (!m || r.age > m.age ? r : m), null);
+  const late = r => r.age >= SECRET_ROTATION_DAYS;
+  return [`${lead} **Oldest row: ${old.age} days (\`${old.name}\`)**, ${rows.filter(late).length} of ${rows.length} at or past ${SECRET_ROTATION_DAYS} days.`, "",
+    "| key | row last written | days | state |", "|---|---|---|---|",
+    ...rows.map(r => `| \`${r.name}\` | ${cst(r.updated_at)} | ${r.age} | ${late(r) ? "**at or past 90**" : "under 90"} |`),
+    "", "- `updated_at` is whatever the last writer of the row left: nothing moves it when a value changes, and no column tells a key from an address or a username.",
+    "- GitHub Actions secrets are not in this table.", ""].join("\n");
+}
+
+/**
  * The block body. Deterministic for a given (facts, nowIso) — the clock is an ARGUMENT, never read
  * in here, so the guard can assert this function directly. `facts` is exactly what fetchFacts()
  * returns, so the test can drive it from a fixture.
@@ -1741,7 +1791,7 @@ export function renderBlock(facts, nowIso) {
   // "not read", never "she has not run".
   // FEATURE: AGT-607 — stalls joins the destructure on the same terms as victoria: absent means
   // "not read", never "no stall was reported".
-  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste, ledger } = facts;
+  const { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste, ledger, secrets } = facts;
   const stamp = asOf(nowIso);
   const open = items.filter(r => !CLOSED.has(r.status));
   const numbered = items.filter(r => r.queue != null);
@@ -2013,6 +2063,15 @@ export function renderBlock(facts, nowIso) {
   // Same contract as the ten groups above it -- a pure helper a fixture can drive, rendering what
   // fetchFacts() read and deciding no state `refusal_ledger_brief()` already derived itself.
   L.push(renderRefusalLedger(ledger, stamp));
+
+  // ---- Secret age (FEATURE: DAT-30) ---------------------------------------------------------
+  // AFTER Redesign after refusal and BEFORE Human gates, which keeps Human gates the last group
+  // (SES-386). It belongs after the ledger deliberately: the ledger is what the platform REFUSED to
+  // change about itself, and the oldest credential on the platform is the clearest standing example
+  // of a fact John can see and the run may not act on. Same contract as the ten groups above it --
+  // a pure helper a fixture can drive, rendering by NAME what fetchFacts() read, writing nothing,
+  // and reading no value.
+  L.push(renderSecretAge(secrets, stamp, nowIso));
 
   // ---- Human gates (FEATURE: SES-386) -------------------------------------------------------
   // After Staff watch (SES-378 slice 5 landed between it and Ticket hygiene), before the provenance
@@ -2429,7 +2488,15 @@ export async function fetchFacts(url, key) {
     "proposed_projects?select=slug,name,proposal_reason,proposed_at,tickets,by_class,cycles&order=proposed_at,slug");
   if (!Array.isArray(proposedProjects)) die("the proposed_projects read came back non-array — refusing to render the proposed-projects group from nothing");
 
-  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste, ledger };
+  // FEATURE: DAT-30 -- the secret ledger, by NAME and `updated_at` only. The query is
+  // SECRET_AGE_QUERY and nothing here restates it, so there is exactly one place in this file that
+  // says which columns are asked for -- and `value` is not one of them. An empty table is a real
+  // state (it renders as a measured zero); a read that did not happen is not, so a non-array
+  // refuses rather than publishing a brief that reports no ageing key nobody read.
+  const secrets = await rest(url, key, SECRET_AGE_QUERY);
+  if (!Array.isArray(secrets)) die("secret-age read came back non-array");
+
+  return { items, settings, drain, decisions, daily, census: classCensus, johnModel, inventionUse, served, governance, audit, hygiene, humanGates, staff, proposedProjects, victoria, stalls, waste, ledger, secrets };
 }
 
 async function main() {
