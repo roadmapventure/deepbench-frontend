@@ -1,80 +1,90 @@
-# DAT-30 — harvest (design, cycle af60da29, v7.0.1046, tree 4ac0bd0, 2026-11-16)
+# DAT-30 — harvest (redesign attempt 2 of 2, cycle 19f836cc, v7.0.1063, tree 369060e, 2026-11-19)
 
-Reasoning behind `docs/kickoffs/v7.0.1046-DAT-30-secret-rotation-stamp-and-brief-age.md`. The build does not need this file.
+Reasoning behind `docs/kickoffs/v7.0.1063-DAT-30-secret-age-on-the-brief-from-updated-at.md`. The build does not need this file. Attempt 1's reasoning was the previous content of this file (git history, v7.0.1046).
 
-## 1. Premise — alive, and two days from the ticket's own deadline
+## 1. Premise — alive, and now past the ticket's own deadline
 
-Measured 2026-11-16T16:49Z with `runner_secrets?select=name,updated_at` (the `value` column was never selected, by me or by any script I ran).
+Measured 2026-11-19T23:16Z with `runner_secrets?select=name,updated_at` over REST. The `value` and `note` columns were never selected, by me or by any script I ran.
 
-| key | updated_at (UTC) | age in days | cause it is this old |
-|---|---|---|---|
-| SUPABASE_URL | 2026-08-20 03:14:32 | 88 | never changed since first insert; it is an address, not a credential |
-| SUPABASE_SERVICE_KEY | 2026-08-20 03:14:32 | 88 | never rotated |
-| VERCEL_AUTOMATION_BYPASS_SECRET | 2026-08-20 03:14:32 | 88 | never rotated |
-| ANTHROPIC_API_KEY | 2026-08-20 03:14:32 | 88 | never rotated |
-| VERCEL_TOKEN | 2026-08-20 04:21:20 | 88 | never rotated |
-| SCRATCH_SUPABASE_SERVICE_KEY | 2026-08-28 20:27:49 | 79 | never rotated |
-| MCP_API_KEY | 2026-09-10 00:25:52 | 67 | never rotated |
-| YAHOO_IMAP_APP_PASSWORD | 2026-09-25 19:37:56 | 51 | never rotated |
-| YAHOO_IMAP_USER | 2026-09-25 19:38:40 | 51 | a username, not a credential |
-| MCP_KEY_interviewquestions | 2026-10-23 18:41:07 | 23 | never rotated |
-| OPENAI_API_KEY | 2026-11-12 22:11:14 | 3 | new since the ticket was written (the ticket counts ten rows; there are eleven) |
+| key | updated_at (UTC) | whole days |
+|---|---|---|
+| ANTHROPIC_API_KEY | 2026-08-20 03:14:32 | 91 |
+| SUPABASE_SERVICE_KEY | 2026-08-20 03:14:32 | 91 |
+| SUPABASE_URL | 2026-08-20 03:14:32 | 91 |
+| VERCEL_AUTOMATION_BYPASS_SECRET | 2026-08-20 03:14:32 | 91 |
+| VERCEL_TOKEN | 2026-08-20 04:21:20 | 91 |
+| SCRATCH_SUPABASE_SERVICE_KEY | 2026-08-28 20:27:49 | 83 |
+| MCP_API_KEY | 2026-09-10 00:25:52 | 70 |
+| YAHOO_IMAP_APP_PASSWORD | 2026-09-25 19:37:56 | 55 |
+| YAHOO_IMAP_USER | 2026-09-25 19:38:40 | 55 |
+| MCP_KEY_interviewquestions | 2026-10-23 18:41:07 | 27 |
+| OPENAI_API_KEY | 2026-11-12 22:11:14 | 7 |
+| MCP_KEY_maricopa_dashboard | 2026-11-19 21:25:01 | 0 |
 
-Eleven rows, eleven accounted for, no remainder. One cause covers all nine credentials: nothing in the platform rotates a key, records a rotation, or shows an age. That is the cause this design removes the last two thirds of; the first third (rotating) needs the provider accounts.
+Twelve rows (the ticket says ten, attempt 1 measured eleven; one was added today). Twelve accounted for, no remainder. One cause covers every row at or past 90: nothing in the platform rotates a key, records a rotation, or shows an age.
 
-Other live facts the design rests on:
+Other live facts, each checked this turn:
 
-- `runner_secrets` columns are `name` (PK), `value`, `note`, `updated_at` (default `now()`). There is no trigger on the table, so `updated_at` is only a default: an UPDATE that omits it leaves it untouched. It is the best evidence of age that exists, which is why the backfill copies it, and why it cannot be the stamp going forward.
-- `relacl` is `{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}`: `anon` and `authenticated` hold nothing, as the ticket says. RLS is off; the exposure is the service key and the connector, not the browser key.
 - `select=rotated_at` answers `42703 column runner_secrets.rotated_at does not exist`.
-- 0 of 178 `governance_rules` statements mention secret, rotation or a 90-day cadence (the one hit for `90` is OD-28's rest wall).
-- `docs/runbooks/standing-brief.md` holds 0 lines starting `**Secret age**`; `scripts/render-standing-brief.js` holds 0 occurrences of `secret`.
-- The ticket says `scripts/build-briefing.mjs` has no secret-age read. True, but that script builds the briefing page; "the standing brief" is `docs/runbooks/standing-brief.md`, rendered by `scripts/render-standing-brief.js`. The design builds in the second one. The briefing page is published, so a list of key ages does not belong on it (pattern:139).
-- `.github/workflows/ci.yml` (lines 302-303, 362-363) and `meter-reader.yml` (lines 64-66) read `secrets.SUPABASE_URL`, `secrets.SUPABASE_SERVICE_KEY` and `secrets.CLAUDE_CODE_OAUTH_TOKEN`, as the ticket says.
+- Catalog read (one read-only query over the Supabase connector, catalog tables only): 0 user triggers on `runner_secrets`; columns `name text, value text, note text, updated_at timestamptz default now()`; `relacl` `{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}` — `anon` and `authenticated` hold nothing, as the ticket says.
+- 0 `governance_rules` statements match `secret` or `rotat`.
+- `scripts/render-standing-brief.js` holds 0 occurrences of `secret`; `docs/runbooks/standing-brief.md` holds 0 lines starting `**Secret age**`.
+- `runner_refusal_attempts` holds one DAT-30 row: attempt 1, `differs: staging`, refused 2026-11-16T17:30Z, the migration sent twice in that run (`earlier_refusals` 1).
+- `runner_model_lanes.orchestrator` is `claude-opus-5`.
 
-## 2. What ships now and what does not, and why
+## 2. What attempt 1 was refused on, and what I did with that
 
-**Ships (one migration, one script, one test, one generated file):** a `rotated_at` stamp that only a change of `value` can move, a per-row cadence (`rotation_days`), and a `Secret age` group on the standing brief.
+The refusal was not a labelled safety-check decision. The Supabase connector asked for an interactive confirmation of the migration and nobody was there to answer within 60 seconds. An unattended cycle cannot answer that question, so the same migration sent again meets the same silence. I do not know which statement in it raised the confirmation, and I did not try to find out by sending variants: that would be probing the check.
 
-**Does not ship, named on the ticket rather than hidden:**
+So attempt 2 sends no migration at all. It is not the same change through another door: the columns, the trigger and the function are simply not in this build. The part that only a schema change on `runner_secrets` can deliver is named in the kickoff as blocked (D1) and stays open on the ticket.
 
-1. **Rotating the keys.** The ticket's build text gives this to John ("the accounts are his"). No tool a cycle holds reaches Anthropic's, Vercel's, Supabase's, Yahoo's or GitHub's key pages. I did not design a task that asks him, reminds him or routes around it: a chore handed to a person is a platform gap, and the open ticket that covers the gap is `AGT-675` ("Every actor is a shared, long-lived key: no personal sign-in, no rotation record…"). `DAT-30` stays open on this sentence.
-2. **The `governance_rules` row.** Deferred, and I want the reason on record in full, because there are two. The engineering reason: four keys pass 90 days on 2026-11-18 03:14-04:21 UTC and no cycle can cure that, so a rule stated today is a live rule breached within two days by a cause the platform cannot act on; meanwhile the cadence is already stored as data (`rotation_days`, default 90), so nothing reads the number from prose. The second reason is plain: with the rule row, its decision record, its before-image, a home section in a doc and a snapshot re-export, the kickoff measured 10,166 bytes against the 8,192 cap after reasoning had already been moved here; without it, 8,133. Something had to wait, and the rule is the part that changes nothing a reader of the brief sees. When it is written, the shape I had drafted: id `SECRET-ROTATION-90`, `prose`, `live`, source group `standards-caps`, statement "A stored key is rotated within its row's `runner_secrets.rotation_days` (column default 90; NULL marks a row that is not a rotating credential). `runner_secrets.rotated_at` moves only when the row's value changes, and the standing brief's `Secret age` group shows every key's age; canonical: those two columns."; inserted under a `record_decision(..., 'rule', 'DAT-30', ...)` with a NULL before-image, as `docs/design/agt-445-cap-ruling.sql` lines 211-225 do; then `node scripts/export-governance-snapshot.js`. Its canonical_doc needs a file that exists (hygiene check 10). Adding it widens the related test set from 20 to 38 through `docs/governance/RULES-SNAPSHOT.md` (all 38 were green uncredentialed on 4ac0bd0).
-3. **A scoped CI key.** The ticket conditions this on Supabase offering one. Read in Supabase's docs on 2026-11-16 ("Understanding API keys", "Migrating to publishable and secret API keys"): secret keys can be created, named and revoked one at a time, and every one of them maps to the `service_role` Postgres role with RLS bypass. That isolates a rotation; it does not narrow a privilege. So the condition is not met, and creating a separate CI key is a dashboard-plus-GitHub-secret act of the same blocked kind as item 1.
-4. **Age of the GitHub Actions secrets.** Not in the table, not readable from the database. The group says so in one line rather than leaving them out silently (pattern:34).
+## 3. Why scope, and why this scope
 
-## 3. Calls I made (reversible), with the alternative each one beat
+The ticket's own discriminating QA is "the standing brief shows an oldest-key age". That needs a read of two columns that already exist and one render function. It does not need the stamp. Attempt 1 bundled the two; they carry different risk:
 
-- **Cadence as a column, not a constant.** A flat 90 in the script would mark `SUPABASE_URL` and `YAHOO_IMAP_USER` overdue forever: one is an address, one a username, and neither can be "rotated". With a constant, the ticket's own acceptance line ("oldest-key age under 90") could never be met. `rotation_days` NULL means "not a credential"; the migration sets it for exactly those two names. Which rows are credentials is my reading of the names; changing one is a single UPDATE.
-- **The stamp is a trigger, and it pins itself.** `rotated_at` becomes `clock_timestamp()` when `value` changes and is put back to its old value otherwise, so nobody can make a key look fresh by editing the date, and nobody has to remember to set it when pasting a new value. `clock_timestamp()` rather than `now()` so the migration's own gate can prove the stamp moved inside one transaction.
-- **Direct named-column read, no new function.** `runner_secrets?select=name,rotated_at,rotation_days` with the service key the script already requires, the same pattern `scripts/security-inventory.js:446` uses for names. The test refuses a source that ever selects `*` or `value` from this table.
-- **Outside `factsSha()`.** An age moves with the clock; hashing it would report drift on every run (`AGT-281`'s rule, followed by the stalls, waste and refusal groups).
-- **A non-array read stops the render**, as every other read in `fetchFacts()` does. Consequence, stated in the risk block: if the columns were ever dropped while the script still reads them, the brief render fails until the script is reverted. Undo order is script first, then columns.
-- **No backfill beyond `updated_at`.** It is the only evidence there is.
+| part | touches | reach | undo |
+|---|---|---|---|
+| age on the brief | one script, one test, one generated doc | a read by name and stamp; no database write | `git revert` |
+| rotation stamp | DDL on the table holding every credential | every row; every later write passes a trigger | by hand only — `capture_migration_down()` refuses an in-place ALTER, so no automatic rollback |
 
-## 4. Risk and undo
+Separating them is the risk rule's ordinary staging call, not a cap split: the kickoff is 3 files and 3 tasks against caps of 51 and 52.
 
-The migration is an in-place ALTER of an existing table, which `capture_migration_down()` classifies `refused` by design; the ship is card-only, not auto-rollbackable, and T1 says to state that. By hand: revert the script, then `drop trigger runner_secret_stamp on public.runner_secrets; drop function public.runner_secret_stamp(); alter table public.runner_secrets drop column rotated_at, drop column rotation_days;`. Reach: eleven rows gain two columns; no value is read, compared outside the trigger, or changed; readers that name their columns are unaffected. No agent's autonomy changes. Trigger functions are not checked for EXECUTE at fire time, so revoking the three named roles does not stop the trigger; the gate asserts the revoke took (`.claude/rules/supabase-column-grants.md`, SES-315 addendum).
+What the smaller scope costs, stated plainly:
 
-## 5. What I did not verify
+1. **The age is weaker evidence than a stamp would be.** `updated_at` is only a column default. A value pasted with an UPDATE that omits `updated_at` leaves the age unchanged (the key looks older than it is); a note edit that sets `updated_at` makes a key look fresh. The group prints this in one line and labels the column "row last written", never "rotated" (pattern:33, pattern:39).
+2. **No per-row cadence.** `SUPABASE_URL` is an address and `YAHOO_IMAP_USER` a username; neither can be rotated, and both are counted. Today that makes the count 5 of 12 where the credentials alone are 4 of 10. I did not hardcode a list of non-credential names into the script: which row is a credential is a judgment about data and belongs in data (pattern:11), and the data home for it is the blocked column. The state cell says "at or past 90" / "under 90" — a fact about the row — rather than "overdue", which would be a wrong word for an address.
+3. **The ticket's closing condition cannot be met by this build.** "Oldest-key age under 90" needs keys rotated and, because of item 2, a way to exclude the address row. DAT-30 stays open; the kickoff's STOP LINE says so.
 
-- **SQL-A was not executed**, not even in a rolled-back transaction: this turn was told to write nothing, and DDL on the secrets table takes a lock. It was read against the live schema (column names, the absent trigger, the ACL, `capture_migration_down`'s `<name> on <schema.table>` trigger identity, read from the function's own source). The gate block in T1 is what proves it on apply.
-- **BASELINE is uncredentialed** for the same reason (credentialed tests write fixtures). 38 tests green on 4ac0bd0, of which the kickoff's 20; step 7 measures the credentialed one.
-- **Whether the service key is a legacy JWT key or a new `sb_secret_` key**: telling them apart means looking at a value. It matters, see below.
+## 4. Alternatives I weighed and dropped
 
-## 6. Found on the way, not designed here
+- **A side table (`name`, `rotated_at`, `rotation_days`) instead of columns.** A new table can be rolled back automatically, which answers the undo problem. But keeping it true needs a trigger on `runner_secrets` anyway, or a writer nobody has; without one it is a second place to forget. And it is a migration on the last attempt this ticket gets, for a part the display does not need. Worth its own ticket once someone can answer a confirmation.
+- **A `runner_settings` knob for the 90.** `runner_settings` is one wide row; a new knob is a new column, which is a migration. A constant is honest here: 90 is the ticket's number and no row carries its own cadence yet (pattern:18).
+- **The `governance_rules` cadence row.** Still deferred, for attempt 1's first reason, now stronger: four credentials are already past 90 days and no cycle can cure that, so the rule would be born breached by a cause the platform cannot act on.
+- **Parking as attended-only.** The runbook forbids parking a ticket whose `parked_why` is `refused`; and the display half genuinely needs nobody.
+- **The briefing page (`scripts/build-briefing.mjs`).** The ticket names it; that page is published. A list of key names and ages does not belong on a published page (pattern:139). The standing brief is a repo document.
 
-- Supabase's migration guide, read 2026-11-16, says legacy `anon` and `service_role` keys "keep working until the end of 2026". If this project's keys are the legacy kind, every reader of `SUPABASE_SERVICE_KEY` (the runner, both workflows, Vercel) has a hard date about six weeks out, independent of any 90-day cadence. Not verified (see section 5) and not filed by me, since this turn writes nothing; it belongs with `AGT-675`.
-- The ticket text says ten rows; there are eleven (`OPENAI_API_KEY`, 2026-11-12).
-- The literal `L.push(renderRefusalLedger(ledger, stamp));` is held by two tracked files, the script and `tests/regression/agt-610-refusal-brief.test.mjs`; the anchor declares 2.
+## 5. Dry runs (scratch copy of 369060e; the clone itself was not edited)
 
-## 7. Dry runs
+- T1 applied exactly as worded, by script, each from-string asserted to occur once.
+- The T2 test as worded: exit 0 after T1; on the unchanged script exit 1, `4 of 4 arms failed`, first line `rows: renderSecretAge must be exported`.
+- `node scripts/render-standing-brief.js` with credentials, writing the scratch copy's brief: `**Secret age**` line count 0 → 1; the line read `**Oldest row: 91 days (`ANTHROPIC_API_KEY`)**, 5 of 12 at or past 90 days.`, placed directly above `**Human gates**`.
+- The 20 related tests (`scripts/related-tests.js` over the script and the brief) on the unchanged clone, uncredentialed: red set 0 of 20. The same 20 plus the new test on the changed, re-rendered scratch copy: 0 of 21.
+- `node scripts/verifier.js --check-kickoff=<draft>`: exit 0, 7,824 bytes.
+- The Redesign line parsed with `scripts/redesign-pickup.js`'s own regex: attempt 2, `scope`.
+- The JS block in the kickoff is byte-identical to the code the dry run used.
 
-- The JS in the kickoff, applied to a pristine copy of 4ac0bd0 exactly as T2 words it: the T3 test exits 0; on the unchanged tree it exits 1 with all four arms failing, first line `rows: renderSecretAge must be exported`. The 20 related tests plus the new one: 0 red of 21, uncredentialed.
-- The same code over today's eleven names and stamps (with `rotation_days` as the migration will set it): `**Oldest key: 88 days (`ANTHROPIC_API_KEY`)**, 0 of 9 rotating keys overdue.`; at 2026-11-18T03:14:33Z it reads 90 days and 3 of 9; from 04:21:21Z, 4 of 9.
-- `node scripts/verifier.js --check-kickoff=<draft>`: exit 0, 8,133 bytes. The first run refused the anchor above at a declared count of 1.
-- The Redesign line is written in the form `scripts/redesign-pickup.js` parses (`differs: staging; because: …; from prior: …`). Its regex does not accept a parenthesis between the `differs` word and the semicolon, so the "(attempt 1: first)" note is left out.
+## 6. What I did not verify
+
+- **BASELINE is uncredentialed.** Credentialed arms write fixtures and cycles run in parallel; step 7 measures the credentialed set.
+- **Whether a write path exists that sets `updated_at` on a value change.** No script in `scripts/` or `api/` writes `runner_secrets`; rows arrive by hand or by connector. So I cannot say how often the stamp is wrong, only that nothing prevents it.
+- **Whether the service key is a legacy key with an end-of-2026 date** (attempt 1's finding): telling them apart means looking at a value. Still unverified, still belongs with `AGT-675`.
+
+## 7. Found on the way, not designed here
+
+- The ticket text is stale on three counts: twelve rows, not ten; the oldest is 91 days, not 78; the 90-day line it warns about is crossed.
+- `MCP_KEY_maricopa_dashboard` was added today: keys are still being minted on the shared-key model `AGT-675` describes.
+- If this attempt is also refused, the remaining step is the diagnostic. The unknown worth writing there: which statement of attempt 1's migration raised the connector's confirmation, since 30 other migrations applied without one.
 
 ## 8. Sources opened
 
-Ticket row `DAT-30`; `runner_secrets` (names, stamps), `runner_model_lanes`, `governance_rules`, `pg_trigger` / `pg_constraint` / `pg_class.relacl` / `pg_proc` for the two tables; `scripts/render-standing-brief.js`; `tests/regression/agt-607-stalled-cycles-brief.test.mjs`, `agt-610-refusal-brief.test.mjs`; `docs/design/agt-445-cap-ruling.sql`; `docs/runbooks/runner-cycle.md` (down capture); `scripts/verifier.js`, `related-tests.js`, `baseline-red-set.js`, `redesign-pickup.js`, `check-session-docs.js`; both workflows; `docs/kickoffs/v7.0.1045-AGT-517-…md` and `v7.0.448-SES-368-…md`; Supabase's API-key docs. Each fact a task needs from them is in the kickoff.
+Ticket row `DAT-30`; `runner_secrets` (names and stamps only), `runner_refusal_attempts`, `runner_model_lanes`, `governance_rules`, `runner_settings`, `backlog_items` (`AGT-673`, `AGT-675`), `pg_trigger` / `pg_attribute` / `pg_class.relacl` for `runner_secrets`; attempt 1's kickoff and harvest; `docs/runbooks/redesign-after-refusal.md`; `scripts/render-standing-brief.js`; `tests/regression/agt-607-stalled-cycles-brief.test.mjs`; `scripts/redesign-pickup.js`, `related-tests.js`, `baseline-red-set.js`, `pre-build-baseline.js`, `verifier.js`; `docs/kickoffs/v7.0.448-SES-368-weekly-pace-gate.md`. Each fact a task needs from them is in the kickoff.
