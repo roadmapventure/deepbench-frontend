@@ -1,3 +1,4 @@
+// DeepBench v7.0.1084 | tests/regression/agt-291-finish-sensor.test.mjs | AGT-571 slice 3 -- arm B grades its own key.
 // DeepBench v7.0.1025 | tests/regression/agt-291-finish-sensor.test.mjs | AGT-291
 // FEATURE: AGT-291 -- THE FINISH LINE GETS ITS SENSOR, ADDITIVELY. Kickoff:
 // docs/kickoffs/v7.0.1025-AGT-291-finish-line-additive.md §5 task 4 and §6.
@@ -47,12 +48,14 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { countScoped, gradeOwnWrites } from "./_lib/scoped-count.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PROPOSE = pathToFileURL(path.join(ROOT, "scripts", "propose-project.js")).href;
 
 // A v4 uuid no row can hold: the claim must answer `[]` without touching anything.
 const EPIC_ABSENT = "00000000-0000-4000-8000-000000000291";
+const OWN_B = { epics: `epics?select=id&id=eq.${EPIC_ABSENT}` };
 const CLAIM_MS = 24 * 3600e3;
 
 async function req(url, key, q, { method = "GET", body, headers = {} } = {}) {
@@ -70,15 +73,6 @@ const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 
 
 // The count is taken as a HEAD with Prefer: count=exact -- a SECOND reading of the same fact, from
 // the rows themselves, so the function's own aggregate is graded rather than echoed.
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const n = Number((res.headers.get("content-range") ?? "").split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status}`);
-  return n;
-}
 
 // AGT-291 §4, re-derived here from the ROWS rather than imported, so this file is free to disagree
 // with the function it grades. D5: finished is a PROJECT fact -- a batch is due only when no locked
@@ -123,11 +117,7 @@ async function run() {
       "run: STANDARDS.md Section 2 rule 5");
   } else {
     await arm("B live sensor, no writes", async () => {
-      const before = {
-        backlog: await count(url, key, "backlog_items?select=id"),
-        epics: await count(url, key, "epics?select=id"),
-        decisions: await count(url, key, "runner_decisions?select=id"),
-      };
+      await gradeOwnWrites(url, key, OWN_B, async () => {
 
       const st = await req(url, key, "rpc/project_finish_line", { method: "POST", body: {} });
       assert.equal(st.status, 200, describe(st));
@@ -144,7 +134,7 @@ async function run() {
       const locked = rows.filter(r => r.locked_at !== null);
       assert.ok(locked.length > 0, "no locked batch exists, so the D1 reversal cannot be graded here");
       for (const r of locked) {
-        const n = await count(url, key, `backlog_items?epic_id=eq.${r.epic_id}&status=in.(open,partial)`);
+        const n = await countScoped(url, key, `backlog_items?epic_id=eq.${r.epic_id}&status=in.(open,partial)`);
         assert.strictEqual(Number(r.left), n,
           `${r.slug}/${r.epic_name}: left=${r.left} but ${n} member(s) are open or partial. AGT-291 D1: ` +
           "`delivered` is BUILT and no longer holds a batch open -- a left that counts it (AGT-240 D2's " +
@@ -233,12 +223,7 @@ async function run() {
         }
       }
 
-      const after = {
-        backlog: await count(url, key, "backlog_items?select=id"),
-        epics: await count(url, key, "epics?select=id"),
-        decisions: await count(url, key, "runner_decisions?select=id"),
-      };
-      assert.deepEqual(after, before, "no read in this arm wrote anything");
+      }, { label: "AGT-291 arm B" });
     });
   }
 
