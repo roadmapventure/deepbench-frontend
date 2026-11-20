@@ -1,3 +1,4 @@
+// DeepBench v7.0.1076 | tests/regression/agt-336-bench-private-and-bundle.test.mjs | AGT-357 -- Private follows `sharing` for EVERY row read, not table-only rows alone (call (iii) below is superseded): the static array holds 0 private entries, so buildRoster(AGENTS, [ZOE]) has 1, and new arm (f) pins an AGENTS entry's own groups against its row.
 // DeepBench v7.0.761 | tests/regression/agt-336-bench-private-and-bundle.test.mjs | AGT-336 slice 2
 //
 // FEATURE: AGT-336 -- the Bench and the agent bundle ask the one visibility check
@@ -9,7 +10,8 @@
 // The Designer's recorded reversible calls (JOHN-0925), which the assertions are written against:
 //   (i)   the filter sits inside buildRoster();
 //   (ii)  a hidden row also removes its AGENTS entry;
-//   (iii) Private follows `sharing` for table-only rows only;
+//   (iii) Private follows `sharing` for table-only rows only -- SUPERSEDED by AGT-357 (v7.0.1076):
+//         it follows `sharing` for every row buildRoster() reads, AGENTS entries included;
 //   (iv)  the bundle's viewer arrives on handler_context.viewer, absent today.
 //
 // PURE (always run):
@@ -65,8 +67,8 @@ async function partPure() {
     `the control failed: AGENTS holds ${AGENTS.length} entries, not ${EXPECTED_ROSTER}, so every count below is off`);
   assert.ok(!AGENTS.some(a => a.id === "zoe" || a.id === "pubx"), "the control failed: AGENTS holds `zoe` or `pubx`");
   assert.ok(AGENTS.some(a => a.id === "dan"), "the control failed: AGENTS holds no `dan` entry");
-  assert.strictEqual(AGENTS.filter(isPrivateAgent).length, 1,
-    `the control failed: AGENTS alone holds ${AGENTS.filter(isPrivateAgent).length} private agents, not 1`);
+  assert.strictEqual(AGENTS.filter(isPrivateAgent).length, 0,
+    `the control failed: AGENTS alone holds ${AGENTS.filter(isPrivateAgent).length} private agents, not 0 (AGT-357)`);
   const snapshot = JSON.stringify(AGENTS);
 
   // (a) THE DISCRIMINATOR, with its controls.
@@ -74,15 +76,28 @@ async function partPure() {
     `(a) tableOnlyAgent(ZOE).benchGroups is ${JSON.stringify(tableOnlyAgent(ZOE).benchGroups)}, not ["private"] -- Private does not follow sharing`);
   const a1 = buildRoster(AGENTS, [ZOE]);
   assert.strictEqual(a1.length, EXPECTED_ROSTER + 1, `(a) buildRoster(AGENTS, [ZOE]) returned ${a1.length} entries`);
-  assert.strictEqual(a1.filter(isPrivateAgent).length, 2,
-    `(a) ${a1.filter(isPrivateAgent).length} roster entries pass isPrivateAgent(), expected 2`);
+  assert.strictEqual(a1.filter(isPrivateAgent).length, 1,
+    `(a) ${a1.filter(isPrivateAgent).length} roster entries pass isPrivateAgent(), expected 1`);
   for (const sharing of ["public", "users"]) {
     assert.deepStrictEqual(tableOnlyAgent({ ...ZOE, sharing }).benchGroups, [],
       `(a) control: sharing '${sharing}' did not give benchGroups []`);
   }
   const { sharing: _dropped, ...noSharing } = ZOE;
   assert.deepStrictEqual(tableOnlyAgent(noSharing).benchGroups, [], "(a) control: a row with no sharing did not give benchGroups []");
-  results.push("private-follows-sharing (25 entries, 2 private; 3 controls [])");
+  results.push("private-follows-sharing (25 entries, 1 private; 3 controls [])");
+
+  // (f) AGT-357 -- an AGENTS entry's Private membership is its ROW's sharing, never a static value.
+  const { benchGroupsFor } = await import("../../src/hooks/useAgents.js");
+  const danStatic = AGENTS.find(a => a.id === "dan").benchGroups;
+  const group = sharing => buildRoster(AGENTS, [{ id: "dan", sharing }]).find(a => a.id === "dan").benchGroups;
+  assert.deepStrictEqual(group("private"), ["private"], `(f) a private row left dan in ${JSON.stringify(group("private"))}, not ["private"]`);
+  assert.deepStrictEqual(group("public"), danStatic, "(f) a public row changed dan's static groups");
+  assert.deepStrictEqual(group(undefined), danStatic, "(f) a row with no sharing changed dan's static groups");
+  assert.strictEqual(buildRoster(AGENTS, [{ id: "dan", sharing: "private" }]).filter(isPrivateAgent).length, 1, "(f) not exactly 1 private");
+  assert.deepStrictEqual(buildRoster(AGENTS, []).find(a => a.id === "dan").benchGroups, danStatic, "(f) no row changed dan's groups");
+  assert.deepStrictEqual(benchGroupsFor(["mi", "private"], "public"), ["mi"], "(f) a static \"private\" survived a public row");
+  assert.deepStrictEqual(benchGroupsFor(undefined, "private"), ["private"], "(f) benchGroupsFor(undefined, private)");
+  results.push("code-agent-private-follows-sharing (5 roster cases, 2 direct)");
 
   // (b) the roster applies the viewer rule.
   const ids = roster => roster.map(a => a.id);

@@ -1,3 +1,4 @@
+// DeepBench v7.0.1076 | tests/regression/agt-332-private-filter.test.mjs | AGT-357 -- the DATA arm's counts follow Private to the agent's own `agents.sharing` row: the static array now holds 0 private and 24 non-private entries. The nav and roster needles are unchanged.
 // DeepBench v7.0.788 | tests/regression/agt-332-private-filter.test.mjs | AGT-384 -- the nav moved to
 // src/components/BenchNav.jsx and reads All, Private Agents, the groups, Product Team (John,
 // 2026-10-05: "move All above Private"); the Bench opens on its home page, so no filter is held in
@@ -94,8 +95,8 @@ async function checkData() {
   const { AGENTS, BENCH_FILTERS, isPrivateAgent } = await import("../../src/data/agents.js");
   const priv = AGENTS.filter(isPrivateAgent).length;
   const nonPriv = AGENTS.filter(a => !isPrivateAgent(a)).length;
-  assert.strictEqual(priv, 1, `Private must hold exactly 1 agent (found ${priv})`);
-  assert.strictEqual(nonPriv, 23, `All must hold exactly 23 non-private agents (found ${nonPriv})`);
+  assert.strictEqual(priv, 0, `Private must hold exactly 0 agents from the static array (found ${priv}) -- AGT-357: Private follows each agent's own sharing row`);
+  assert.strictEqual(nonPriv, 24, `All must hold exactly 24 non-private agents (found ${nonPriv})`);
   assert.strictEqual(AGENTS.length, 24, `AGENTS must hold 24 agents (found ${AGENTS.length})`);
   assert.deepStrictEqual(BENCH_FILTERS.map(f => f.id), ["mi", "platform", "nigp", "special"],
     "BENCH_FILTERS ids must stay mi, platform, nigp, special -- Private is built from BENCH_PRIVATE, not added here");

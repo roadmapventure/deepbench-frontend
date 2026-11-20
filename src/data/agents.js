@@ -1,3 +1,4 @@
+// DeepBench v7.0.1076 | agents.js | AGT-357 -- brittany benchGroups ["private"] -> []: Private is her row's agents.sharing.
 // DeepBench v7.0.868 | agents.js | AGT-491 — AVATAR_CFG + AGENT_PRONOUNS entries for `architect` (The Governance Architect, GV-09, role `Governance — Architect`), lane `governance` and is_active true in `public.agents` (the SES-338 lane carve-out, .claude/rules/agent-roster-inert.md). NOT in the AGENTS array, same terms as every governance id before it: the Bench's Governance section renders those agents from the live `lane = 'governance'` rows (src/components/GovernanceSection.jsx, view governance_agent_activity_7d), never from a list in this file — AGT-69 deleted OFF_BENCH_AGENT_IDS for that reason (John's ruling 2026-09-11, decision 146256c1) — and the AVATAR_CFG / AGENT_PRONOUNS entries exist only so a portrait and pronouns resolve wherever a findings, audit, cycle or decision surface already draws the id. Applied with docs/design/agt-491-governance-architect-seed.sql (migration agt491_governance_architect), pinned by tests/regression/agt-491-governance-architect.test.mjs. The header keeps the newest five stamps: the v7.0.485 AGT-70 (`auditor` GV-07, `ticketowner` GV-08), v7.0.456 AGT-69 and v7.0.434 AGT-68 (`devmanager` GV-01) lines retire here, and every claim in all three is restated in this one.
 // DeepBench v7.0.788 | agents.js | AGT-384 — BENCH_PRIVATE.label "Private" → "Private Agents" (John, 2026-10-05); the id stays "private", so isPrivateAgent() and every benchGroups value are unchanged.
 // DeepBench v7.0.752 | agents.js | AGT-332 slice 1 — BENCH_PRIVATE + isPrivateAgent(); brittany benchGroups ["platform"] → ["private"]
@@ -286,7 +287,7 @@ export const AGENTS = [
     salary: 0, value: 0, hourly: 0, reportHrs: 0, reportCost: 0, docs: 0,
     classes: 0, chunks: 0, skill: 0, situational: 0, trainable: true,
     trainableBy: "Customer", revenueModel: "POC · none", color: T.brass,
-    quip: `"I only know what you teach me."`, benchGroups: ["private"] },
+    quip: `"I only know what you teach me."`, benchGroups: [] },
 ];
 
 // FEATURE: RO-10 — Bench screen category filter definitions. "all" is not

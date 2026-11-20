@@ -1,3 +1,4 @@
+// DeepBench v7.0.1076 | useAgents.js | AGT-357 -- Private follows agents.sharing for every row read.
 // DeepBench v7.0.790 | useAgents.js | AGT-386 -- an archived private agent (sharing 'private',
 // is_active false) leaves the roster: buildRoster() fences it out with isArchivedPrivate(), so every
 // useAgents() caller stops offering it. This narrows AGT-335's call "inactive rows are appended too":
@@ -328,6 +329,12 @@ export function mergeRoster(codeAgents, tableRows) {
 // FEATURE: AGT-335 — one roster entry from one table row that AGENTS does not hold. Pure. Text the
 // row lacks reads "—", numbers read 0, the quip is empty: nothing is invented for an agent the
 // repo has never seen. is_active is carried from the row, never set here.
+// FEATURE: AGT-357 -- an entry's Private membership is its ROW's sharing, never a static value.
+// A private row is in Private ONLY (D2); any other row keeps its static groups minus "private".
+// Pure and exported so the regression suite can assert it without a roster.
+export const benchGroupsFor = (groups, sharing) =>
+  sharing === SHARING.PRIVATE ? [BENCH_PRIVATE.id] : (groups || []).filter(g => g !== BENCH_PRIVATE.id);
+
 const ABSENT = "—";
 const TABLE_ONLY_NUMBERS = ["skill", "situational", "salary", "value", "hourly", "reportHrs", "reportCost"];
 export function tableOnlyAgent(t) {
@@ -344,7 +351,7 @@ export function tableOnlyAgent(t) {
     docs: 0, classes: 0, chunks: 0,
     quip: t.quip ?? "",
     color: T.brass,
-    benchGroups: t.sharing === SHARING.PRIVATE ? [BENCH_PRIVATE.id] : [],
+    benchGroups: benchGroupsFor([], t.sharing),
     trainable: t.agent_origin === "customer",
     is_active: t.is_active ?? true,
     tableOnly: true,
@@ -370,7 +377,10 @@ export function buildRoster(codeAgents, tableRows, viewer = null) {
   const held = new Set(codeAgents.map(a => a.id));
   const extra = rows.filter(r => !held.has(r.id)).map(tableOnlyAgent);
   extra.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  return [...mergeRoster(codeAgents.filter(a => !hidden.has(a.id)), rows), ...extra];
+  const byId = new Map(rows.map(r => [r.id, r]));
+  const merged = mergeRoster(codeAgents.filter(a => !hidden.has(a.id)), rows)
+    .map(a => (byId.has(a.id) ? { ...a, benchGroups: benchGroupsFor(a.benchGroups, byId.get(a.id).sharing) } : a));
+  return [...merged, ...extra];
 }
 
 // FEATURE: AGT-335 — the last roster the fetch built. A screen that mounts the hook after the Bench

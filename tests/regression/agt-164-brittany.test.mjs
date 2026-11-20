@@ -1,5 +1,6 @@
+// DeepBench v7.0.1076 | tests/regression/agt-164-brittany.test.mjs | AGT-357 -- her Private membership is her public.agents row's `sharing`, not a static benchGroups value: the three static pins follow it to [] / false / 0.
 // DeepBench v7.0.788 | tests/regression/agt-164-brittany.test.mjs | AGT-384 -- the BENCH_PRIVATE pin follows the label to "Private Agents" (one assertion; nothing else here changes)
-// DeepBench v7.0.752 | tests/regression/agt-164-brittany.test.mjs | AGT-164 (AGT-332 slice 1: the benchGroups pin follows her to ["private"])
+// DeepBench v7.0.752 | tests/regression/agt-164-brittany.test.mjs | AGT-164 (AGT-332 slice 1 pinned her benchGroups to ["private"]; AGT-357 above moved that to [])
 //
 // FEATURE: AGT-164 -- Brittany (MK-07), the outside tester's BLANK marketing agent. Two things
 // landed together and this file pins both: her `public.agents` row, applied verbatim from
@@ -17,8 +18,9 @@
 // splicing an `INSERT INTO public.agent_configs` in and catching it.
 //
 // STATIC (always run):
-//   (a) AGENTS has `brittany` -- code MK-07, trainable true, benchGroups exactly ["private"] (no
-//       "mi": the Channel Intelligence screen reads "mi"), a five-key AVATAR_CFG entry, and
+//   (a) AGENTS has `brittany` -- code MK-07, trainable true, benchGroups exactly [] (AGT-357:
+//       Private is her `public.agents` row's `sharing`, which buildRoster() reads; no "mi"
+//       either, the Channel Intelligence screen reads "mi"), a five-key AVATAR_CFG entry, and
 //       AGENT_PRONOUNS she/her/her.
 //   (b) the seed carries exactly ONE `INSERT INTO public.agents`, and that statement carries
 //       'brittany', 'MK-07', `false, 'create', 'customer'` and `'[]'::jsonb`; exactly one
@@ -92,15 +94,15 @@ async function partA_roster() {
   assert.ok(entry, `AGENTS has no '${SELF_ID}' entry`);
   assert.strictEqual(entry.code, CODE, `AGENTS.${SELF_ID}.code is ${entry.code}, expected ${CODE}`);
   assert.strictEqual(entry.trainable, true, `AGENTS.${SELF_ID}.trainable is ${entry.trainable} -- the tester trains her`);
-  assert.deepStrictEqual(entry.benchGroups, ["private"], `AGENTS.${SELF_ID}.benchGroups is not exactly ["private"] (AGT-332: Private only)`);
+  assert.deepStrictEqual(entry.benchGroups, [], `AGENTS.${SELF_ID}.benchGroups is not exactly [] (AGT-357: Private follows her row's sharing, not this array)`);
   assert.ok(!entry.benchGroups.includes("mi"), `AGENTS.${SELF_ID} is in the "mi" bench group`);
   // FEATURE: AGT-332 -- Private is a benchGroups VALUE read off the agent's own entry, never an id check.
   // AGT-384: the label reads "Private Agents" (John, 2026-10-05); the id is unchanged.
   assert.deepStrictEqual(BENCH_PRIVATE, { id: "private", label: "Private Agents" }, `BENCH_PRIVATE is not { id: "private", label: "Private Agents" }`);
   assert.ok(!BENCH_FILTERS.some(f => f.id === "private"), `BENCH_FILTERS lists "private" -- like "all" it is positioned, not a plain group`);
-  assert.strictEqual(isPrivateAgent(entry), true, `isPrivateAgent(${SELF_ID}) is not true`);
+  assert.strictEqual(isPrivateAgent(entry), false, `isPrivateAgent(${SELF_ID}) is not false -- AGT-357: the static entry is no longer private`);
   assert.strictEqual(isPrivateAgent(AGENTS.find(a => a.id === "nathan")), false, `isPrivateAgent(nathan) is not false -- the move bled past ${SELF_ID}`);
-  assert.strictEqual(AGENTS.filter(isPrivateAgent).length, 1, `expected exactly 1 private agent at this ship, found ${AGENTS.filter(isPrivateAgent).length}`);
+  assert.strictEqual(AGENTS.filter(isPrivateAgent).length, 0, `expected exactly 0 private agents in the static array at this ship (AGT-357), found ${AGENTS.filter(isPrivateAgent).length}`);
   assert.strictEqual(isPrivateAgent({}), false, `isPrivateAgent({}) is not false -- no benchGroups is not private`);
   results.push(`agents-brittany-${CODE}-trainable-private-only`);
 
