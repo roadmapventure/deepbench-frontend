@@ -1,3 +1,4 @@
+// DeepBench v7.0.1081 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-571 slice 3 -- arm C grades its own key.
 // DeepBench v7.0.871 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-494 -- BYTES_AT_SHIP
 // re-pinned 380963 -> 380920 in the same commit as ses-413d's home pin: JOHN-0925 passages re-pointed at
 // JOHN-1013-TESTED-TICKETS +37 B, one dangling 7f sentence -80 B; wc -c; 60 B under agt-138's 380,980 ratchet.
@@ -56,6 +57,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { gradeOwnWrites } from "./_lib/scoped-count.js";
 import { parseSteps } from "../../scripts/render-cycle-card.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -83,6 +85,8 @@ const STEP = "6";
 const DESIGN_ONLY_PROJECT = "trainer-authored-agents";
 const MEMBERS = ["AGT-250", "AGT-251", "AGT-252"];
 const RANDOM_CYCLE = "00000000-4253-4253-4253-000000000253";
+const OWN_C = { cards: `runner_items?select=id&cycle_id=eq.${RANDOM_CYCLE}`, decisions: `runner_decisions?select=id&cycle_id=eq.${RANDOM_CYCLE}`,
+  images: `runner_before_images?select=id&cycle_id=eq.${RANDOM_CYCLE}` };
 
 const lf = t => String(t).replace(/\r\n/g, "\n");
 const read = rel => lf(fs.readFileSync(path.join(ROOT, rel), "utf8"));
@@ -177,16 +181,6 @@ async function req(url, key, q, { method = "GET", body, headers = {} } = {}) {
   return { ok: res.ok, status: res.status, text, json, code: json && !Array.isArray(json) ? json.code : undefined };
 }
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 240)}`;
-
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const n = Number((res.headers.get("content-range") ?? "").split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status}`);
-  return n;
-}
 
 async function run() {
   const failures = [];
@@ -322,11 +316,7 @@ async function run() {
 
     // --- C. both refusals fire by their own sentence, and nothing is written -----------------------
     await arm("C refusals, no writes", async () => {
-      const before = {
-        cards: await count(url, key, "runner_items?select=id"),
-        decisions: await count(url, key, "runner_decisions?select=id"),
-        questions: await count(url, key, "runner_questions?select=id"),
-      };
+      await gradeOwnWrites(url, key, OWN_C, async () => {
 
       const body = p => ({
         p_cycle_id: RANDOM_CYCLE, p_backlog_id: p, p_kickoff_path: "docs/kickoffs/v7.0.999-probe.md",
@@ -360,12 +350,7 @@ async function run() {
           "three new functions, in the SAME transaction that created them.");
       }
 
-      const after = {
-        cards: await count(url, key, "runner_items?select=id"),
-        decisions: await count(url, key, "runner_decisions?select=id"),
-        questions: await count(url, key, "runner_questions?select=id"),
-      };
-      assert.deepEqual(after, before, "every probe above is a refusal -- none of them may write a row");
+      }, { label: "AGT-253 arm C" });
     });
   }
 

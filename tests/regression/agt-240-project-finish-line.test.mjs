@@ -1,3 +1,4 @@
+// DeepBench v7.0.1081 | tests/regression/agt-240-project-finish-line.test.mjs | AGT-571 slice 3 -- arm D grades its own key.
 // DeepBench v7.0.869 | tests/regression/agt-240-project-finish-line.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
 // a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
 // FILES a ticket and carries neither test {reproduced, how, result} nor untested_reason (John
@@ -33,6 +34,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { countScoped, gradeOwnWrites } from "./_lib/scoped-count.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PROPOSE = pathToFileURL(path.join(ROOT, "scripts", "propose-project.js")).href;
@@ -46,7 +48,9 @@ const EPIC_AE = "6c8a8325-205c-4e08-b0b2-64c939582cc6";
 // definition of finished can reach.
 const EPIC_NOT_DUE = "eeda31e6-7149-4afe-824a-ccf4fb1d571d";
 const CUT = "2026-09-24T05:00:00Z";
-const CYCLE = "fe346b72-3e94-41e6-999c-572150456327";
+const CYCLE = "00000000-0000-4000-8000-000000000240";
+const OWN_D = { tickets: "backlog_items?select=id&backlog_id=eq.ZPROBE-2400", decisions: `runner_decisions?select=id&cycle_id=eq.${CYCLE}`,
+  images: `runner_before_images?select=id&cycle_id=eq.${CYCLE}` };
 const LOCK_SENTENCE = "AGT-240: epic Auditor Enhancements is locked; the finding waits on the findings list";
 const FUNCS = [
   ["project_batch_state", {}],
@@ -67,16 +71,6 @@ async function req(url, key, q, { method = "GET", body, headers = {} } = {}) {
   return { ok: res.ok, status: res.status, text, json, code: json && !Array.isArray(json) ? json.code : undefined };
 }
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 240)}`;
-
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const n = Number((res.headers.get("content-range") ?? "").split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status}`);
-  return n;
-}
 
 async function run() {
   const failures = [];
@@ -179,17 +173,13 @@ async function run() {
       const ep = await req(url, key, `epics?id=eq.${EPIC_AE}&select=locked_at,finished_at`);
       assert.equal(ep.status, 200, describe(ep));
       assert.ok(ep.json[0] && ep.json[0].locked_at, "the Auditor Enhancements list is locked");
-      const listed = await count(url, key, "audit_findings?status=eq.listed&ruling=like.AGT-240*&select=id");
+      const listed = await countScoped(url, key, "audit_findings?status=eq.listed&ruling=like.AGT-240*&select=id");
       assert.ok(listed >= 65, `the returned findings wait as listed (62 carried + 3 minted); got ${listed}`);
     });
 
     // --- D. the lock and the finish refuse, nothing is written ------------------------------------------
     await arm("D refusals, no writes", async () => {
-      const before = {
-        backlog: await count(url, key, "backlog_items?select=id"),
-        decisions: await count(url, key, "runner_decisions?select=id"),
-        findings: await count(url, key, "audit_findings?select=id"),
-      };
+      await gradeOwnWrites(url, key, OWN_D, async () => {
       const ins = await req(url, key, "backlog_items", {
         method: "POST", headers: { Prefer: "return=representation" },
         body: { backlog_id: "ZPROBE-2400", tier: "next", type: "Tooling", priority_class: "P10 - Tooling",
@@ -239,12 +229,7 @@ async function run() {
         notRun("AGT-240 arm D (anon half)", "VITE_SUPABASE_ANON_KEY absent -- the anon denial on the four functions is unverified here");
       }
 
-      const after = {
-        backlog: await count(url, key, "backlog_items?select=id"),
-        decisions: await count(url, key, "runner_decisions?select=id"),
-        findings: await count(url, key, "audit_findings?select=id"),
-      };
-      assert.deepEqual(after, before, "no probe wrote anything");
+      }, { label: "AGT-240 arm D" });
     });
   }
 
