@@ -1,3 +1,4 @@
+// DeepBench v7.0.1078 | tests/regression/agt-312-proposal-review.test.mjs | AGT-571 slice 2 -- arm B grades its own key.
 // DeepBench v7.0.747 | tests/regression/agt-312-proposal-review.test.mjs | AGT-312
 // FEATURE: AGT-312 -- A PROPOSAL REACHES JOHN ONLY WHEN BOTH THE MANAGER AND VICTORIA AGREE.
 // Kickoff: docs/kickoffs/v7.0.747-AGT-312-proposal-review-gate.md §5 task 4 and §6.
@@ -26,6 +27,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { gradeOwnWrites } from "./_lib/scoped-count.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PROPOSE = pathToFileURL(path.join(ROOT, "scripts", "propose-project.js")).href;
@@ -35,7 +37,8 @@ const PROPOSE = pathToFileURL(path.join(ROOT, "scripts", "propose-project.js")).
 // off Auditor Enhancements, which is now finished (paused, locked, no member open or partial) and
 // therefore due.
 const EPIC_NOT_DUE = "eeda31e6-7149-4afe-824a-ccf4fb1d571d";
-const CYCLE = "fe346b72-3e94-41e6-999c-572150456327";
+const CYCLE = "00000000-0000-4000-8000-000000000312";
+const OWN_B = { decisions: `runner_decisions?select=id&cycle_id=eq.${CYCLE}`, images: `runner_before_images?select=id&cycle_id=eq.${CYCLE}` };
 
 const M1 = "proposal needs a review with verdict, reason and account (John 2026-10-02, decision 6668e1ac)";
 const M3 = "the review verdict is disagree -- a proposal reaches John only when both the manager and the review agree (John 2026-10-02, decision 6668e1ac)";
@@ -53,16 +56,6 @@ async function req(url, key, q, { method = "GET", body } = {}) {
   return { ok: res.ok, status: res.status, text, json, code: json && !Array.isArray(json) ? json.code : undefined };
 }
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 240)}`;
-
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const n = Number((res.headers.get("content-range") ?? "").split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status}`);
-  return n;
-}
 
 async function run() {
   const failures = [];
@@ -120,11 +113,7 @@ async function run() {
   } else {
     // --- B. the gate refuses live, and writes nothing ----------------------------------------------
     await arm("B live gate, no writes", async () => {
-      const before = {
-        decisions: await count(url, key, "runner_decisions?select=id"),
-        projects: await count(url, key, "projects?select=id"),
-        images: await count(url, key, "runner_before_images?select=id"),
-      };
+      await gradeOwnWrites(url, key, OWN_B, async () => {
       // agt-240's FUNCS[1] body, minus and plus the review -- the only difference between the two calls.
       const call = p_proposal => req(url, key, "rpc/finish_project_batch", { method: "POST",
         body: { p_cycle_id: CYCLE, p_session_name: null, p_epic: EPIC_NOT_DUE, p_proposal } });
@@ -152,13 +141,7 @@ async function run() {
       assert.equal(String(maybe.json?.message), PREFIX + "review verdict maybe is not agree or disagree",
         "an unknown verdict takes its own branch and names itself");
 
-      const after = {
-        decisions: await count(url, key, "runner_decisions?select=id"),
-        projects: await count(url, key, "projects?select=id"),
-        images: await count(url, key, "runner_before_images?select=id"),
-      };
-      assert.deepEqual(after, before,
-        "the gate is checked before project_batch_state(), so four refused calls wrote no decision, no project and no before-image");
+      }, { label: "AGT-312 arm B" });
     });
   }
 

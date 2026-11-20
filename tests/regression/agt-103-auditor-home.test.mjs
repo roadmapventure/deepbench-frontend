@@ -1,3 +1,4 @@
+// DeepBench v7.0.1078 | tests/regression/agt-103-auditor-home.test.mjs | AGT-571 slice 2 -- arm C grades its own key.
 // DeepBench v7.0.558 | tests/regression/agt-103-auditor-home.test.mjs | AGT-103 -- every ticket the
 // Development Manager files from an Auditor finding is homed in the Auditor Enhancements epic (project
 // `auditor-enhancements`). Migration `agt103_auditor_home` (applied over the Supabase MCP) replaces the one
@@ -20,11 +21,15 @@
 
 import assert from "node:assert/strict";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { gradeOwnWrites } from "./_lib/scoped-count.js";
 
 const UP = "agt103_auditor_home";
 const PREV = "20260923211705"; // agt86_s9b_checklist_edits
 const HOME_EPIC = "6c8a8325-205c-4e08-b0b2-64c939582cc6";
 const ZERO = "00000000-0000-0000-0000-000000000000";
+const QA_SESSION = "agt-103-qa";
+const OWN_C = { decisions: `runner_decisions?select=id&session_name=eq.${QA_SESSION}`, images: `runner_before_images?select=id&session_name=eq.${QA_SESSION}`,
+  tickets: `backlog_items?select=id&session_ref=like.${QA_SESSION}*` };
 
 async function req(url, key, q, { method = "GET", body } = {}) {
   const res = await fetch(`${url}/rest/v1/${q}`, {
@@ -38,13 +43,6 @@ async function req(url, key, q, { method = "GET", body } = {}) {
   return { ok: res.ok, status: res.status, text, json, code: json && !Array.isArray(json) ? json.code : undefined };
 }
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 240)}`;
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, { method: "HEAD", headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" } });
-  const cr = res.headers.get("content-range") ?? "";
-  const n = Number(cr.split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status} content-range=${cr}`);
-  return n;
-}
 
 async function run() {
   const url = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
@@ -92,11 +90,8 @@ async function run() {
 
   // --- C. controls (write-proof) --------------------------------------------------------------------
   await arm("C controls", async () => {
-    const before = {
-      backlog: await count(url, key, "backlog_items?select=id"),
-      decisions: await count(url, key, "runner_decisions?select=id"),
-    };
-    const probe = { p_cycle_id: null, p_session_name: "agt-103-qa", p_week: "2026-W39",
+    await gradeOwnWrites(url, key, OWN_C, async () => {
+    const probe = { p_cycle_id: null, p_session_name: QA_SESSION, p_week: "2026-W39",
       p_review: { groups: [{ kind: "carry", finding_ids: [ZERO] }], summary_for_john: "qa", patterns_applied: [] } };
     const r = await req(url, key, "rpc/apply_audit_review", { method: "POST", body: probe });
     assert.equal(r.status, 400, `the reason-less carry probe must be refused; got ${describe(r)}`);
@@ -110,11 +105,7 @@ async function run() {
     } else {
       notRun("AGT-103 arm C (anon half)", "VITE_SUPABASE_ANON_KEY absent -- the anon refusal of apply_audit_review is unverified here");
     }
-    const after = {
-      backlog: await count(url, key, "backlog_items?select=id"),
-      decisions: await count(url, key, "runner_decisions?select=id"),
-    };
-    assert.deepEqual(after, before, "no probe wrote: backlog_items and runner_decisions counts unchanged");
+    }, { label: "AGT-103 arm C" });
     const e = await req(url, key, "epics?name=eq.Auditor%20Enhancements&select=id,projects(slug)");
     assert.equal(e.status, 200, describe(e));
     assert.equal(e.json.length, 1, `exactly one epic named Auditor Enhancements; got ${e.json.length}`);

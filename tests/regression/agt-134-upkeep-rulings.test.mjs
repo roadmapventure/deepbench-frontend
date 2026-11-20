@@ -1,3 +1,4 @@
+// DeepBench v7.0.1078 | tests/regression/agt-134-upkeep-rulings.test.mjs | AGT-571 slice 2 -- arm C grades its own key.
 // DeepBench v7.0.869 | tests/regression/agt-134-upkeep-rulings.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
 // a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
 // FILES a ticket and carries neither test {reproduced, how, result} nor untested_reason (John
@@ -55,7 +56,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { gradeOwnWrites } from "./_lib/scoped-count.js";
 import { LIVE_ROUTES, MANAGER_PROJECT } from "./_lib/finding-routes.js";
+const PROBE_CYCLE = "00000000-0000-0000-0000-00000000c134";
+const OWN_C = { decisions: `runner_decisions?select=id&cycle_id=eq.${PROBE_CYCLE}`, images: `runner_before_images?select=id&cycle_id=eq.${PROBE_CYCLE}`,
+  tickets: `backlog_items?select=id&session_ref=like.cycle%20${PROBE_CYCLE}*` };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SCRIPT = path.join(ROOT, "scripts", "audit-review.js");
@@ -127,17 +132,6 @@ async function req(url, key, q, { method = "GET", body } = {}) {
   return { ok: res.ok, status: res.status, text, json, code: json && !Array.isArray(json) ? json.code : undefined };
 }
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 240)}`;
-
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const cr = res.headers.get("content-range") ?? "";
-  const n = Number(cr.split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status} content-range=${cr}`);
-  return n;
-}
 
 async function run() {
   const url = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
@@ -262,11 +256,7 @@ async function run() {
 
   // --- C. the refusals over the live function, proving it writes nothing ----------------------------
   await arm("C probes", async () => {
-    const before = {
-      backlog: await count(url, key, "backlog_items?select=id"),
-      findings: await count(url, key, "audit_findings?select=id"),
-      decisions: await count(url, key, "runner_decisions?select=id"),
-    };
+    await gradeOwnWrites(url, key, OWN_C, async () => {
 
     // A finding id that is not a finding. Loop 1a's carry branch looks the fingerprint up and finds
     // none, so it falls straight through to the needs_desktop check -- which is ahead of coverage
@@ -275,7 +265,7 @@ async function run() {
                               finding_ids: ["00000000-0000-0000-0000-0000000000aa"], ...extra });
     const call = g => req(url, key, "rpc/apply_audit_review", {
       method: "POST",
-      body: { p_cycle_id: "00000000-0000-0000-0000-00000000c134", p_session_name: null,
+      body: { p_cycle_id: PROBE_CYCLE, p_session_name: null,
               p_week: "2026-W39", p_review: { groups: [g] } },
     });
 
@@ -299,12 +289,7 @@ async function run() {
     assert.match(String(ctl.json.message), /unknown or not open\/carried finding/,
       "it dies on coverage instead -- which is downstream of the gate the two arms above tripped");
 
-    const after = {
-      backlog: await count(url, key, "backlog_items?select=id"),
-      findings: await count(url, key, "audit_findings?select=id"),
-      decisions: await count(url, key, "runner_decisions?select=id"),
-    };
-    assert.deepEqual(after, before, "no probe wrote anything: backlog, findings and decision counts unchanged");
+    }, { label: "AGT-134 arm C" });
   });
 
   notRun("AGT-134: apply_audit_review()'s INSERT column list, and the ticket a flagged group actually files",
