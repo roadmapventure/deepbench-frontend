@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1072 | scripts/audit-corpus.js | AGT-318 -- --root-max-age=<label>=<whole hours> declares how old an --extra-root's newest commit may be, and --root-age=<json> writes the `config-mirror-stale` findings it reads; nothing stated the claude-config mirror's age before.
 // DeepBench v7.0.562 | scripts/audit-corpus.js | AGT-100 -- --extra-root reads GIT-TRACKED files only.
 // walkRoot() below lists its root with trackedFiles() (scripts/audit-private-scan.js, the one shared
 // core) and reads only what git tracks there; the working interviewquestions folder had been handing
@@ -101,6 +102,7 @@
 //
 // Usage:
 //   node scripts/audit-corpus.js [--corpus=<dir>] [--no-db] [--out=<json>] [--detect[=<json>]]
+//                                 [--root-max-age=<label>=<hours>] [--root-age=<json>]
 //   node scripts/audit-corpus.js --agent=<id> [--out=<json>] [--detect[=<json>]]
 //
 //   --corpus=<dir>  Extract markdown from this directory's *.md INSTEAD of the real file list.
@@ -111,6 +113,9 @@
 //   --no-db         Skip every database source. Without it, credentials are required.
 //   --out=<json>    Write the statement table to that path.
 //   --detect[=json] Write the findings to that path (bare --detect prints them instead).
+//   --root-max-age=<label>=<hours>  (AGT-318, repeatable) the age limit for one --extra-root label;
+//                   prints `root-age <label>: <h> h old` and `-- STALE (limit <h> h)` past it.
+//   --root-age=<json>  (AGT-318) write {week, found_by, findings} for the stale roots above.
 //   --extra-root=<label>=<dir>  (AGT-86 slice 6, repeatable) ALSO read <dir>'s *.md and *.json as
 //                   `<label>:<rel>` statements. AGT-100: a root that IS a git checkout contributes its
 //                   GIT-TRACKED *.md/*.json only (`git ls-files`) -- an untracked or ignored file is
@@ -137,6 +142,7 @@
 import fs from "fs";
 import path from "path";
 import { createHash } from "crypto";
+import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { RETIREMENT_VOCAB, enclosingParagraph, PROCEDURE_GENERATED_DOCS } from "./check-session-docs.js";
 import { normalize, locationKey } from "./audit-ledger.js";
@@ -578,6 +584,35 @@ function flattenJson(rel, value, prefix, depth, out) {
   }
 }
 
+// AGT-318 -- THE MIRROR'S OWN AGE. Nothing in the weekly review stated how old the claude-config
+// mirror was, so a sync that stopped read exactly like a project with nothing to say: the corpus
+// still arrived, the statements were still judged, and every one of them was history. The age is
+// read from the root's OWN newest commit (`git log -1 --format=%cI`), never from a file mtime a
+// clone resets, and never from a declared sync schedule -- the schedule is the claim under test.
+//
+// `null` IS NOT ZERO AND NOT A PASS. git exiting non-zero (not a checkout, no commits, no git) or a
+// date that will not parse returns null, and staleRootFinding() files on null exactly as it files
+// on an over-limit age: an unreadable age is the same blind monitor an over-age mirror is, and the
+// one thing it must never be is a silent green (the false all-clear this file's header refuses).
+// Floored whole hours, never below 0 -- a committer date in the future is clock skew, not freshness.
+export function rootAge(dir, now = Date.now()) {
+  const r = spawnSync("git", ["-C", String(dir), "log", "-1", "--format=%cI"], { encoding: "utf8" });
+  if (r.status !== 0) return null;
+  const t = Date.parse(String(r.stdout ?? "").trim());
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((now - t) / 3600000));
+}
+
+// ONE finding per stale root, in the ledger's own finding shape (kind `stale-or-irrelevant`, the
+// same kind detectStaleParameters() files): the whole root is one fact, and a row per memory file
+// is the board flooding the ledger is append-only against. The location is synthetic
+// (`audit-root-age/<label>`) because the defect is not IN any one file -- it is the mirror.
+export const staleRootFinding = (label, h, max) => h !== null && h <= max ? null : {
+  check_slug: "config-mirror-stale", kind: "stale-or-irrelevant", confidence: "high",
+  locations: [{ location: `audit-root-age/${label}`, text: `newest commit ${h} h old, limit ${max} h` }],
+  governing_fact: `the ${label} mirror is at most ${max} hours old when read`,
+  proposed_resolution: `run the sync that writes ${label} and find why it stopped` };
+
 // AGT-86 slice 6 -- an EXTRA ROOT outside this repo (Claude memory, hooks, interview questions).
 // readIfPresent/globMd are ROOT-relative and non-recursive, so this walks its own absolute dir.
 // Locations are `<label>:<rel>` with forward slashes, so audit-ledger.js's locationKey() still
@@ -791,6 +826,19 @@ async function main() {
     }
     extraRoots.push({ label, dir: path.resolve(dir) });
   }
+
+  // AGT-318: a limit names an --extra-root LABEL and whole hours, parsed and checked BEFORE any
+  // work, same reason the roots themselves are -- a limit for a label nobody passed would read as a
+  // root that was measured and found fresh. `nope=48` is exit 2, never a run that measured nothing.
+  const rootMaxAge = new Map();
+  for (const spec of args(argv, "root-max-age")) {
+    const m = /^(.+)=(\d+)$/.exec(spec);
+    if (!m || !extraRoots.some(r => r.label === m[1])) {
+      console.error(`audit-corpus: --root-max-age=${spec} must be <label>=<whole hours> for an --extra-root label (exit 2 = could not run, never a pass).`);
+      process.exit(2);
+    }
+    rootMaxAge.set(m[1], Number(m[2]));
+  }
   if (extraRoots.length && typeof agentId === "string") {
     console.error("audit-corpus: --extra-root cannot be combined with --agent=<id>, which reads one agent's database rows only (exit 2 = could not run, never a pass).");
     process.exit(2);
@@ -852,6 +900,7 @@ async function main() {
 
   // AGT-86 slice 6: extra roots are APPENDED after either file half, never replace it.
   const extraLines = [];
+  const rootAgeFindings = [];
   for (const r of extraRoots) {
     let got;
     try {
@@ -863,6 +912,21 @@ async function main() {
     }
     for (const s of got) statements.push(s);   // a large root overflows the spread-argument limit
     extraLines.push(`extra-root ${r.label}: ${got.length} statements`);
+    // AGT-318: the root's own age, printed beside its statement count for every root that declared
+    // a limit -- the one line that was missing when a stopped sync looked like a quiet project.
+    if (rootMaxAge.has(r.label)) {
+      const max = rootMaxAge.get(r.label);
+      const h = rootAge(r.dir);
+      const f = staleRootFinding(r.label, h, max);
+      extraLines.push(`root-age ${r.label}: ${h === null ? "unreadable" : `${h} h old`}${f ? ` -- STALE (limit ${max} h)` : ""}`);
+      if (f) rootAgeFindings.push(f);
+    }
+  }
+  const rootAgeOut = arg(argv, "root-age");
+  if (typeof rootAgeOut === "string") {
+    const { isoWeek } = await import("./audit-ledger.js");
+    fs.mkdirSync(path.dirname(path.resolve(rootAgeOut)), { recursive: true });
+    fs.writeFileSync(path.resolve(rootAgeOut), JSON.stringify({ week: isoWeek(new Date()), found_by: "auditor:root-age", findings: rootAgeFindings }, null, 2), "utf8");
   }
   const privateOut = arg(argv, "private-scan");
   if (typeof privateOut === "string") {

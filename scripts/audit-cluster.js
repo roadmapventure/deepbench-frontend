@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1072 | scripts/audit-cluster.js | AGT-318 -- --build takes --reserve=<location prefix>=<n>, repeatable: up to n clusters built from the statements under that prefix are added BESIDE the --max-clusters cut, so a corpus whose only home is claude-config:memory/ (spread 1) is reviewed instead of never reaching a task file.
 // DeepBench v7.0.920 | scripts/audit-cluster.js | AGT-304 slice 39 -- both audit_findings reads page by id: unpaged, 1,000 of 2,399 rows came back and the carry saw 2 of 24 open fingerprints.
 // DeepBench v7.0.881 | scripts/audit-cluster.js | AGT-502 -- the byte-identical second home of the token sum, fixed in the same commit: it now imports model-trial.js's usageSplit() and logs the cache columns instead of folding them into --input-tokens.
 // DeepBench v7.0.552 | scripts/audit-cluster.js | AGT-86 slice 8a -- the Auditor routine runs this script under a SESSION NAME (it has no runner_cycles row): --run takes exactly one of --cycle-id / --session-name via audit-ledger.js attribution(), and agent-log.js gets --cycle only when a cycle exists. Config clusters (statements carrying slice 6's `project` label) route to audit-config-review / au-config-intent, and --build writes --repo-visibility=<label>=<public|private> as task_context.repo_visibility. The --collect note names the routine's ingest, not a hand step.
@@ -62,6 +63,7 @@
 // Usage:
 //   node scripts/audit-cluster.js --build --statements=<json> --week=<YYYY-Www> --out-dir=<dir>
 //                                 [--max-clusters=12] [--no-db] [--repo-visibility=<label>=<public|private> ...]
+//                                 [--reserve=<location prefix>=<n> ...]
 //   node scripts/audit-cluster.js --run --dir=<dir> (--cycle-id=<uuid> | --session-name=<name>) [--limit=N] [--dry-run]
 //
 // AGT-86 slice 8a: --run takes EXACTLY ONE of --cycle-id / --session-name (a dry run may take
@@ -220,6 +222,20 @@ export function buildClusters(statements, { maxStatements = MAX_STATEMENTS, text
   }
   return kept;
 }
+
+// AGT-318 -- RESERVED CLUSTERS, BESIDE THE CUT AND NEVER INSIDE IT. buildClusters() sorts by
+// `spread` (how many distinct `source`s an anchor spans) and --build keeps the top --max-clusters;
+// measured 2026-11-20, the 12th survivor of 2,000 clusters spanned 4 sources. A cluster whose only
+// home is the claude-config memory mirror spans ONE, so memory-against-memory could not reach a
+// task file at any threshold a week's run would accept -- the check was unreachable, not rare.
+//
+// So the reservation is a SEPARATE pass over the same statements, filtered to one location prefix,
+// clustered by the same function (no second clustering rule -- pattern:14) and capped at n. The
+// caller appends the result AFTER the slice, which is the whole point: these n are extra work the
+// week buys on purpose, never n fewer of the wide-spread clusters. `kind: "reserved"` is what the
+// task file and the build summary read; capabilityFor() still routes them on their `project` label.
+export const reservedClusters = (statements, prefix, n) => buildClusters((statements ?? [])
+  .filter(s => String(s?.location ?? "").startsWith(prefix))).slice(0, n).map(c => ({ ...c, kind: "reserved" }));
 
 // Windows of 40 chars at step 20 over the LEDGER's quoted text, matched against the statement's
 // normalized text. A whole-string match would fail on any re-wrap or ellipsis; a single short
@@ -548,6 +564,12 @@ async function doBuild(argv) {
   const prior = priorClusters(rows, statements);
   const anchors = buildClusters(statements);
   const clusters = [...prior.clusters, ...anchors].slice(0, maxClusters);
+  // AGT-318: reserved clusters are added AFTER the cut, so they cost nothing the cut was protecting.
+  for (const a of argv.filter(x => x.startsWith("--reserve="))) {
+    const m = /^--reserve=(.+)=([1-9]\d*)$/.exec(a);
+    if (!m) fail(2, `--reserve must be <location prefix>=<n> with n >= 1 (got ${a.slice("--reserve=".length)}).`);
+    clusters.push(...reservedClusters(statements, m[1], Number(m[2])));
+  }
   const priorFingerprints = rows.filter(r => r.iso_week === week).map(r => r.fingerprint);
 
   fs.mkdirSync(path.resolve(outDir), { recursive: true });
