@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1071 | scripts/verifier.js | AGT-326 -- a test that asserts a piece of an anchored line pins it; a runbook edit's dragged files are counted before the Builder runs.
 // DeepBench v7.0.1065 | scripts/verifier.js | AGT-328 -- the delta counts failing arms; a pin rides the ship that changes it.
 // DeepBench v7.0.1056 | scripts/verifier.js | AGT-673 -- a kickoff naming apply_migration says who applies it.
 // DeepBench v7.0.991 | scripts/verifier.js | AGT-629 -- a test the pre-build tree genuinely LACKED is not an unmeasured red: `absentPreBuildFrom()` reads the `— ABSENT pre-build` lines `renderOut()` now writes, both baseline readers carry `absent` beside `measured`, and `baselineCoverageFinding()` exempts ONLY a name on such a line. Every other uncovered name still refuses (AGT-457) and `regressionDelta()` is untouched, so a red new test still blocks.
@@ -2742,7 +2743,7 @@ export function pinsBlockLines(text) {
 }
 
 // Step 6. `resolve` is the anchors clause's own resolver: literal -> { files } | null.
-export function kickoffPinsFinding(text, resolve, out = {}) {
+export function kickoffPinsFinding(text, resolve, out = {}, tests = null) {
   const lines = pinsBlockLines(text);
   const refuse = (why) => ({
     kind: "kickoff-no-lanes",
@@ -2774,6 +2775,16 @@ export function kickoffPinsFinding(text, resolve, out = {}) {
       if (file.startsWith("tests/regression/") && file !== pinPath(a.path) && !holders.has(file)) holders.set(file, a.literal);
     }
   }
+  // AGT-326: the fragment direction, into the SAME holders map. `tests` is the suite's sources or a
+  // function returning them; null (unreadable, or a stamp before v7.0.1072) adds nothing.
+  const fragTests = stampAtLeast(text, FRAGMENT_FROM) ? (typeof tests === "function" ? tests() : tests) : null;
+  const fragCache = new Map();
+  if (Array.isArray(fragTests)) for (const a of anchorBlockLines(text)) {
+    if (a.path === null || a.literal === null) continue;
+    for (const file of fragmentHolders({ path: a.path, literal: a.literal, tests: fragTests, cache: fragCache })) {
+      if (file !== pinPath(a.path) && !holders.has(file)) holders.set(file, a.literal);
+    }
+  }
   out.holders = holders.size;
   const missing = [...holders.keys()].filter(t => !declared.has(t));
   if (missing.length) {
@@ -2783,6 +2794,143 @@ export function kickoffPinsFinding(text, resolve, out = {}) {
   const repin = (lines ?? []).filter(l => l.disposition === "repin").length;
   out.note = `pins: ${holders.size} regression test(s) hold an anchored literal, all declared; ${(lines ?? []).length} line(s), `
     + `${repin} repin (AGT-328).` + (unresolved ? ` ${unresolved} anchor(s) NOT GRADED -- the resolver could not answer.` : "");
+  return null;
+}
+
+// ---- FEATURE: AGT-326 -- A PIN IS OFTEN A FRAGMENT OF THE LINE, NOT THE LINE. ----------------
+// The pins clause above (AGT-328) asks which files hold the WHOLE anchored literal. A regression
+// test usually asserts a PIECE of a line -- a quoted string, or a `/regex/.test(` body carrying its
+// own backslash escapes -- so the whole line resolves into no test at all. Measured on tree
+// 278e126: the runbook line cycle 89491155's kickoff deleted is held whole by ONE file, the runbook
+// itself, while tests/regression/ses-315-ship-reverse.test.mjs asserts 49 characters of it. That
+// kickoff cost a Designer and a Builder lane before 7a blocked it. `fragmentHolders()` asks the
+// other direction and feeds the SAME clause: a test that names the anchored file and holds a
+// fragment of the anchored literal is a holder, and needs its `pins` line like any other.
+// COVERAGE, NEVER THE DECISION: `keep` is still declared, never proven. A FLOOR, NEVER A PROOF: a
+// regex with a wildcard, a template literal and a string built by concatenation are not seen.
+// Graded from v7.0.1072; an older stamp keeps AGT-328's holders exactly.
+export const FRAGMENT_FROM = [7, 0, 1072];
+export const FRAGMENT_MIN = 20;
+const stampAtLeast = (text, f) => {
+  const s = kickoffStampVersion(text);
+  return s !== null && (s[0] !== f[0] ? s[0] > f[0] : s[1] !== f[1] ? s[1] > f[1] : s[2] >= f[2]);
+};
+
+// Pure. What one test's source pins as text: its double- and single-quoted strings and the bodies
+// of its `/regex/.test(` calls, backslash escapes removed, comment lines skipped. Only a fragment of
+// FRAGMENT_MIN characters or more that holds a space counts -- shorter ones and bare paths are names,
+// not assertions about a line.
+export function pinnedFragments(src) {
+  const out = new Set();
+  for (const line of String(src ?? "").split("\n")) {
+    if (/^\s*\/\//.test(line)) continue;
+    for (const m of line.matchAll(/"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|\/((?:[^\/\\\n]|\\.)+)\/[a-z]*\.test\(/g)) {
+      const t = (m[1] ?? m[2] ?? m[3] ?? "").replace(/\\(.)/g, "$1");
+      if (t.length >= FRAGMENT_MIN && t.includes(" ")) out.add(t);
+    }
+  }
+  return [...out];
+}
+
+// Pure. `tests` is [{ file, src }]. The tests that NAME the anchored file (by basename, the way
+// scripts/related-tests.js relates them) and hold a fragment of the anchored literal.
+export function fragmentHolders({ path: anchored, literal, tests, cache = new Map() }) {
+  const base = String(anchored ?? "").split("/").pop();
+  const lit = String(literal ?? "");
+  const out = [];
+  if (!base || lit.length < FRAGMENT_MIN) return out;
+  for (const t of Array.isArray(tests) ? tests : []) {
+    if (!String(t.src).includes(base)) continue;
+    if (!cache.has(t.file)) cache.set(t.file, pinnedFragments(t.src));
+    if (cache.get(t.file).some(frag => lit.includes(frag))) out.push(t.file);
+  }
+  return out;
+}
+
+// The suite's sources, read once. null when the directory cannot be read: NOT GRADED, never a pass.
+export function regressionSources(root) {
+  try {
+    return suiteTests(root).map(f => ({
+      file: `tests/regression/${f}`,
+      src: fs.readFileSync(path.join(root, "tests/regression", f), "utf8"),
+    }));
+  } catch { return null; }
+}
+
+// ---- FEATURE: AGT-326 -- A FILE THAT DRAGS OTHER FILES IS COUNTED BEFORE THE BUILDER RUNS. ----
+// Some files cannot change alone. ANY byte change to docs/runbooks/runner-cycle.md needs
+// docs/runbooks/cycle-card.md re-rendered in the same commit (its header carries the runbook's
+// sha256; ses-377-cycle-card.test.mjs asserts it), and needs `BYTES_AT_SHIP` in
+// tests/regression/ses-413d-questions-scoreboard.test.mjs re-pinned unless the edit is byte-neutral.
+// A Builder may not widen a kickoff's file list, so a kickoff that anchors such a file and leaves a
+// dragged file out cannot pass 7a -- and that is knowable from the kickoff's own bytes.
+//
+// THE MAP IS STATIC AND SMALL ON PURPOSE (pattern:18): one entry, read off the tree, changed in the
+// ship that changes the coupling. `files` are dragged by ANY edit and must be named; `says` is a
+// word the kickoff must carry because the drag is conditional (the Designer states re-pin or
+// byte-neutral); `conditional` is counted only when the kickoff names it. WHO PAYS for the card
+// re-render is AGT-319's question and is not decided here: this clause counts what today's tree
+// drags, and AGT-319's ship edits this map.
+//
+// THE COUNT IS A FLOOR: distinct anchored paths plus the dragged files. A kickoff's new files are
+// not anchored, so the real count is this or more -- a floor over the cap is a certain cap case
+// (pattern:172), never a guess. The cap is read from the kickoff's own `caps N / M` words; a kickoff
+// that says the cap was waived is counted and not refused. Graded from v7.0.1072.
+export const COUPLED_CLAUSE = "coupled";
+export const COUPLED_FROM = [7, 0, 1072];
+export const COUPLED_FILES = Object.freeze({
+  "docs/runbooks/runner-cycle.md": Object.freeze({
+    files: Object.freeze(["docs/runbooks/cycle-card.md"]),
+    says: Object.freeze(["BYTES_AT_SHIP"]),
+    conditional: Object.freeze(["tests/regression/ses-413d-questions-scoreboard.test.mjs"]),
+  }),
+});
+const CAP_WORDS_RE = /\bcaps?\s+(\d+)\s*(?:files?)?\s*\/\s*(\d+)/i;
+
+export function kickoffCoupledFinding(text, out = {}) {
+  const t = String(text ?? "");
+  const paths = new Set(anchorBlockLines(t).map(a => a.path).filter(Boolean).map(pinPath));
+  const keys = Object.keys(COUPLED_FILES).filter(k => paths.has(k));
+  if (!keys.length) { out.note = "coupled: no anchored file drags another (AGT-326)."; return null; }
+  if (!stampAtLeast(t, COUPLED_FROM)) {
+    const s = kickoffStampVersion(t);
+    out.note = `NOT GRADED (AGT-326): stamp ${s ? "v" + s.join(".") : "absent"} predates v${COUPLED_FROM.join(".")}.`;
+    return null;
+  }
+  const refuse = (why, remedy) => ({
+    kind: "kickoff-no-lanes",
+    clause: COUPLED_CLAUSE,
+    remedy_owner: KICKOFF_REMEDY_OWNER,
+    remedy,
+    reason: `kickoff coupled files (AGT-326): ${why} The Builder may not widen the file list, so this is `
+      + "decided before the Builder runs, never at 7a.",
+  });
+  const missing = [];
+  const floor = new Set(paths);
+  for (const k of keys) {
+    const c = COUPLED_FILES[k];
+    for (const f of c.files) { floor.add(f); if (!t.includes(f)) missing.push(`${f} (dragged by any edit to ${k})`); }
+    for (const w of c.says) if (!t.includes(w)) missing.push(`the word ${w} (say re-pinned or byte-neutral; ${k})`);
+    for (const f of c.conditional) if (t.includes(f)) floor.add(f);
+  }
+  out.floor = floor.size;
+  if (missing.length) {
+    return refuse(`the kickoff anchors ${keys.join(", ")} and does not name ${missing.join("; ")}.`,
+      're-assemble design-kickoff ONCE with "no_lanes":true, naming each dragged file in a task; the caller never adds them');
+  }
+  const cap = CAP_WORDS_RE.exec(t);
+  if (/\bcaps?[^\n]{0,40}?waive/i.test(t)) { out.note = `coupled: ${floor.size} files at least; the kickoff says the cap is waived (AGT-326).`; return null; }
+  if (!cap) {
+    return refuse(`the kickoff anchors ${keys.join(", ")}, which drags files, and states no file cap to count them against `
+      + "-- write `caps N / M` (files / tasks, from the cycle's task_context) in SESSION.",
+      're-assemble design-kickoff ONCE with "no_lanes":true, writing `caps N / M` in SESSION');
+  }
+  out.cap = Number(cap[1]);
+  if (floor.size > out.cap) {
+    return refuse(`${floor.size} files at least (${[...floor].sort().join(", ")}) against a file cap of ${out.cap}.`,
+      're-assemble design-kickoff ONCE with "no_lanes":true; the Designer returns a CAP CASE (kickoff null, the parts in harvest_markdown) for scripts/rule-cap-case.js -- never a narrower kickoff (pattern:172)');
+  }
+  out.note = `coupled: ${keys.length} anchored file(s) drag others; all named; ${floor.size} files at least within the cap of ${out.cap} (AGT-326).`;
   return null;
 }
 
@@ -4049,7 +4197,8 @@ async function main() {
       return emit({ code: 1, payload: { ok: false, exitCode: 1, ...risk, risk_parts: riskOut.parts, risk_covered: riskOut.covered }, prose: risk.reason });
     }
     const applyOut = {}; const apply = kickoffApplyFinding(text, applyOut); if (apply) return emit({ code: 1, payload: { ok: false, exitCode: 1, ...apply }, prose: apply.reason });
-    const pinsOut = {}; const pins = kickoffPinsFinding(text, resolveLiteral, pinsOut); if (pins) return emit({ code: 1, payload: { ok: false, exitCode: 1, ...pins }, prose: pins.reason });
+    const pinsOut = {}; const pins = kickoffPinsFinding(text, resolveLiteral, pinsOut, () => regressionSources(repoRoot)); if (pins) return emit({ code: 1, payload: { ok: false, exitCode: 1, ...pins }, prose: pins.reason });
+    const coupledOut = {}; const coupled = kickoffCoupledFinding(text, coupledOut); if (coupled) return emit({ code: 1, payload: { ok: false, exitCode: 1, ...coupled, coupled_floor: coupledOut.floor }, prose: coupled.reason });
     // ---- AGT-187: THE THIRD CLAUSE -- the green says WHOSE declaration it graded. -------------
     //
     // ORDER IS cap -> lanes -> attestation, and it is not interchangeable: the first two grade the
@@ -4100,7 +4249,7 @@ async function main() {
         baseline_note: baselineNote,
       anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
         risk_note: riskOut.note,
-        apply_note: applyOut.note, pins_note: pinsOut.note,
+        apply_note: applyOut.note, pins_note: pinsOut.note, coupled_note: coupledOut.note,
         attests: "the Designer's own answer carries these exact bytes -- the Lanes: line is the Designer's" },
         prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376), and ATTESTED: the Designer's answer carries these exact bytes (AGT-187)` });
     }
@@ -4109,7 +4258,7 @@ async function main() {
       baseline_note: baselineNote,
       anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
       risk_note: riskOut.note,
-      apply_note: applyOut.note, pins_note: pinsOut.note,
+      apply_note: applyOut.note, pins_note: pinsOut.note, coupled_note: coupledOut.note,
       attests: "a Lanes: line is present -- NOT that the Designer wrote it" },
       prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376). UNATTESTED (AGT-187): a Lanes: line is present -- NOT that the Designer wrote it. Pass --answer=<path> to attest it.` });
   }
