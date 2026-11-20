@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1066 | scripts/model-trial.js | AGT-522 -- replayableRows(): a build job's cycle shipped a push_sha.
 // DeepBench v7.0.1060 | scripts/model-trial.js | AGT-522 -- changedFiles(): the node_modules link the replay itself makes is not a change the candidate made.
 // DeepBench v7.0.881 | scripts/model-trial.js | AGT-502 -- usageSplit(): the envelope's four token quantities reach their own four columns. --input-tokens is usage.input_tokens ALONE; the trial's `tokens:` keeps the total under its own name. One exported derivation, read by scripts/audit-cluster.js's second home of it.
 // DeepBench v7.0.677 | scripts/model-trial.js | AGT-151 -- the orchestrator lane's recorded job is a
@@ -90,13 +91,28 @@ export function pickJobs(rows, { jobKind, jobKey, model }) {
   }
   const jobs = (rows ?? [])
     .filter(r => r && r.model === model
-      && r.input_tokens !== null && r.input_tokens !== undefined
-      && r.output_tokens !== null && r.output_tokens !== undefined
+      && (isBuildRow(r) || (r.input_tokens != null && r.output_tokens != null))
       && r.visitor_id
       && allowed.includes(r.feature))
     .sort((a, b) => (Date.parse(b.created_at) - Date.parse(a.created_at)) || (Number(b.id) - Number(a.id)))
     .slice(0, 3);
   return { jobs };
+}
+
+// FEATURE: AGT-522 -- the build jobs a trial can replay.
+const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+export const isBuildRow = r => REPLAYABLE[r?.feature]?.kind === "build";
+export function replayableRows(rows, cycles) {
+  const by = new Map((cycles ?? []).map(c => [String(c.id), c]));
+  return (rows ?? []).filter(r => {
+    if (!isBuildRow(r)) return true;
+    const c = by.get(String(r.visitor_id));
+    return !!c && c.outcome === "shipped" && !!c.push_sha && !!c.item_id && !UUID.test(String(c.item_id));
+  });
+}
+export function candidateWhy(score, answer) {
+  if (score.passed) return score.why;
+  return `${score.why}; answer outcome ${answer?.outcome ?? "none"}: ${String(answer?.deviations ?? "").slice(0, 200)}`;
 }
 
 // The CLI envelope's `result` carries the answer; cut first `{` to last `}` (audit-cluster.js shape).
@@ -477,7 +493,7 @@ async function replayBuild({ job, cycle, spec, jobRef, candidate, cycleId }) {
     const trial = {
       job_ref: jobRef, run_at: runAt,
       baseline: { passed: baselinePassed, verdict: "none", tokens: baselineTokens(job), minutes },
-      candidate: { passed: score.passed, verdict: "none", why: score.why, tokens: totalTok, minutes: durationMs / 60000 },
+      candidate: { passed: score.passed, verdict: "none", why: candidateWhy(score, answerOf(envelope)), tokens: totalTok, minutes: durationMs / 60000 },
     };
     if (note) trial.note = note;
     if (c.error || c.status !== 0) {
@@ -509,10 +525,13 @@ async function main() {
   const [assignment] = await pg(`model_assignments?job_kind=eq.${args.jobKind}&job_key=eq.${encodeURIComponent(args.jobKey)}&select=model_id`);
   if (!assignment) fail(2, `no model_assignments row ${args.jobKind}/${args.jobKey}`);
   const baselineModel = assignment.model_id;
-  const rows = await pg(`ai_activity_log?model=eq.${encodeURIComponent(baselineModel)}&input_tokens=not.is.null&output_tokens=not.is.null&visitor_id=not.is.null`
+  const logRows = (kind, tokens) => pg(`ai_activity_log?model=eq.${encodeURIComponent(baselineModel)}${tokens}&visitor_id=not.is.null`
     + `&select=id,created_at,feature,model,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,latency_ms,visitor_id`
-    + `&feature=in.(${Object.keys(REPLAYABLE).map(f => `"${f}"`).join(",")})&order=created_at.desc&limit=50`);
-  const picked = pickJobs(rows, { jobKind: args.jobKind, jobKey: args.jobKey, model: baselineModel });
+    + `&feature=in.(${Object.keys(REPLAYABLE).filter(f => REPLAYABLE[f].kind === kind).map(f => `"${f}"`).join(",")})&order=created_at.desc&limit=50`);
+  const rows = [...await logRows("build", ""), ...await logRows("turn", "&input_tokens=not.is.null&output_tokens=not.is.null")];
+  const ids = [...new Set(rows.filter(isBuildRow).map(r => r.visitor_id))].filter(v => UUID.test(v));
+  const shipped = ids.length ? await pg(`runner_cycles?id=in.(${ids})&select=id,outcome,push_sha,item_id`) : [];
+  const picked = pickJobs(replayableRows(rows, shipped), { jobKind: args.jobKind, jobKey: args.jobKey, model: baselineModel });
   if (picked.jobs.length < 3) {
     console.log(`jobs: ${picked.jobs.length} of 3 needed${picked.reason ? ` (${picked.reason})` : ""}`);
     process.exit(4);
