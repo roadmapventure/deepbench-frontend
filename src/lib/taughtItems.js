@@ -1,3 +1,4 @@
+// DeepBench v7.0.1080 | taughtItems.js | AGT-362 -- ownRecordCount() and ownRecordsLabel(): the strip's fourth count
 // DeepBench v7.0.770 | taughtItems.js | AGT-344
 // The facts the Personnel file's Training tab shows about what an agent was taught: the screen's
 // entry shape, the strip's three counts, a taught card's chips and line, and the note form's count
@@ -39,6 +40,15 @@ export function taughtCounts(entries) {
     always:   given.filter(e => e.always).length,
     lookedUp: given.filter(e => !e.always).length,
   };
+}
+
+// FEATURE: AGT-362 — the entries the agent wrote for itself, every status, as `taught` counts them
+export function ownRecordCount(entries) {
+  return entries.filter(e => !e.taught).length;
+}
+
+export function ownRecordsLabel(firstName) {
+  return `${firstName}'s own records`;
 }
 
 export function cardFacts(entry, firstName) {

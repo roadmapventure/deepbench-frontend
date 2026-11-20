@@ -1,3 +1,4 @@
+// DeepBench v7.0.1080 | PersonnelScreen.jsx | AGT-362 -- the Training strip counts the agent's own records; a private agent's file shows no Compensation card
 // DeepBench v7.0.1079 | PersonnelScreen.jsx | AGT-361 -- a created agent's Agent Readiness Score reads its own rows
 // DeepBench v7.0.833 | PersonnelScreen.jsx | mobile -- Agent Roster link moves to the right of the name row in the compact persona block.
 // DeepBench v7.0.832 | PersonnelScreen.jsx | mobile -- Personnel persona block compacts to avatar left, name + title right, quote underneath (~15% of the screen); the rest of the card sits behind a Details dropdown, default closed.
@@ -50,7 +51,7 @@ import { isPrivateAgent } from "../data/agents.js";
 import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
 import { supabase } from "../lib/supabase.js";
-import { toEntry, taughtCounts, cardFacts, countLine } from "../lib/taughtItems.js";
+import { toEntry, taughtCounts, cardFacts, countLine, ownRecordCount, ownRecordsLabel } from "../lib/taughtItems.js";
 import { computeLayers, isCreatedAgent, ownConfigCounts } from "../lib/readinessLayers.js"; // FEATURE: AGT-361
 
 // FEATURE: PE-03 — Training tab live wiring
@@ -571,6 +572,7 @@ function BadgeActions({ agent, onAddTraining, onConnect, style, align = "right" 
 
 // Compensation card
 function CompensationCard({ agent, tight = false }) {
+  if (isPrivateAgent(agent)) return null; // FEATURE: AGT-362 — no mock ledger on a private agent
   const fmt = fmt$;
   return (
         <div style={{background:T.card,border:`1px solid ${T.line}`,padding:"14px 18px",position:"relative"}}>
@@ -1670,6 +1672,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
   const disabled = entries.filter(e=>e.status==="disabled");
   // FEATURE: AGT-344 — the strip's three counts; one form open at a time
   const counts   = taughtCounts(entries);
+  const ownCount = ownRecordCount(entries); // FEATURE: AGT-362
   const formOpen = showAddView || editingEntry || noteForm;
 
   // FEATURE: PE-03 — loading state while entries fetch
@@ -1687,7 +1690,7 @@ function TrainingTab({ agent, entries, setEntries, reload, initialAdd, loadingEn
       {/* Navy stats strip — FEATURE: PE-03 */}
       <div style={{background:T.navy,padding:"11px 18px",display:"flex",gap:isMobile?12:22,alignItems:"center",flexWrap:isMobile?"wrap":"nowrap",border:`1px solid rgba(182,135,58,.3)`}}>
         {/* FEATURE: AGT-344 — what was taught, and how much of it is given on every run */}
-        {[["Taught items",counts.taught,T.card],["Always given",counts.always,T.brassLight],["Looked up",counts.lookedUp,T.navyTextLo]].map(([k,v,c])=>(
+        {[["Taught items",counts.taught,T.card],["Always given",counts.always,T.brassLight],["Looked up",counts.lookedUp,T.navyTextLo],...(ownCount>0?[[ownRecordsLabel(firstName),ownCount,T.card]]:[])].map(([k,v,c])=>(
           <div key={k}>
             <div style={{fontFamily:mono,fontSize:8,color:T.navyTextLo,textTransform:"uppercase",letterSpacing:1.2,marginBottom:2}}>{k}</div>
             <div style={{fontFamily:display,fontSize:17,fontWeight:600,color:c}}>{v||"0"}</div>
