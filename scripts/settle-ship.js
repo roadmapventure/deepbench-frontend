@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1094 | scripts/settle-ship.js | AGT-582 -- SES-247 branch (c) gets its writer.
 // DeepBench v7.0.988 | scripts/settle-ship.js | AGT-634 -- an id-less STOP LINE sentence closes partial only when it DECLARES it, never when it describes the behaviour shipped.
 // DeepBench v7.0.985 | scripts/settle-ship.js | AGT-628 -- the cost patch verifies the clause it promises; one settle mints one decision.
 // DeepBench v7.0.980 | scripts/settle-ship.js | AGT-595 -- a refused delivered settles partial + files a card; --release frees the claim.
@@ -230,14 +231,28 @@ export function decideStatus({ kickoffText = "", ticketId = null, gatedOpen = fa
   return { status: "delivered", reasons: ["the record names no unbuilt work: no slice remainder, no STOP LINE `partial`, no open card, no card ruled `rework`, no declared remainder"] };
 }
 
-// planSettle(row, kickoffPath, status) -> { id, patch: { status, design_status, kickoff_link } }
+// planSettle(row, kickoffPath, status, deferReason) -> { id, patch: { status, design_status, kickoff_link } }
+// plus, ONLY when a `deferReason` is handed in, `defer_status: "yes"` + `defer_reason: <the condition>`.
+//
+// AGT-582 -- SES-247 BRANCH (c) GETS ITS WRITER, AND IT IS A DECLARED FLAG, NEVER A READER.
+// `docs/runbooks/runner-cycle.md:2402` rules branch (c): a `partial` whose remainder is not
+// buildable for a NON-TICKET reason (an attended apply, a credential, a machine John has) carries
+// `defer_status = 'yes'` + `defer_reason`, which the pick excludes. Measured read-only 2026-11-20:
+// `grep -c defer_status scripts/settle-ship.js` read 0 -- the rule had no writer at all, and 6 of 17
+// settled partials naming a non-ticket condition sat queued and re-pickable.
+//
+// NO REGEX OVER PROSE DECIDES THIS WRITE (AGT-128/AGT-634's lesson, applied before it could be
+// repeated): the condition is passed in as `--defer-reason=<condition>` by whoever closed the
+// cycle, so an unflagged settle writes THE SAME THREE CELLS IN THE SAME ORDER as every settle
+// before this ship (`ses-385b:140`, `agt-506:297` are the control). A deferral is additive, and
+// `delivered` has no remainder to defer, so the pair is refused rather than written.
 //
 // THREE CELLS, ALWAYS THE SAME THREE, whichever status was decided -- that is slice 1's rule in
 // full and the reason the flag and the link are not conditional. `design_status` is cleared so a
 // spent kickoff stops advertising a design that is already built (this is check 12's whole
 // subject); `kickoff_link` is SET rather than cleared because `ship_handoff_census` reads it and
 // `ck_design_status_kickoff` allows the cleared flag beside a live link, never the reverse.
-export function planSettle(row, kickoffPath, status) {
+export function planSettle(row, kickoffPath, status, deferReason = null) {
   if (!row || typeof row !== "object" || row.id == null) {
     throw new Error("planSettle: no row to settle — the ticket was not found on the board");
   }
@@ -250,7 +265,16 @@ export function planSettle(row, kickoffPath, status) {
   if (typeof kickoffPath !== "string" || kickoffPath.trim() === "") {
     throw new Error("planSettle: the kickoff path is the link this write sets — it cannot be empty");
   }
-  return { id: row.id, patch: { status, design_status: null, kickoff_link: kickoffPath } };
+  const defer = typeof deferReason === "string" ? deferReason.trim() : "";
+  if (defer !== "" && status !== "partial") {
+    throw new Error(`planSettle: a \`${status}\` settle has no remainder to defer — \`defer_status\` answers branch (c) of the \`partial\` rule (a remainder that is not buildable for a non-ticket reason), so a deferral beside a finished ship is two answers to one question`);
+  }
+  const patch = { status, design_status: null, kickoff_link: kickoffPath };
+  if (defer !== "") {
+    patch.defer_status = "yes";
+    patch.defer_reason = defer;
+  }
+  return { id: row.id, patch };
 }
 
 // AGT-595 -- A REFUSED `delivered` HAS A DESTINATION, AND IT IS NOT AN EXIT 2 OVER AN UNTOUCHED ROW.
@@ -454,7 +478,7 @@ export function planShip({ status, ticket, verdict = null, cycleRow = null, exis
 // ---------------------------------------------------------------------------------------------
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainder", "apply", "resettle", "ship", "release"]);
+export const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainder", "apply", "resettle", "ship", "release", "defer-reason"]);
 
 // AGT-167 -- ONE DIRECTION, and the constant is here rather than inline so the guard has a name a
 // test can point at. `resettleTicket()` moves a row OFF `delivered` and nothing else: `partial` is
@@ -565,6 +589,15 @@ function renderPlan({ ticket, kickoffRel, row, decided, plan, gatedOpen }) {
   out += `  design_status ${JSON.stringify(row.design_status)} → null\n`;
   out += `  kickoff_link  ${JSON.stringify(row.kickoff_link)} → ${JSON.stringify(plan.patch.kickoff_link)}\n`;
   out += `  open gated_before_build card: ${gatedOpen ? "yes" : "no"}\n`;
+  // AGT-582 -- the dry run answers branch (c)'s question on every `partial`, written or not: a
+  // deferral that nobody was asked for is how 6 of 17 settled partials came to sit queued with a
+  // non-ticket condition named in their own record. `delivered` prints no line -- it has no
+  // remainder to defer, and `planSettle()` refuses the pair outright.
+  if (plan.patch.status === "partial") {
+    out += plan.patch.defer_status
+      ? `  defer_status  ${JSON.stringify(row.defer_status ?? null)} → ${JSON.stringify(plan.patch.defer_status)} · defer_reason ${JSON.stringify(plan.patch.defer_reason)}\n`
+      : `  defer_status  unchanged (${JSON.stringify(row.defer_status ?? null)}) — is this remainder unbuildable for a NON-TICKET reason (branch (c), docs/runbooks/runner-cycle.md:2402)? If so, re-run with --defer-reason="<the condition>"\n`;
+  }
   for (const r of decided.reasons) out += `  · ${r}\n`;
   return out;
 }
@@ -760,6 +793,7 @@ export async function writeCost({ base, key, cycleId, cost }) {
 // `runner_before_images` each take one attribution, never both and never neither.
 export async function applySettle({
   base, key, cycleId = null, sessionName = null, ticket, row, kickoffPath, status, reasons = [],
+  deferReason = null,
   log = s => process.stdout.write(s),
 } = {}) {
   const hasCycle = typeof cycleId === "string" && cycleId !== "";
@@ -767,7 +801,7 @@ export async function applySettle({
   if (hasCycle === hasSession) {
     fail("applySettle: exactly one of cycleId / sessionName — `ck_decision_attribution` takes one attribution, never both and never neither.");
   }
-  const plan = planSettle(row, kickoffPath, status);
+  const plan = planSettle(row, kickoffPath, status, deferReason);
 
   // 1 -- the decision. It exists before the image, and the image before the cell.
   const summary = `Close-out: ${ticket} settles \`${plan.patch.status}\``;
@@ -784,10 +818,17 @@ export async function applySettle({
   const census = await rest(base, key, `runner_decisions?select=id,summary,decided_at&kind=eq.ticket-status&backlog_id=eq.${encodeURIComponent(ticket)}&${attr}`, {}, "settle census");
   if (!Array.isArray(census)) fail("settle census: non-array read -- refusing to mint off a census that was not read.");
   const already = census.find(d => d.summary === summary) ?? null;
+  // AGT-582 -- ONE CLAUSE, spliced in only when the deferral is actually being written, so the
+  // `ticket-status` decision row says WHICH branch of the `partial` rule moved the two extra cells.
+  // A `reverse_decision()` reader who finds `defer_status` on the image needs the condition in
+  // words, not just the cell.
+  const deferClause = plan.patch.defer_status
+    ? ` Branch (c) of the \`partial\` rule (\`docs/runbooks/runner-cycle.md:2402\`): this remainder is not buildable for a non-ticket reason, so the settle also writes \`defer_status\` = \`yes\` and \`defer_reason\` = ${JSON.stringify(plan.patch.defer_reason)}, which takes the row out of the pick until the condition clears. AGT-582.`
+    : "";
   const reasoning =
     `settle-ship.js read ${kickoffPath} and the undecided \`gated_before_build\` cards, and decided \`${plan.patch.status}\`: ` +
     `${(Array.isArray(reasons) ? reasons : []).join("; ")}. The verdict is not an input — a \`delivered\` on a record naming unbuilt work is a bug, never an override. ` +
-    `Writing status, \`design_status\` NULL (a spent kickoff stops advertising a built design) and \`kickoff_link\` = this kickoff (\`ship_handoff_census\` reads it). SES-385 slice 2. pattern:0`;
+    `Writing status, \`design_status\` NULL (a spent kickoff stops advertising a built design) and \`kickoff_link\` = this kickoff (\`ship_handoff_census\` reads it).${deferClause} SES-385 slice 2. pattern:0`;
 
   const decision = already ? already.id : await rest(base, key, "rpc/record_decision", {
     method: "POST",
@@ -838,6 +879,26 @@ export async function applySettle({
     const want = plan.patch[k];
     if (String(got ?? null) !== String(want ?? null)) {
       fail(`${where("patch")}: ${k} read ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+    }
+  }
+
+  // AGT-582 -- A DEFERRAL THAT LEAVES A QUEUE NUMBER BEHIND IS STILL PICKABLE, so the cell and its
+  // consequence ship together (pattern:15): `recompute_backlog_queue()` is what turns
+  // `defer_status = 'yes'` into the NULL queue `ses-305-deferred-never-picked.test.mjs` arm (1)
+  // reads, and the pick reads the QUEUE, never the flag. NON-FATAL BY CONSTRUCTION, step 6's shape:
+  // settling the ticket is this script's primary job and a recompute that could not run must not
+  // take it down -- it SAYS SO on stdout and the row keeps its number until the next recompute.
+  if (plan.patch.defer_status) {
+    try {
+      await rest(base, key, "rpc/recompute_backlog_queue", { method: "POST", body: JSON.stringify({}) }, where("recompute queue"));
+      const qrows = await rest(base, key, `backlog_items?select=queue&id=eq.${row.id}`, {}, where("queue read-back"));
+      const queue = Array.isArray(qrows) && qrows[0] ? qrows[0].queue : undefined;
+      log(`  deferred: defer_status yes · recompute_backlog_queue() ran · ${ticket} queue ${queue === null ? "null" : JSON.stringify(queue)}\n`);
+      if (queue !== null) {
+        log(`  WARN: ${ticket} is deferred and still carries queue ${JSON.stringify(queue)} — it stays pickable, and tests/regression/ses-305-deferred-never-picked.test.mjs arm (1) reads that red. Run \`SELECT public.recompute_backlog_queue();\` and re-read the row.\n`);
+      }
+    } catch (e) {
+      log(`  deferred: recompute NOT RUN — ${e && e.message ? e.message : e}. ${ticket} keeps its queue number, so tests/regression/ses-305-deferred-never-picked.test.mjs arm (1) reads it red until \`SELECT public.recompute_backlog_queue();\` is run.\n`);
     }
   }
 
@@ -1083,7 +1144,7 @@ async function main() {
   for (const a of argv) {
     const name = a.startsWith("--") ? a.slice(2).split("=")[0] : a;
     if (!a.startsWith("--") || !ALLOWED_FLAGS.has(name)) {
-      fail(`unknown flag ${a} — this script takes --ticket=<ID>, --kickoff=<path>, --cycle-id=<uuid>, --remainder=<text>, --resettle, --ship, --release and --apply.`);
+      fail(`unknown flag ${a} — this script takes --ticket=<ID>, --kickoff=<path>, --cycle-id=<uuid>, --remainder=<text>, --defer-reason=<condition>, --resettle, --ship, --release and --apply.`);
     }
   }
 
@@ -1095,6 +1156,11 @@ async function main() {
   const resettleArg = arg(argv, "resettle");
   const shipArg = arg(argv, "ship");
   const releaseArg = arg(argv, "release");
+  // AGT-582 -- branch (c) is DECLARED, never read out of prose. A bare `--defer-reason` (no `=`)
+  // reads `true`, which is not a condition, so it falls to `null` and nothing is deferred; the
+  // trim in `planSettle()` does the same for `--defer-reason=""`.
+  const deferReasonArg = arg(argv, "defer-reason");
+  const deferReason = typeof deferReasonArg === "string" ? deferReasonArg : null;
 
   if (typeof ticket !== "string" || ticket === "") fail("--ticket=<ID> is required — this script settles exactly one ticket.");
 
@@ -1303,7 +1369,7 @@ async function main() {
   let decided = decideStatus({ kickoffText, ticketId: ticket, gatedOpen, remainder });
   let plan;
   try {
-    plan = planSettle(row, kickoffArg, decided.status);
+    plan = planSettle(row, kickoffArg, decided.status, deferReason);
   } catch (e) {
     fail(e.message);
   }
@@ -1374,6 +1440,7 @@ async function main() {
   await applySettle({
     base, key, cycleId, sessionName: null, ticket, row,
     kickoffPath: kickoffArg, status: plan.patch.status, reasons: decided.reasons,
+    deferReason,
   });
 
 
