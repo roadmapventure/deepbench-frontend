@@ -1,3 +1,4 @@
+// DeepBench v7.0.1090 | tests/regression/agt-264-accepts-findings.test.mjs | AGT-571 slice 5 -- the no-write proof grades the probe's own key.
 // DeepBench v7.0.869 | tests/regression/agt-264-accepts-findings.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
 // a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
 // FILES a ticket and carries neither test {reproduced, how, result} nor untested_reason (John
@@ -78,6 +79,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { countScoped, snapshot } from "./_lib/scoped-count.js";
 import { LIVE_ROUTES } from "./_lib/finding-routes.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -128,17 +130,6 @@ async function req(url, key, q, { method = "GET", body, prefer } = {}) {
   return { ok: res.ok, status: res.status, text, json, code: json && !Array.isArray(json) ? json.code : undefined };
 }
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 260)}`;
-
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const cr = res.headers.get("content-range") ?? "";
-  const n = Number(cr.split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status} content-range=${cr}`);
-  return n;
-}
 
 // ISO week of a date, the same shape scripts/audit-ledger.js computes.
 function isoWeek(d) {
@@ -258,19 +249,7 @@ async function run() {
 
   // ---- C. LIVE PROBE, NO WRITES, STATUS-INDEPENDENT ----------------------------------------------
   await arm("C live probe, both directions", async () => {
-    // THE NO-WRITE PROOF IS "NOTHING WAS ADDED", NOT "THE NUMBERS ARE IDENTICAL", and that is a
-    // measurement, not a convenience: on the AGT-264 ship run these three counts fell by one decision
-    // and one ticket BETWEEN the two reads (1366/1134 -> 1365/1133 at 19:07Z) while this arm ran, and
-    // then held still. This is a shared live project with a runner cycle on it. A probe that only
-    // SELECTs or RAISEs cannot delete a row, so a DECREASE can never be this arm's doing -- pinning
-    // equality would hand the next cycle a false red to diagnose (pattern:163). An INCREASE still
-    // fails, which is the direction a stray write would actually move, and the two residue checks
-    // below catch a probe row even if some other write masked the count.
-    const before = {
-      findings: await count(url, key, "audit_findings?select=id"),
-      tickets: await count(url, key, "backlog_items?select=id"),
-      decisions: await count(url, key, "runner_decisions?select=id"),
-    };
+    // AGT-571: the proof is keyed to the findings the probe names -- none ruled, none filed.
 
     const projects = await req(url, key, "projects?select=slug,status,accepts_findings&order=slug");
     assert.ok(projects.ok, describe(projects));
@@ -289,6 +268,11 @@ async function run() {
       return;
     }
 
+    const OWN = {
+      standing: `audit_findings?select=id&id=in.(${pickable.id})&status=in.(open,carried)`,
+      filed: `audit_findings?select=id&id=in.(${pickable.id})&filed_backlog_id=not.is.null`,
+    };
+    const before = await snapshot(url, key, OWN);
     let accepted = 0, refused = 0;
     for (const row of projects.json) {
       // THE EXPECTATION IS COMPUTED FROM THE ROW AS READ -- no slug, no status is a literal here, so a
@@ -319,15 +303,8 @@ async function run() {
     assert.ok(accepted >= 1, "at least one flagged project must have been accepted, or this ticket did nothing");
     assert.ok(refused >= 1, "at least one unflagged locked project must still refuse, or the lock was removed rather than gated");
 
-    const after = {
-      findings: await count(url, key, "audit_findings?select=id"),
-      tickets: await count(url, key, "backlog_items?select=id"),
-      decisions: await count(url, key, "runner_decisions?select=id"),
-    };
-    for (const k of Object.keys(before)) {
-      assert.ok(after[k] <= before[k],
-        `the probe adds nothing: ${k} went ${before[k]} -> ${after[k]}`);
-    }
+    const after = await snapshot(url, key, OWN);
+    assert.deepEqual(after, before, `the probe moved its own findings: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
     const residueT = await req(url, key, "backlog_items?source_file=eq.agt-264-test&select=backlog_id");
     assert.deepEqual(residueT.json, [], `the probe left a ticket behind: ${residueT.text}`);
     const residueF = await req(url, key, "audit_findings?found_by=like.*qa-agt264*&select=id,found_by");
@@ -381,7 +358,7 @@ async function run() {
 
   // ---- E. LIVE: the epic lock no longer refuses a flagged project's locked epic -------------------
   await arm("E epic lock from the insert side", async () => {
-    const before = await count(url, key, "backlog_items?select=id");
+    const before = await countScoped(url, key, `backlog_items?select=id&backlog_id=eq.${PROBE_ID}`);
     const ins = await req(url, key, "backlog_items", {
       method: "POST",
       prefer: "return=representation",
@@ -402,7 +379,7 @@ async function run() {
       assert.ok(!ins.text.includes("AGT-240: epic"),
         `a flagged project's locked epic must no longer draw the AGT-240 refusal; got ${describe(ins)}`);
     }
-    assert.equal(await count(url, key, "backlog_items?select=id"), before,
+    assert.equal(await countScoped(url, key, `backlog_items?select=id&backlog_id=eq.${PROBE_ID}`), before,
       "backlog_items count re-read equal -- the probe leaves nothing behind");
   });
 

@@ -1,3 +1,4 @@
+// DeepBench v7.0.1090 | tests/regression/agt-484-agent-route-holding.test.mjs | AGT-571 slice 5 -- the no-write proof grades the probe's own key.
 // DeepBench v7.0.859 | tests/regression/agt-484-agent-route-holding.test.mjs | AGT-484 -- AGENT-SOURCED
 // FINDINGS LAND ON A HOLDING LIST, AND THE ROUTE -- NOT THE PICKER -- DECIDES.
 //
@@ -44,6 +45,7 @@
 
 import assert from "node:assert/strict";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { snapshot } from "./_lib/scoped-count.js";
 import { LIVE_ROUTES, MANAGER_PROJECT } from "./_lib/finding-routes.js";
 
 // This cycle's migration window -- the lower bound is this cycle's own start, so the range cannot
@@ -69,17 +71,6 @@ async function req(url, key, q, { method = "GET", body, prefer } = {}) {
   return { ok: res.ok, status: res.status, text, json, code: json && !Array.isArray(json) ? json.code : undefined };
 }
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 260)}`;
-
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const cr = res.headers.get("content-range") ?? "";
-  const n = Number(cr.split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status} content-range=${cr}`);
-  return n;
-}
 
 async function run() {
   const url = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
@@ -127,21 +118,18 @@ async function run() {
 
   // ---- C. LIVE PROBE, NO WRITES ------------------------------------------------------------------
   await arm("C live resolution, three picks", async () => {
-    // A DECREASE can never be this arm's doing -- a probe that only SELECTs or RAISEs cannot delete a
-    // row, and this is a shared live project with a runner cycle on it (agt-264 arm C measured these
-    // same counts falling mid-arm). An INCREASE is the direction a stray write would move, and that
-    // still fails.
-    const before = {
-      findings: await count(url, key, "audit_findings?select=id"),
-      tickets: await count(url, key, "backlog_items?select=id"),
-      decisions: await count(url, key, "runner_decisions?select=id"),
-    };
+    // AGT-571: the proof is keyed to the findings the probe names -- none ruled, none filed.
 
     const f = await req(url, key, "audit_findings?found_by=eq.agent:jerry&select=id&order=created_at.desc&limit=1");
     assert.ok(f.ok, describe(f));
     assert.equal(f.json.length, 1,
       `the probe needs one agent:jerry finding to route -- the premise AGT-484 exists for; got ${f.text}`);
     const fid = f.json[0].id;
+    const OWN = {
+      standing: `audit_findings?select=id&id=in.(${fid})&status=in.(open,carried)`,
+      filed: `audit_findings?select=id&id=in.(${fid})&filed_backlog_id=not.is.null`,
+    };
+    const before = await snapshot(url, key, OWN);
 
     // THE EXPECTED EPIC IS COMPUTED FROM THE PROJECT AS READ. No uuid is a literal here, so a
     // re-pointed or re-created holding epic cannot make this arm lie about where a finding went.
@@ -187,14 +175,8 @@ async function run() {
     assert.equal(other.json, epic,
       `a pick of ${OTHER_PICK} must reach the holding epic ${epic} too -- the route decides, not the picker; got ${describe(other)}`);
 
-    const after = {
-      findings: await count(url, key, "audit_findings?select=id"),
-      tickets: await count(url, key, "backlog_items?select=id"),
-      decisions: await count(url, key, "runner_decisions?select=id"),
-    };
-    for (const k of Object.keys(before)) {
-      assert.ok(after[k] <= before[k], `the probe adds nothing: ${k} went ${before[k]} -> ${after[k]}`);
-    }
+    const after = await snapshot(url, key, OWN);
+    assert.deepEqual(after, before, `the probe moved its own findings: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
   });
 
   // ---- D. LIVE LEDGER ----------------------------------------------------------------------------

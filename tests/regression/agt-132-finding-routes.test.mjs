@@ -1,3 +1,4 @@
+// DeepBench v7.0.1090 | tests/regression/agt-132-finding-routes.test.mjs | AGT-571 slice 5 -- the no-write proof grades the probe's own key.
 // DeepBench v7.0.919 | tests/regression/agt-132-finding-routes.test.mjs | AGT-304 slice 38 -- arms C, D, G, H grade the change.
 // DeepBench v7.0.872 | tests/regression/agt-132-finding-routes.test.mjs | AGT-304 slice 15 -- arm B reads its one home
 // DeepBench v7.0.869 | tests/regression/agt-132-finding-routes.test.mjs | AGT-492 -- the `pick` filing
@@ -81,6 +82,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { countScoped, snapshot } from "./_lib/scoped-count.js";
 // ONE matcher for the chain rule, shared with the file that owns it (SES-45: a second
 // implementation agreeing with itself proves nothing). Importing a test module does not run it --
 // selfRun only fires for the entry module.
@@ -153,17 +155,6 @@ async function req(url, key, q, { method = "GET", body } = {}) {
   return { ok: res.ok, status: res.status, text, json, code: json && !Array.isArray(json) ? json.code : undefined };
 }
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 240)}`;
-
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const cr = res.headers.get("content-range") ?? "";
-  const n = Number(cr.split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status} content-range=${cr}`);
-  return n;
-}
 
 async function run() {
   const url = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
@@ -332,11 +323,6 @@ async function run() {
 
   // --- C. the resolver over live ids, proving it writes nothing --------------------------------------
   await arm("C probes", async () => {
-    const before = {
-      findings: await count(url, key, "audit_findings?select=id"),
-      backlog: await count(url, key, "backlog_items?select=id"),
-      decisions: await count(url, key, "runner_decisions?select=id"),
-    };
     const f = await req(url, key, "audit_findings?status=in.(open,carried)&select=id,found_by,finding_type&order=created_at,id");
     assert.equal(f.status, 200, describe(f));
     const bySource = s => (f.json ?? []).find(x => sourceOf(x.found_by) === s);
@@ -344,6 +330,11 @@ async function run() {
     const au = bySource("auditor");
     assert.ok(to, `a live open finding from a precedence-30 source (routes to ${MANAGER_PROJECT})`);
     assert.ok(au, "and a live open auditor finding");
+    const OWN = {
+      standing: `audit_findings?select=id&id=in.(${to.id},${au.id})&status=in.(open,carried)`,
+      filed: `audit_findings?select=id&id=in.(${to.id},${au.id})&filed_backlog_id=not.is.null`,
+    };
+    const before = await snapshot(url, key, OWN);
     const probe = (group, k = key) => req(url, k, "rpc/finding_group_epic", { method: "POST", body: { p_group: group } });
     const group = extra => ({ kind: "root-cause", title: "t", root_cause: "r", fix: "f", finding_ids: [to.id], ...extra });
     const st = await req(url, key, `projects?slug=in.(${MANAGER_PROJECT},auditor-findings)&select=slug,status,accepts_findings`);
@@ -378,12 +369,8 @@ async function run() {
         "VITE_SUPABASE_ANON_KEY absent -- that the browser key cannot EXECUTE finding_group_epic is unverified here");
     }
 
-    const after = {
-      findings: await count(url, key, "audit_findings?select=id"),
-      backlog: await count(url, key, "backlog_items?select=id"),
-      decisions: await count(url, key, "runner_decisions?select=id"),
-    };
-    assert.deepEqual(after, before, "no probe wrote anything: findings, backlog and decision counts unchanged");
+    const after = await snapshot(url, key, OWN);
+    assert.deepEqual(after, before, `the probe moved its own findings: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
   });
 
   // --- D. the manager's prompt actually carries the paragraph ----------------------------------------
@@ -423,7 +410,7 @@ async function run() {
 
   // --- F. the guard fires on INSERT, and the probe cannot write whatever it finds ------------------
   await arm("F insert guard", async () => {
-    const before = await count(url, key, "audit_findings?select=id");
+    const before = await countScoped(url, key, "audit_findings?select=id&fingerprint=eq.agt132s2-probe");
     const bad = await req(url, key, "audit_findings", {
       method: "POST",
       body: {
@@ -439,7 +426,7 @@ async function run() {
       `the refusal must come from audit_findings_guard's INSERT limb, which is a BEFORE trigger and so runs ahead of every CHECK. A kind-check message here means the limb is gone and the one-source rule is now enforced NOWHERE (the table CHECK was dropped in ${UP2}). got ${describe(bad)}`);
     assert.ok(String(bad.json?.message ?? bad.text).includes("auditor + ticket-owner"),
       "and it echoes the offending value, so the writer can see which two sources were joined");
-    assert.equal(await count(url, key, "audit_findings?select=id"), before,
+    assert.equal(await countScoped(url, key, "audit_findings?select=id&fingerprint=eq.agt132s2-probe"), before,
       "the probe wrote nothing -- audit_findings is append-only, so a row that landed here could not be cleaned up");
   });
 
