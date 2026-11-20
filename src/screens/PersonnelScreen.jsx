@@ -1,3 +1,4 @@
+// DeepBench v7.0.1079 | PersonnelScreen.jsx | AGT-361 -- a created agent's Agent Readiness Score reads its own rows
 // DeepBench v7.0.833 | PersonnelScreen.jsx | mobile -- Agent Roster link moves to the right of the name row in the compact persona block.
 // DeepBench v7.0.832 | PersonnelScreen.jsx | mobile -- Personnel persona block compacts to avatar left, name + title right, quote underneath (~15% of the screen); the rest of the card sits behind a Details dropdown, default closed.
 // DeepBench v7.0.818 | PersonnelScreen.jsx | AGT-402 -- Future Controls Training section gains a sample Your trainee badge card (the badge means you can train this agent; John moved it to Future Controls).
@@ -50,6 +51,7 @@ import { fetchAgentActivity, activityView } from "../lib/personnelActivity.js";
 import { AI_PAT } from "../aiPatterns.js";
 import { supabase } from "../lib/supabase.js";
 import { toEntry, taughtCounts, cardFacts, countLine } from "../lib/taughtItems.js";
+import { computeLayers, isCreatedAgent, ownConfigCounts } from "../lib/readinessLayers.js"; // FEATURE: AGT-361
 
 // FEATURE: PE-03 — Training tab live wiring
 async function apiGetEntries(agent_id) {
@@ -292,17 +294,7 @@ Return ONLY the JSON. No explanation.`;
   }
 }
 
-// ── 5-layer readiness calc ────────────────────────────────────────────────────
-function computeLayers(agent, entries) {
-  const n = entries.length;
-  return [
-    { num:"L1", label:"Role & Behavior",    tab:"Resume",   s: agent.skill > 0 ? Math.min(100, agent.skill) : 0 },
-    { num:"L2", label:"Background (RAG)",   tab:"Training", s: agent.trainable ? Math.min(100, Math.round(20 + n*6)) : 0 },
-    { num:"L3", label:"Analysis Payload",   tab:"—",        s: 100 },
-    { num:"L4", label:"Output Format",      tab:"Playbook", s: agent.trainable ? 72 : 50 },
-    { num:"L5", label:"Guardrails",         tab:"Playbook", s: agent.trainable ? 68 : 45 },
-  ];
-}
+// FEATURE: AGT-361 — computeLayers() lives in src/lib/readinessLayers.js
 
 // ── Mock tasks per agent (replace with Supabase in Phase 0) ─────────────────
 const AGENT_TASKS = {
@@ -2285,6 +2277,18 @@ export default function PersonnelScreen() {
       .catch(err => console.error("Failed to load capabilities", err));
   }, [agent?.id]);
 
+  // FEATURE: AGT-361 — a created agent's own Playbook rows, re-read on each tab change
+  const [ownConfigs, setOwnConfigs] = useState(null);
+  const createdAgent = isCreatedAgent(agent);
+  useEffect(() => {
+    if (!createdAgent) return;
+    let live = true;
+    Promise.all([apiGetConfigs(agentId, "output_format"), apiGetConfigs(agentId, "guardrail")])
+      .then(([formats, guardrails]) => { if (live) setOwnConfigs({ id: agentId, ...ownConfigCounts(formats, guardrails) }); })
+      .catch(() => { if (live) { setOwnConfigs(null); showToast("Could not load playbook configs", "⚠"); } });
+    return () => { live = false; };
+  }, [agentId, createdAgent, activeTab]);
+
   // FEATURE: PE-03 — load live training entries from Supabase on mount
   useEffect(() => {
     setLoadingEntries(true);
@@ -2364,7 +2368,7 @@ export default function PersonnelScreen() {
   if (!agent && !settled) return <AppShell toast={toast}><div style={{flex:1,padding:"40px 24px",fontFamily:mono,fontSize:10,color:T.muted,letterSpacing:1.3,textTransform:"uppercase"}}>Loading…</div></AppShell>;
   if (!agent) return <Navigate to="/bench" replace />;
 
-  const layers    = computeLayers(agent, entries);
+  const layers    = computeLayers(agent, entries, ownConfigs?.id === agentId ? ownConfigs : null);
   const readiness = Math.round(layers.reduce((s,l)=>s+l.s,0)/layers.length);
 
   return (
