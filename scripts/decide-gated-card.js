@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1070 | scripts/decide-gated-card.js | AGT-672 -- a ruling's follow-up carries proposed_resolution.
 // DeepBench v7.0.585 | scripts/decide-gated-card.js | AGT-127 -- The Development Manager rules every
 // undecided `gated_before_build` card, as a client of public.apply_gate_rulings().
 // Spec: docs/kickoffs/v7.0.585-AGT-127-devmanager-rules-gated-cards.md sections 4 and 5.
@@ -219,6 +220,7 @@ export function resettleTargets(rulings, cards) {
 // who files it. A failed filing never fails the ruling (the ruling is the card's answer, not the
 // ledger's), which is why the suffix is read BACK off the ledger rather than assumed.
 export const FOLLOW_UP_SLUG = "ruling-follow-up";
+export const FOLLOW_UP_RESOLUTION = "Root-cause the fault this ruling named, then ticket it or rule it not-a-defect with the reason; the ruling proposed no fix of its own.";
 // A reason PROMISING a separate filing, in the words a manager actually writes ("filing it
 // separately", "I will file this separately"). The promise is only refused when no `follow_up`
 // rides with it -- the rule is "file it", not "never mention it".
@@ -233,7 +235,8 @@ export function followUpRefusals(r, shown) {
 // fold into one fingerprint. `finding_type` is the manager's when he names one; `defect` otherwise.
 export const followUpFinding = r => ({ kind: "other", check_slug: FOLLOW_UP_SLUG, confidence: "high", finding_type: r.follow_up.finding_type ?? "defect",
   locations: [{ text: String(r.follow_up.text), location: `runner_items:${r.card_id}` }],
-  governing_fact: `${String(r.follow_up.text)} (ruling ${r.ruling} on card ${r.card_id})` });
+  governing_fact: `${String(r.follow_up.text)} (ruling ${r.ruling} on card ${r.card_id})`,
+  proposed_resolution: FOLLOW_UP_RESOLUTION });
 export const filedSuffix = (id, week) => ` [follow-up filed: audit_findings ${id}, ${week}]`;
 export const unfiledSuffix = why => ` [follow-up UNFILED: ${why}; the Development Manager files it at review-audit-worklist]`;
 

@@ -1,3 +1,4 @@
+// DeepBench v7.0.1070 | tests/regression/agt-127-decide-gated-card.test.mjs | AGT-672 -- a follow-up row carries every required column.
 // DeepBench v7.0.585 | tests/regression/agt-127-decide-gated-card.test.mjs | AGT-127 -- the
 // Development Manager rules every undecided `gated_before_build` card, and an all-gated board boots
 // to do exactly that instead of refusing forever.
@@ -58,6 +59,9 @@
 // NO MODEL CALL, NO SPEND. Offline parts plus REST reads, one insert pair, one PATCH, one delete pair.
 
 import assert from "assert";
+import { randomUUID } from "node:crypto";
+import { toRow, isoWeek } from "../../scripts/audit-ledger.js";
+import { followUpFinding } from "../../scripts/decide-gated-card.js";
 import { selfRun, notRun } from "./_lib/self-run.js";
 import {
   RULINGS, JOHN_CALLS, GATE_KIND, NOTHING_TO_RULE, qidFor, rulableCards, buildTaskContext,
@@ -106,6 +110,12 @@ async function pg(url, key, pathAndQuery, init) {
 }
 
 const bootGate = (url, key) => pg(url, key, "rpc/runner_should_boot", { method: "POST", body: "{}" });
+
+// AGT-672 -- audit_findings' NOT NULL columns with no default and no trigger (measured 2026-11-20).
+const NEEDS_VALUE = ["fingerprint", "iso_week", "kind", "locations", "governing_fact", "confidence", "proposed_resolution", "found_by", "finding_type"];
+const followUpRow = () => toRow(
+  followUpFinding({ card_id: "ffffffff-0000-0000-0000-000000000672", ruling: "rework", follow_up: { text: "AGT-672 regression probe -- refused by design, never filed" } }),
+  { week: isoWeek(new Date()), foundBy: "session:agt-672-probe", sessionName: "agt-672-probe", id: randomUUID() });
 
 // ---- (a) the vocabulary and the qid, offline ------------------------------------------------
 function partA() {
@@ -213,6 +223,9 @@ function partB() {
   // The suffix the reason actually carries, by value: the finding id and the ISO week the row was
   // appended under, so a reader of the ruling can open the row instead of taking its word.
   assert.equal(filedSuffix("abc", "2026-W45"), " [follow-up filed: audit_findings abc, 2026-W45]");
+  const fuRow = followUpRow();
+  for (const c of NEEDS_VALUE) assert.ok(fuRow[c] !== undefined && fuRow[c] !== null && String(fuRow[c]).trim() !== "",
+    `(b/AGT-672) a follow-up row must carry ${c}: audit_findings refuses a NULL there with 23502`);
   console.log("  (b) rulableCards both directions, task_context, 8 validator refusals incl. coverage -- PASS");
 }
 
@@ -455,6 +468,22 @@ async function run() {
       "whose text were optional would let him return `{}`, which validateRulings() refuses, so the " +
       "row and the script would disagree and every such answer would be sent back");
     console.log("  (h) dm-gate-intent carries follow_up -- PASS");
+    // ---- (i) AGT-672: both POSTs are refusals, 0 rows land.
+    const dup = await pg(url, key, "audit_findings?select=fingerprint,iso_week&order=created_at.asc&limit=1");
+    assert.equal(dup.length, 1);
+    const send = async body => {
+      const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/audit_findings`, { method: "POST",
+        headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(body) });
+      return { status: res.status, text: await res.text().catch(() => "") };
+    };
+    const whole = await send({ ...followUpRow(), ...dup[0] });
+    assert.ok(whole.status === 409 && whole.text.includes("23505") && !whole.text.includes("23502"),
+      `(i) a complete row stops only at the UNIQUE key; got ${whole.status} ${whole.text.slice(0, 300)}`);
+    const { proposed_resolution: dropped, ...bare } = followUpRow();
+    const short = await send({ ...bare, ...dup[0] });
+    assert.ok(dropped && short.status === 400 && short.text.includes("23502") && short.text.includes("proposed_resolution"),
+      `(i) CONTROL: no proposed_resolution, 23502; got ${short.status} ${short.text.slice(0, 300)}`);
+    console.log("  (i) a follow-up row stops only at the UNIQUE key, 0 rows written -- PASS");
   } finally {
     if (qid) {
       await pg(url, key, `runner_questions?qid=eq.${qid}`, { method: "DELETE", headers: { Prefer: "return=minimal" } })
