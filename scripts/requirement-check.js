@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1064 | scripts/requirement-check.js | AGT-331 -- a .json --out receives the --json envelope, the prompt beside it; a prompt passed as --context is named.
 // DeepBench v7.0.1020 | scripts/requirement-check.js | AGT-666 -- `--prepare-list --new-only`: the list door keeps only the tickets `public.victoria_new_waiting()` names for THIS slug (John, decision 572d2b06: she grades new waiting tickets; the window lives in that function, never here). Read once over `rpc/victoria_new_waiting`; `newOnlyFilter()` (pure, exported, also used by ticket-validation.js) is the whole filter. On an executing project's list the flag is a usage refusal (exit 2) -- the arm is waiting lists only; nothing left after the filter is exit 1. Without the flag the door is unchanged.
 // DeepBench v7.0.982 | scripts/requirement-check.js | AGT-521 -- both doors carry the charters: --prepare reads victoria_charter_state() too (decision 17).
 // DeepBench v7.0.973 | scripts/requirement-check.js | AGT-615 -- A RUNNING PROJECT'S LIST OFFERS ONLY UNGRADED TICKETS. John 2026-11-06 (decision 58934bfb): "why would victoria grade a ticket already graded? that was supposed to already be in her list of not to do". `listOffer()` (pure, exported) is the whole offer rule: `--rescore` offers every ticket (AGT-431); an executing project's list offers only ungraded tickets with a standing validation (a graded one is already home -- no move, no re-grade -- so a turn on it bought only a `hold`; tooling offered 29 for 1-3 ungraded); a waiting list is unchanged. `LIST_EXECUTING_NOTE` drops its `hold` clause.
@@ -760,10 +761,21 @@ function die(code, msg) {
   throw new Exit(String(code));
 }
 
+export function outPlan(out) {
+  if (typeof out !== "string" || !out) return { prompt: null, context: null };
+  if (!/\.json$/i.test(out)) return { prompt: out, context: null };
+  return { prompt: out.replace(/\.json$/i, ".prompt.md"), context: out };
+}
+export const PROMPT_NOT_CONTEXT = "is the rendered prompt --out wrote, not JSON: --context needs the --json output, or an --out path ending .json";
+
 function readJson(p, what) {
   if (typeof p !== "string" || !p) die(2, `requirement-check: ${what} path missing`);
-  try { return JSON.parse(fs.readFileSync(path.resolve(p), "utf8")); }
-  catch (e) { die(2, `requirement-check: cannot read ${what} ${p}: ${e.message}`); }
+  let raw;
+  try { raw = fs.readFileSync(path.resolve(p), "utf8"); return JSON.parse(raw); }
+  catch (e) {
+    if (what === "context" && raw?.trimStart().startsWith("#")) die(2, `requirement-check: ${what} ${p} ${PROMPT_NOT_CONTEXT}`);
+    die(2, `requirement-check: cannot read ${what} ${p}: ${e.message}`);
+  }
 }
 
 function creds() {
@@ -937,12 +949,18 @@ async function assembleAndEmit({ base, key, args, task_context, intentSlug, head
   const laneLine = lane.from ? `\n# lane: judgment degraded to ${lane.model} (${lane.reason})` : "";
   const text = `${header}${laneLine}\n${system_prompt}\n`;
 
-  if (typeof args.out === "string" && args.out) fs.writeFileSync(path.resolve(args.out), text, "utf8");
+  const envelope = `${JSON.stringify({
+    ...head, model: assembly.llm?.model,
+    prompt_bytes: Buffer.byteLength(text, "utf8"), context: task_context,
+  }, null, 2)}\n`;
+  const plan = outPlan(args.out);
+  if (plan.prompt) fs.writeFileSync(path.resolve(plan.prompt), text, "utf8");
+  if (plan.context) {
+    fs.writeFileSync(path.resolve(plan.context), envelope, "utf8");
+    process.stderr.write(`requirement-check --prepare: prompt -> ${plan.prompt}; --context reads ${plan.context}\n`);
+  }
   if (args.json) {
-    process.stdout.write(`${JSON.stringify({
-      ...head, model: assembly.llm?.model,
-      prompt_bytes: Buffer.byteLength(text, "utf8"), context: task_context,
-    }, null, 2)}\n`);
+    process.stdout.write(envelope);
   } else if (!args.out) {
     process.stdout.write(text);
   }

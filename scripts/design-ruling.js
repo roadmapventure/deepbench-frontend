@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1064 | scripts/design-ruling.js | AGT-331 -- a .json --out receives the --json envelope, the prompt beside it; a prompt passed as --context is named.
 // DeepBench v7.0.696 | scripts/design-ruling.js | AGT-136 slice 2 -- The Designer rules every OPEN
 // question on the board AND every Knowledge ask recorded against HER, as a client of
 // public.apply_design_rulings().
@@ -323,10 +324,21 @@ function die(code, msg) {
   throw new Exit(String(code));
 }
 
+export function outPlan(out) {
+  if (typeof out !== "string" || !out) return { prompt: null, context: null };
+  if (!/\.json$/i.test(out)) return { prompt: out, context: null };
+  return { prompt: out.replace(/\.json$/i, ".prompt.md"), context: out };
+}
+export const PROMPT_NOT_CONTEXT = "is the rendered prompt --out wrote, not JSON: --context needs the --json output, or an --out path ending .json";
+
 function readJson(p, what) {
   if (typeof p !== "string" || !p) die(2, `design-ruling: ${what} path missing`);
-  try { return JSON.parse(fs.readFileSync(path.resolve(p), "utf8")); }
-  catch (e) { die(2, `design-ruling: cannot read ${what} ${p}: ${e.message}`); }
+  let raw;
+  try { raw = fs.readFileSync(path.resolve(p), "utf8"); return JSON.parse(raw); }
+  catch (e) {
+    if (what === "context" && raw?.trimStart().startsWith("#")) die(2, `design-ruling: ${what} ${p} ${PROMPT_NOT_CONTEXT}`);
+    die(2, `design-ruling: cannot read ${what} ${p}: ${e.message}`);
+  }
 }
 
 function creds() {
@@ -396,9 +408,15 @@ async function prepare(args) {
   const laneLine = lane.from ? `\n# lane: judgment degraded to ${lane.model} (${lane.reason})` : "";
   const text = `${header}${laneLine}\n${system_prompt}\n`;
 
-  if (typeof args.out === "string" && args.out) fs.writeFileSync(path.resolve(args.out), text, "utf8");
+  const envelope = `${JSON.stringify({ questions: task_context.questions.length, asks: task_context.knowledge_asks.length, model: assembly.llm?.model, prompt_bytes: Buffer.byteLength(text, "utf8"), context: task_context }, null, 2)}\n`;
+  const plan = outPlan(args.out);
+  if (plan.prompt) fs.writeFileSync(path.resolve(plan.prompt), text, "utf8");
+  if (plan.context) {
+    fs.writeFileSync(path.resolve(plan.context), envelope, "utf8");
+    process.stderr.write(`design-ruling --prepare: prompt -> ${plan.prompt}; --context reads ${plan.context}\n`);
+  }
   if (args.json) {
-    process.stdout.write(`${JSON.stringify({ questions: task_context.questions.length, asks: task_context.knowledge_asks.length, model: assembly.llm?.model, prompt_bytes: Buffer.byteLength(text, "utf8"), context: task_context }, null, 2)}\n`);
+    process.stdout.write(envelope);
   } else if (!args.out) {
     process.stdout.write(text);
   }
