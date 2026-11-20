@@ -1,3 +1,4 @@
+// DeepBench v7.0.1092 | tests/regression/agt-150-model-assignment.test.mjs | AGT-571 slice 7 -- the probe's own write is graded.
 // DeepBench v7.0.671 | tests/regression/agt-150-model-assignment.test.mjs | AGT-150 -- the model
 // assignment driver sequences watch -> trial -> assign in one command, and its offline validator
 // mirrors all 20 refusals of public.apply_model_assignment().
@@ -27,6 +28,7 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { countScoped } from "./_lib/scoped-count.js";
 import { roomFor } from "../../scripts/model-trial.js";
 import {
   ACTIONS, AGENT, CAPABILITY, REFUSAL_LINES, parsePairs, trialFileName, validateAnswer,
@@ -290,9 +292,14 @@ async function partE() {
   const detail = (Array.isArray(boot) ? boot[0] : boot)?.detail ?? null;
   const room = roomFor(detail, CANDIDATE);
 
-  // AGT-304 slice 43: d scoped to decisions THIS probe could write. Cycle 26a05523 completed 2026-09-28, so no peer writes under it, and decided_at >= t0 drops its 4 historical rows -- elimination, not a window. a/c stay whole-table: 5 and 27 rows, no created_at on the first.
+  // AGT-304 slice 43: d scoped to decisions THIS probe could write. Cycle 26a05523 completed 2026-09-28, so no peer writes under it, and decided_at >= t0 drops its 4 historical rows -- elimination, not a window. a/c: AGT-571, below.
   const t0 = new Date().toISOString();
-  const before = { a: await count("model_assignments"), c: await count("model_catalog"), d: await count("runner_decisions", `&cycle_id=eq.${CYCLE}&decided_at=gte.${t0}`) };
+  // AGT-571: a is the revert's own stamp; c has no key: rows born since t0.
+  const OWN_A = `model_assignments?select=id&updated_by=eq.${encodeURIComponent(`cycle ${CYCLE}`)}`;
+  const OWN_C = `model_catalog?select=model_id&created_at=gte.${t0}`;
+  assert.deepStrictEqual([await countScoped(url, key, OWN_A), await countScoped(url, key, OWN_C)], [0, 0],
+    `this probe's stamp is on no assignment and no catalog row is newer than ${t0} BEFORE --prepare`);
+  const before = { a: await countScoped(url, key, OWN_A), c: await countScoped(url, key, OWN_C), d: await count("runner_decisions", `&cycle_id=eq.${CYCLE}&decided_at=gte.${t0}`) };
   assert.strictEqual(before.d, 0,
     `cycle ${CYCLE} already owns ${before.d} runner_decisions row(s) since ${t0} BEFORE --prepare: the key is the probe's own attribution, and it owns none`);
   const liveAssignments = await get("model_assignments?select=job_kind");
@@ -342,7 +349,7 @@ async function partE() {
   // NO MODEL CALL: model-trial.js logs every replay that reaches the model under this feature prefix.
   const logged = await get(`ai_activity_log?feature=like.model-assignment:trial:*&created_at=gt.${encodeURIComponent(started)}&select=id`);
   assert.deepEqual(logged, [], "a no-room --prepare spawns no claude, so it writes no trial log row");
-  const after = { a: await count("model_assignments"), c: await count("model_catalog"), d: await count("runner_decisions", `&cycle_id=eq.${CYCLE}&decided_at=gte.${t0}`) };
+  const after = { a: await countScoped(url, key, OWN_A), c: await countScoped(url, key, OWN_C), d: await count("runner_decisions", `&cycle_id=eq.${CYCLE}&decided_at=gte.${t0}`) };
   assert.deepEqual(after, before,
     `--prepare moved no assignment, no catalog row and no decision (before ${JSON.stringify(before)}, after ${JSON.stringify(after)})`);
   console.log(`  (e) live --prepare: exit 3, watch 0/0, ${room ? `no-room: ${room.reason}` : "no pair spawned"}, model ${json.model}, ${json.prompt_bytes} prompt bytes, 0 trial log rows, counts unchanged -- PASS`);

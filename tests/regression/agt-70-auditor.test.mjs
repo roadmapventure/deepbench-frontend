@@ -1,3 +1,4 @@
+// DeepBench v7.0.1092 | tests/regression/agt-70-auditor.test.mjs | AGT-571 slice 7 -- the probe's own write is graded.
 // DeepBench v7.0.920 | tests/regression/agt-70-auditor.test.mjs | AGT-304 slice 39 -- parts M and Q page every audit_findings read (PostgREST answers 1,000 of 2,399 rows); step (5) mirrors carryForward's week guard and probes a far week.
 // DeepBench v7.0.578 | tests/regression/agt-70-auditor.test.mjs | AGT-108
 // DeepBench v7.0.576 | tests/regression/agt-70-auditor.test.mjs | AGT-107
@@ -175,6 +176,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { countScoped } from "./_lib/scoped-count.js";
 import {
   fingerprint, locationKey, normalize, renderReport, isoWeek, isoWeekStart, classifyIngest, toRow,
   LEDGER_STATUSES,
@@ -1167,7 +1169,9 @@ async function theLedgerSweepRunsDryAgainstTheRealBoard() {
   };
   // AGT-107 -- snapshot BEFORE this part's first spawn, so the assertions below grade this part's
   // own commands rather than the size the live ledger happens to have reached.
-  const ledgerBefore = (await getAll(url, key, "audit_findings?select=id")).length;
+  // AGT-571: the sweep has no door to audit_findings; its doors are graded.
+  const sweep = read("scripts/tripwire-to-backlog.js");
+  const doors = [...sweep.matchAll(/rest\/v1\/([a-z_]+)`, \{\s*method: "([A-Z]+)"/g)].map(m => `${m[2]} ${m[1]}`);
   const filedBefore  = (await get("backlog_items?select=id&source_file=eq.audit-ledger")).length;
 
   let out = "";
@@ -1193,8 +1197,8 @@ async function theLedgerSweepRunsDryAgainstTheRealBoard() {
   // it -- here, and in the QA above -- must leave both exactly where it found them.
   // AGT-107 -- the claim is INVARIANCE, not a size. The ledger grows week on week (65 rows this
   // cycle across W37/W38/W39); pinning it to 6 graded the live world, not this part (pattern:162).
-  assert.strictEqual((await getAll(url, key, "audit_findings?select=id")).length, ledgerBefore,
-    `every command in this part is a dry run: the ledger must end where it started (${ledgerBefore} rows)`);
+  assert.deepStrictEqual([doors, sweep.split("method:").length - 1], [["POST runner_before_images", "POST backlog_items"], 2],
+    `the sweep writes an image and a ticket, never the ledger; got ${JSON.stringify(doors)}`);
   assert.strictEqual((await get("backlog_items?select=id&source_file=eq.audit-ledger")).length, filedBefore,
     `no board row may be filed from the ledger by a dry run; started at ${filedBefore}`);
 }
@@ -1460,7 +1464,9 @@ async function weekTwoRunsAgainstTheRealLedger() {
   };
   // AGT-107 -- snapshot BEFORE this part's first spawn, so (6) below grades this part's own
   // commands rather than the size the live ledger happens to have reached.
-  const ledgerBefore = (await getAll(url, key, "audit_findings?select=id")).length;
+  // AGT-571: any ledger write this part could make is an ingest at its two weeks.
+  const OWN = "audit_findings?select=id&iso_week=in.(2026-W37,2026-W38)";
+  const ledgerBefore = await countScoped(url, key, OWN);
   const filedBefore  = (await get("backlog_items?select=id&source_file=eq.audit-ledger")).length;
 
   const spawn = (script, args) => execFileSync(process.execPath, [path.join(ROOT, "scripts", script), ...args],
@@ -1596,7 +1602,7 @@ async function weekTwoRunsAgainstTheRealLedger() {
   // (6) THE TWO COUNTS. Nothing above passed --apply, so the ledger and the board are untouched.
   // AGT-107 -- the claim is INVARIANCE, not a size. The ledger grows week on week (65 rows this
   // cycle across W37/W38/W39); pinning it to 6 graded the live world, not this part (pattern:162).
-  assert.strictEqual((await getAll(url, key, "audit_findings?select=id")).length, ledgerBefore,
+  assert.strictEqual(await countScoped(url, key, OWN), ledgerBefore,
     `every command in this part is a dry run: the ledger must end where it started (${ledgerBefore} rows)`);
   assert.strictEqual((await get("backlog_items?select=id&source_file=eq.audit-ledger")).length, filedBefore,
     `no board row may be filed from the ledger by a dry run; started at ${filedBefore}`);
