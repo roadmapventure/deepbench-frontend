@@ -1,3 +1,4 @@
+// DeepBench v7.0.1067 | tests/regression/ses-374-meter-reader.test.mjs | AGT-617 -- the 5h pair is optional: absent reads null, the week and Fable week stay required.
 // DeepBench v7.0.484 | tests/regression/ses-374-meter-reader.test.mjs | SES-388 -- a second arm:
 // the SAME three numbers taken from rate-limit headers, which is how the always-on GitHub reader
 // takes them. Both arms always run; both are pure, and neither needs a login or the service key.
@@ -101,6 +102,14 @@ export const HEADERS_FABLE = {
   "anthropic-ratelimit-unified-7d_oi-utilization": "0.91",
 };
 
+// AGT-617: the SHAPE the API has sent since 2026-10-31 -- the 5h pair stopped arriving, the week pair
+// did not. The VALUES are 2026-09-14's measured ones, so only the absence is new, not the numbers.
+export const HEADERS_GENERAL_1108 = {
+  "anthropic-ratelimit-unified-7d-utilization": "0.57",
+  "anthropic-ratelimit-unified-7d-reset": "1789711200",
+};
+export const HEADERS_FABLE_1108 = { ...HEADERS_GENERAL_1108, "anthropic-ratelimit-unified-7d_oi-utilization": "0.91" };
+
 function withoutHeader(bag, name) {
   const copy = { ...bag };
   delete copy[name];
@@ -140,11 +149,9 @@ function everyMissingHeaderIsNamed() {
   // error, and the detail must name the header that went missing.
   const cases = [
     ["Fable week gone", HEADERS_GENERAL, withoutHeader(HEADERS_FABLE, "anthropic-ratelimit-unified-7d_oi-utilization"), /7d_oi-utilization/],
-    ["5h utilization gone", withoutHeader(HEADERS_GENERAL, "anthropic-ratelimit-unified-5h-utilization"), HEADERS_FABLE, /5h-utilization/],
     ["7d utilization gone", withoutHeader(HEADERS_GENERAL, "anthropic-ratelimit-unified-7d-utilization"), HEADERS_FABLE, /7d-utilization/],
     ["week reset gone", withoutHeader(HEADERS_GENERAL, "anthropic-ratelimit-unified-7d-reset"), HEADERS_FABLE, /7d-reset/],
-    ["session reset gone", withoutHeader(HEADERS_GENERAL, "anthropic-ratelimit-unified-5h-reset"), HEADERS_FABLE, /5h-reset/],
-    ["no headers at all", {}, {}, /5h-utilization/],
+    ["no headers at all", {}, {}, /7d-utilization/],
     ["utilization is not a number", { ...HEADERS_GENERAL, "anthropic-ratelimit-unified-7d-utilization": "n/a" }, HEADERS_FABLE, /not a number/],
     ["utilization out of range", { ...HEADERS_GENERAL, "anthropic-ratelimit-unified-7d-utilization": "1.4" }, HEADERS_FABLE, /outside 0\.\.1/],
   ];
@@ -211,6 +218,51 @@ async function aRefusedProbeIsNamedNotSwallowed() {
   assert.ok(p2.detail.includes(HEADER_MODELS.fable), `the detail must name the Fable model: ${p2.detail}`);
 }
 
+async function theWeekParsesWithoutTheSessionHeaders() {
+  // AGT-617. The reading the GitHub sensor actually gets since 2026-10-31: no 5h pair at all. The week
+  // and the Fable week are the numbers the pace gate reads, so an absent 5h pair must read NULL rather
+  // than refuse the whole reading -- while a 5h header that IS present but malformed still refuses,
+  // because that is a broken sensor, not a quiet meter.
+  const a = parseRateLimitHeaders(HEADERS_GENERAL_1108, HEADERS_FABLE_1108);
+  assert.ok(!a.error, `the 2026-11-08 header shape must parse; got ${JSON.stringify(a)}`);
+  assert.strictEqual(a.session5hPct, null, "an absent 5h utilization reads NULL, never 0");
+  assert.strictEqual(a.allModelsPct, 57);
+  assert.strictEqual(a.fablePct, 91);
+  assert.strictEqual(a.resets.session, null);
+  assert.strictEqual(a.resets.week, "Sep 18, 1am (America/Chicago)");
+
+  // Each half of the pair is independently optional.
+  const b = parseRateLimitHeaders(withoutHeader(HEADERS_GENERAL, "anthropic-ratelimit-unified-5h-utilization"), HEADERS_FABLE);
+  assert.ok(!b.error, `an absent 5h utilization must parse; got ${JSON.stringify(b)}`);
+  assert.strictEqual(b.session5hPct, null);
+  assert.strictEqual(b.resets.session, "Sep 14, 12:40pm (America/Chicago)");
+
+  const c = parseRateLimitHeaders(withoutHeader(HEADERS_GENERAL, "anthropic-ratelimit-unified-5h-reset"), HEADERS_FABLE);
+  assert.ok(!c.error, `an absent 5h reset must parse; got ${JSON.stringify(c)}`);
+  assert.strictEqual(c.session5hPct, 7);
+  assert.strictEqual(c.resets.session, null);
+
+  // CONTROLS: present-but-malformed is still a refusal, so "optional" did not become "ignored".
+  const d = parseRateLimitHeaders(
+    { ...HEADERS_GENERAL_1108, "anthropic-ratelimit-unified-5h-utilization": "n/a" }, HEADERS_FABLE_1108);
+  assert.strictEqual(d.error, "parse", `control "5h utilization is not a number": accepted it -- it pins nothing`);
+  assert.ok(/5h-utilization.*not a number/.test(d.detail), `refused for the wrong reason: ${d.detail}`);
+
+  const e = parseRateLimitHeaders(
+    { ...HEADERS_GENERAL_1108, "anthropic-ratelimit-unified-5h-reset": "soon" }, HEADERS_FABLE_1108);
+  assert.strictEqual(e.error, "parse", `control "5h reset is not an epoch second": accepted it -- it pins nothing`);
+  assert.ok(/5h-reset.*not an epoch second/.test(e.detail), `refused for the wrong reason: ${e.detail}`);
+
+  // SEAM PROOF (labelled as one): the SHIPPED readViaHeaders, driven with a stub fetch that answers
+  // with today's header shape, reaches a reading instead of exit 2.
+  let n = 0;
+  const stub = async () => ({ status: 200, headers: ++n === 1 ? HEADERS_GENERAL_1108 : HEADERS_FABLE_1108, text: async () => "" });
+  const f = await readViaHeaders("tok", stub);
+  assert.ok(!f.error, `the shipped reader must reach a reading on today's headers; got ${JSON.stringify(f)}`);
+  assert.strictEqual(f.session5hPct, null);
+  assert.strictEqual(f.fablePct, 91);
+}
+
 export async function run() {
   theCapturedOutputParses();
   aZeroReadingIsAReading();
@@ -220,12 +272,13 @@ export async function run() {
   theMeasuredHeadersParse();
   aFullWeekIsAHundred();
   everyMissingHeaderIsNamed();
+  await theWeekParsesWithoutTheSessionHeaders();
   headerNamesAreMatchedCaseInsensitively();
   await theTwoProbesAreTheMeasuredCall();
   await aRefusedProbeIsNamedNotSwallowed();
   console.log("  [PASS] ses-374-meter-reader.test.mjs");
   console.log("         CLI parser: captured 2026-09-11 output -> 22/10/18 with both reset instants; logged-out named; 6 controls red; CLI args pinned");
-  console.log("         header parser: measured 2026-09-14 GitHub headers -> 7/57/91, resets Sep 18 1am / Sep 14 12:40pm CT; 9 controls red; two probes seam-proved");
+  console.log("         header parser: measured 2026-09-14 GitHub headers -> 7/57/91, resets Sep 18 1am / Sep 14 12:40pm CT; the 5h pair optional (absent reads null, malformed still refuses); 9 controls red; two probes seam-proved");
 }
 
 selfRun(import.meta.url, run);

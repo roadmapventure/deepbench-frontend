@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1067 | scripts/read-usage-meter.js | AGT-617 -- the 5h headers are optional; a reading without them is written with session NULL.
 // DeepBench v7.0.484 | scripts/read-usage-meter.js | SES-388 -- --via-headers: the always-on reader.
 // DeepBench v7.0.455 | scripts/read-usage-meter.js | SES-374 -- the scheduled meter reader.
 //
@@ -156,16 +157,18 @@ export function parseRateLimitHeaders(generalHeaders, fableHeaders) {
     if (!rendered) return { error: "parse", detail: `'${name}' on the ${where} response is not an epoch second: ${String(raw).slice(0, 40)}` };
     return { value: rendered };
   };
-  const session = pct(general, RATE_LIMIT_HEADERS.session, "general-model");
-  if (session.error) return session;
+  // AGT-617: the 5h pair is OPTIONAL -- absent reads null, present but malformed still refuses.
+  const absent = (bag, name) => bag[name] === undefined || bag[name] === null || bag[name] === "";
   const week = pct(general, RATE_LIMIT_HEADERS.week, "general-model");
   if (week.error) return week;
   const fableWeek = pct(fable, RATE_LIMIT_HEADERS.fable, "Fable");
   if (fableWeek.error) return fableWeek;
-  const sessionReset = reset(general, RATE_LIMIT_HEADERS.sessionReset, "general-model");
-  if (sessionReset.error) return sessionReset;
   const weekReset = reset(general, RATE_LIMIT_HEADERS.weekReset, "general-model");
   if (weekReset.error) return weekReset;
+  const session = absent(general, RATE_LIMIT_HEADERS.session) ? { value: null } : pct(general, RATE_LIMIT_HEADERS.session, "general-model");
+  if (session.error) return session;
+  const sessionReset = absent(general, RATE_LIMIT_HEADERS.sessionReset) ? { value: null } : reset(general, RATE_LIMIT_HEADERS.sessionReset, "general-model");
+  if (sessionReset.error) return sessionReset;
   return {
     session5hPct: session.value,
     allModelsPct: week.value,
@@ -332,13 +335,13 @@ function fail(reason, detail) {
 // The half both readers share: print it, or write the row and print what was written. `viaHeaders`
 // only decides the row's provenance -- the numbers arrive already in parseUsage's shape either way.
 async function report(parsed, viaHeaders) {
-  if (DRY) return finish(0, { dryRun: true, ...parsed }, `dry-run: session ${parsed.session5hPct}% · week all models ${parsed.allModelsPct}% · week Fable ${parsed.fablePct}% (resets ${parsed.resets.week || "?"}); nothing written`);
+  if (DRY) return finish(0, { dryRun: true, ...parsed }, `dry-run: session ${parsed.session5hPct ?? "?"}% · week all models ${parsed.allModelsPct}% · week Fable ${parsed.fablePct}% (resets ${parsed.resets.week || "?"}); nothing written`);
   const creds = loadCredentials();
   if (creds.error) return fail(creds.error, creds.detail);
   try {
     const row = await insertReading(creds, parsed, viaHeaders);
     return finish(0, { id: row.id, takenAt: row.taken_at, ...parsed, credentials: creds.from },
-      `wrote runner_usage_readings ${row.id}: week all models ${parsed.allModelsPct}% · Fable ${parsed.fablePct}% · session ${parsed.session5hPct}% (credentials: ${creds.from})`);
+      `wrote runner_usage_readings ${row.id}: week all models ${parsed.allModelsPct}% · Fable ${parsed.fablePct}% · session ${parsed.session5hPct ?? "?"}% (credentials: ${creds.from})`);
   } catch (e) {
     return fail("insert-refused", e.message);
   }
