@@ -1,3 +1,4 @@
+// DeepBench v7.0.1091 | tests/regression/ses-297-pre-boot-pickability.test.mjs | AGT-571 slice 6 -- the no-write proof grades the probe's own key.
 // DeepBench v7.0.748 | tests/regression/ses-297-pre-boot-pickability.test.mjs | AGT-314 -- the
 // nothing-pickable slot splits AGAIN: `work_to_find` is the THIRD verdict that boots. BOOTING_REASONS
 // grows to three, the closed-set assertion ranges over it, the oracle counts open/carried
@@ -96,6 +97,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { snapshot } from "./_lib/scoped-count.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const RUNBOOK_REL = "docs/runbooks/runner-cycle.md";
@@ -1133,12 +1135,10 @@ async function theLiveGateObeysItsOwnLadder() {
 
   // --- PURITY, asserted by SIDE EFFECT because pg_proc is unreachable from here. A gate rewired to
   // call drain_epic_next(uuid) would retire a fully-done drain directive and write a before-image.
-  const countOf = async q => {
-    const res = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/${q}`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact", Range: "0-0" },
-    });
-    if (!res.ok) throw new Error(`${q} returned HTTP ${res.status}`);
-    return Number((res.headers.get("content-range") || "/0").split("/")[1]);
+  // AGT-571: the image count is keyed to the one write the rewire would make -- a runner_directives image.
+  const OWN = {
+    images: "runner_before_images?select=id&table_name=eq.runner_directives",
+    queuedDirectives: "runner_directives?select=id&status=eq.queued",
   };
   // Design-session follow-up (2026-09-02, design-m6-build-0902): the board is SHARED. Attended
   // sessions and cycles write runner_before_images rows at any moment, so a single before/after
@@ -1146,10 +1146,7 @@ async function theLiveGateObeysItsOwnLadder() {
   // read exactly that on d1853cca while a close-out was writing images. The arm therefore samples
   // up to three times and fails only if the board moved across EVERY sample: a STABLE function
   // that writes would move it every time, a concurrent writer will not.
-  const sample = async () => ({
-    images: await countOf("runner_before_images?select=id"),
-    queuedDirectives: await countOf("runner_directives?select=id&status=eq.queued"),
-  });
+  const sample = () => snapshot(url, key, OWN);
   let before, after, again;
   for (let attempt = 0; attempt < 3; attempt++) {
     before = await sample();

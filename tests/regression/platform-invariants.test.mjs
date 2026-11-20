@@ -1,3 +1,4 @@
+// DeepBench v7.0.1091 | tests/regression/platform-invariants.test.mjs | AGT-571 slice 6 -- the no-write proof grades the probe's own key.
 // DeepBench v7.0.949 | tests/regression/platform-invariants.test.mjs | the daily self-check (INTAKE-LIFECYCLE-RCA-1103 D6)
 //
 // Grades docs/design/platform-invariants.sql against the live database, never a re-implementation:
@@ -12,6 +13,7 @@
 
 import assert from "assert";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { countScoped } from "./_lib/scoped-count.js";
 
 const RULES = ["runner_stalled", "victoria_missed", "intake_stuck", "budget_next_month"];
 
@@ -33,8 +35,9 @@ async function run() {
     return;
   }
 
-  const countResults = async () =>
-    (await rest(url, key, "platform_invariant_results?select=id")).length;
+  // AGT-571: only rows stamped since this run began (a minute of clock slack), never the table.
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const countResults = () => countScoped(url, key, `platform_invariant_results?select=id&checked_at=gte.${since}`);
 
   // A
   const before = await countResults();

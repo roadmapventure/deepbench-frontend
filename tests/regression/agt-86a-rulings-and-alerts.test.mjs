@@ -1,3 +1,4 @@
+// DeepBench v7.0.1091 | tests/regression/agt-86a-rulings-and-alerts.test.mjs | AGT-571 slice 6 -- the no-write proof grades the probe's own key.
 // DeepBench v7.0.777 | tests/regression/agt-86a-rulings-and-alerts.test.mjs | AGT-304 slice 2 -- re-pin: the probe row gained the two columns that became NOT NULL after this test was pinned, finding_type under AGT-131 v7.0.591 and family under AGT-239 D1 v7.0.661, so arm V reaches the CHECK under test instead of stopping at 23502; nothing weakened.
 // DeepBench v7.0.542 | tests/regression/agt-86a-rulings-and-alerts.test.mjs | AGT-86 slice 1a
 //
@@ -31,6 +32,7 @@
 
 import assert from "node:assert/strict";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { countScoped } from "./_lib/scoped-count.js";
 
 const PROBE = { fingerprint: "e141f20a37d1fbe9", iso_week: "2026-W37" };
 const SESSION_TAG = "agt-86a-qa";
@@ -78,7 +80,9 @@ async function run() {
   const probeQ = `audit_findings?fingerprint=eq.${PROBE.fingerprint}&iso_week=eq.${PROBE.iso_week}`;
   const [probe] = await get(`${probeQ}&select=*`);
   assert.ok(probe, `the probe row ${PROBE.fingerprint}/${PROBE.iso_week} must exist -- every arm keys on it`);
-  const findingsBefore = (await get("audit_findings?select=id")).length;
+  // AGT-571: the proof is keyed to the probe's own (fingerprint, iso_week) -- every POST here carries it.
+  const OWN = `${probeQ}&select=id`;
+  const findingsBefore = await countScoped(url, key, OWN);
 
   // --- V. vocabulary ------------------------------------------------------------------------------
   await arm("V vocabulary", async () => {
@@ -100,7 +104,7 @@ async function run() {
       assert.equal(r.code, "23505", `status '${status}' must clear audit_findings_status_check; got ${describe(r)}`);
     }
 
-    const after = (await get("audit_findings?select=id")).length;
+    const after = await countScoped(url, key, OWN);
     assert.equal(after, findingsBefore, `no probe may write a row: count ${findingsBefore} -> ${after}`);
   });
 
@@ -129,7 +133,8 @@ async function run() {
   await arm("C claim once", async () => {
     const pre = await call(url, key, "GET", "john_alerts?select=id,notified_at");
     assert.ok(pre.ok, `john_alerts must exist and be readable by service_role; got ${describe(pre)}`);
-    const countBefore = pre.json.length;
+    const MINE = `john_alerts?select=id&source=eq.${SESSION_TAG}`;
+    const countBefore = await countScoped(url, key, MINE);
     if (pre.json.some(r => r.notified_at === null)) {
       notRun("AGT-86a arm C (claim once)",
         "john_alerts holds a real unnotified alert; claim_john_alerts() would mark it notified, and a test never mutates working data");
@@ -153,7 +158,7 @@ async function run() {
     } finally {
       await call(url, key, "DELETE", `john_alerts?id=eq.${id}`);
     }
-    const countAfter = (await get("john_alerts?select=id")).length;
+    const countAfter = await countScoped(url, key, MINE);
     assert.equal(countAfter, countBefore, `the fixture must be gone: john_alerts ${countBefore} -> ${countAfter}`);
   });
 
@@ -180,7 +185,7 @@ async function run() {
     assert.equal(now.ruling, probe.ruling, "the probe row's ruling must be exactly as found");
     const del = await call(url, key, "DELETE", `audit_findings?id=eq.${probe.id}`);
     assert.equal(del.code, "P0001", `DELETE on audit_findings must still be the guard's refusal; got ${describe(del)}`);
-    const after = (await get("audit_findings?select=id")).length;
+    const after = await countScoped(url, key, OWN);
     assert.equal(after, findingsBefore, `audit_findings count must be unchanged: ${findingsBefore} -> ${after}`);
   });
 
