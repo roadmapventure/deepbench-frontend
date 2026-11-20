@@ -1,3 +1,4 @@
+// DeepBench v7.0.1089 | tests/regression/agt-489-move-door.test.mjs | AGT-571 slice 4 -- the undo grades its own fixture key.
 // DeepBench v7.0.973 | tests/regression/agt-489-move-door.test.mjs | AGT-615 -- arm F (offline): listOffer(), a running project's list offers only ungraded tickets; waiting lists and --rescore unchanged.
 // DeepBench v7.0.971 | tests/regression/agt-489-move-door.test.mjs | AGT-613 -- arm E (offline): V9, an executing project's own list is graded in place -- a move or a placement home is refused there and accepted on a waiting list, a bare no-fit there must name where it waits, parks and P5 unchanged, and the context carries `list_executing` / `list_note`.
 // DeepBench v7.0.870 | tests/regression/agt-489-move-door.test.mjs | AGT-493 -- arm C's `expected` now subtracts what `needs_validation()` names: a ticket filed more than 14 days ago with no standing validation is not offered to the list turn at all (d.30), so a re-derivation that did not subtract them would read the new, correct behaviour as a defect.
@@ -56,6 +57,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { snapshot } from "./_lib/scoped-count.js";
 import { buildListContext, validateListVerdict, LIST_VERDICTS, MOVE_KIND, LIST_EXECUTING_NOTE, listOffer }
   from "../../scripts/requirement-check.js";
 
@@ -99,17 +101,6 @@ async function req(url, key, q, { method = "GET", body, prefer } = {}) {
 }
 
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 300)}`;
-
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const cr = res.headers.get("content-range") ?? "";
-  const n = Number(cr.split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status} content-range=${cr}`);
-  return n;
-}
 
 const rpc = (url, key, fn, args, q = "") =>
   req(url, key, `rpc/${fn}${q}`, { method: "POST", body: args ?? {} });
@@ -386,9 +377,8 @@ async function run() {
   const SESSION = "agt489-test";
   const NONCE = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const beforeItems = await count(url, key, "backlog_items?select=id");
-  const beforeDec = await count(url, key, "runner_decisions?select=id");
-  const beforeImg = await count(url, key, "runner_before_images?select=id");
+  const OWN = { tickets: `backlog_items?select=id&backlog_id=like.${FIXTURE_PREFIX}-*` };
+  const before = await snapshot(url, key, OWN);
   const residue = [];
 
   const row = async bid => {
@@ -728,13 +718,11 @@ async function run() {
   }
 
   // ---- the counts, re-read ---------------------------------------------------------------------
-  const afterItems = await count(url, key, "backlog_items?select=id");
-  const afterDec = await count(url, key, "runner_decisions?select=id");
-  const afterImg = await count(url, key, "runner_before_images?select=id");
-  console.log(`      [counts] backlog_items ${beforeItems} -> ${afterItems}; ` +
-    `runner_decisions ${beforeDec} -> ${afterDec}; runner_before_images ${beforeImg} -> ${afterImg}`);
-  if (afterItems !== beforeItems) {
-    residue.push(`ZERO RESIDUE: backlog_items read ${afterItems}, not ${beforeItems} -- a fixture leaked`);
+  const after = await snapshot(url, key, OWN);
+  console.log(`      [own rows] ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+  for (const k of Object.keys(OWN)) {
+    if (before[k] !== 0) residue.push(`PRECONDITION: own ${k} read ${before[k]} BEFORE the probe -- an earlier run leaked`);
+    if (after[k] !== 0) residue.push(`ZERO RESIDUE: own ${k} read ${after[k]} after the undo -- a fixture leaked`);
   }
   const standing = await req(url, key,
     "runner_decisions?select=id,backlog_id,kind&kind=in.(requirement-check,placement)&reversed_at=is.null" +

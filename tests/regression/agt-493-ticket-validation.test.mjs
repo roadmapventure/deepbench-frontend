@@ -1,3 +1,4 @@
+// DeepBench v7.0.1089 | tests/regression/agt-493-ticket-validation.test.mjs | AGT-571 slice 4 -- the undo grades its own fixture key.
 // DeepBench v7.0.905 | tests/regression/agt-493-ticket-validation.test.mjs | AGT-304 slice 24 --
 // arm C reads the executing home live instead of pinning go-to-market, which John paused.
 // DeepBench v7.0.870 | tests/regression/agt-493-ticket-validation.test.mjs | AGT-493 -- THE
@@ -49,6 +50,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { countScoped, gradeOwnWrites, snapshot } from "./_lib/scoped-count.js";
 import { executingHome } from "./_lib/board-state.js";
 import { buildValidationContext, validateValidation, VERDICTS, REASON_CHARS, STANDING_DAYS, DEFAULT_LIMIT }
   from "../../scripts/ticket-validation.js";
@@ -97,17 +99,6 @@ async function req(url, key, q, { method = "GET", body, prefer } = {}) {
 }
 
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 300)}`;
-
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const cr = res.headers.get("content-range") ?? "";
-  const n = Number(cr.split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status} content-range=${cr}`);
-  return n;
-}
 
 const rpc = (url, key, fn, args, q = "") =>
   req(url, key, `rpc/${fn}${q}`, { method: "POST", body: args ?? {} });
@@ -336,7 +327,7 @@ async function run() {
 
     // AND THE WRITER'S SAME-TEXT REFUSAL, which must cost nothing: a `revised` answer carrying the
     // ticket's own description reopens no grade, so it is refused BEFORE record_decision().
-    const beforeDec = await count(url, key, "runner_decisions?select=id");
+    await gradeOwnWrites(url, key, { decisions: `runner_decisions?select=id&session_name=eq.${AUTHOR}&backlog_id=eq.${pick}` }, async () => {
     const same = await rpc(url, key, "apply_ticket_validation", {
       p_cycle: null, p_session: AUTHOR,
       p: { backlog_id: pick, verdict: "revised", reason: "qa", account: "qa", description: t.description },
@@ -344,9 +335,7 @@ async function run() {
     assert.equal(same.status, 400, `a same-text revision must be refused; got ${describe(same)}`);
     assert.ok(String(same.json?.message ?? "").includes("differs"),
       `and refused for not differing; got ${describe(same)}`);
-    const afterDec = await count(url, key, "runner_decisions?select=id");
-    assert.equal(afterDec, beforeDec,
-      `the refusal must write NOTHING; runner_decisions read ${beforeDec} -> ${afterDec}`);
+    }, { label: "AGT-493 arm B" });
 
     // AND THE LIST DOOR does not offer one at all (the AGT-489 precedent for the under-3 case).
     const out = path.join(os.tmpdir(), `agt493-prepare-${NONCE}.md`);
@@ -373,9 +362,8 @@ async function run() {
 
   // ---- C. BOTH WAYS on fixtures, write-then-undo ----------------------------------------------
   const ALL = [1, 2, 3].map(n => `${FIXTURE_PREFIX}-${n}`);
-  const beforeItems = await count(url, key, "backlog_items?select=id");
-  const beforeDec = await count(url, key, "runner_decisions?select=id");
-  const beforeImg = await count(url, key, "runner_before_images?select=id");
+  const OWN = { tickets: `backlog_items?select=id&backlog_id=like.${FIXTURE_PREFIX}-*` };
+  const before = await snapshot(url, key, OWN);
   const residue = [];
   let wrote = false;
 
@@ -438,7 +426,7 @@ async function run() {
     // same fixture id (4 of them by the third run, which is how this was caught). The claim being
     // measured is "a validation never writes a grade", and a grade written by this run is an
     // UNREVERSED row -- which is also the predicate `grade_standing()` itself reads.
-    const grades = async bid => count(url, key,
+    const grades = async bid => countScoped(url, key,
       `runner_decisions?select=id&kind=eq.requirement-check&reversed_at=is.null&backlog_id=eq.${bid}`);
 
     // (1) GRADED, OLD, AND REFUSED.
@@ -531,13 +519,11 @@ async function run() {
     if (!requeue.ok) residue.push(`undo: recompute_backlog_queue must re-canonicalise the board; got ${describe(requeue)}`);
   }
 
-  const afterItems = await count(url, key, "backlog_items?select=id");
-  const afterDec = await count(url, key, "runner_decisions?select=id");
-  const afterImg = await count(url, key, "runner_before_images?select=id");
-  console.log(`      [counts] backlog_items ${beforeItems} -> ${afterItems}; ` +
-    `runner_decisions ${beforeDec} -> ${afterDec}; runner_before_images ${beforeImg} -> ${afterImg}`);
-  if (afterItems !== beforeItems) {
-    residue.push(`ZERO RESIDUE: backlog_items read ${afterItems}, not ${beforeItems} -- a fixture leaked`);
+  const after = await snapshot(url, key, OWN);
+  console.log(`      [own rows] ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+  for (const k of Object.keys(OWN)) {
+    if (before[k] !== 0) residue.push(`PRECONDITION: own ${k} read ${before[k]} BEFORE the probe -- an earlier run leaked`);
+    if (after[k] !== 0) residue.push(`ZERO RESIDUE: own ${k} read ${after[k]} after the undo -- a fixture leaked`);
   }
   const standing = await req(url, key,
     "runner_decisions?select=id,backlog_id,kind&kind=in.(requirement-check,placement,ticket-validation)" +

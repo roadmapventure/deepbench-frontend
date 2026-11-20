@@ -1,3 +1,4 @@
+// DeepBench v7.0.1089 | tests/regression/agt-490-parked-home.test.mjs | AGT-571 slice 4 -- the undo grades its own fixture key.
 // DeepBench v7.0.906 | tests/regression/agt-490-parked-home.test.mjs | AGT-304 slice 25 -- case 4b names its active home by reading the board, never by pinning a slug.
 // DeepBench v7.0.866 | tests/regression/agt-490-parked-home.test.mjs | AGT-490 -- A PARKED 0 NAMES
 // WHERE IT WAITS.
@@ -47,6 +48,7 @@
 
 import assert from "node:assert/strict";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { snapshot } from "./_lib/scoped-count.js";
 import { executingHome } from "./_lib/board-state.js";
 import { buildListContext, validateListVerdict, projectSlug, PARKED_PREFIX, PARK_VERDICT,
   NEW_PROJECT_MIN, NEW_PROJECT_MAX } from "../../scripts/requirement-check.js";
@@ -88,17 +90,6 @@ async function req(url, key, q, { method = "GET", body, prefer } = {}) {
 }
 
 const describe = r => `HTTP ${r.status} code=${r.code ?? "-"} ${r.text.slice(0, 300)}`;
-
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, {
-    method: "HEAD",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" },
-  });
-  const cr = res.headers.get("content-range") ?? "";
-  const n = Number(cr.split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status} content-range=${cr}`);
-  return n;
-}
 
 const rpc = (url, key, fn, args, q = "") =>
   req(url, key, `rpc/${fn}${q}`, { method: "POST", body: args ?? {} });
@@ -318,9 +309,9 @@ async function run() {
   const ALL = [F1, F2, F3];
   const SESSION = "agt490-test";
 
-  const beforeItems = await count(url, key, "backlog_items?select=id");
-  const beforeProjects = await count(url, key, "projects?select=id");
-  const beforeEpics = await count(url, key, "epics?select=id");
+  const OWN = { tickets: `backlog_items?select=id&backlog_id=like.${FIXTURE_PREFIX}-*`, projects: `projects?select=id&slug=eq.${NEW_PROJECT_SLUG}`,
+    epics: `epics?select=id,projects!inner(slug)&projects.slug=eq.${NEW_PROJECT_SLUG}` };
+  const before = await snapshot(url, key, OWN);
   const residue = [];
 
   const row = async bid => {
@@ -596,19 +587,11 @@ async function run() {
   }
 
   // ---- the counts, re-read ---------------------------------------------------------------------
-  const afterItems = await count(url, key, "backlog_items?select=id");
-  const afterProjects = await count(url, key, "projects?select=id");
-  const afterEpics = await count(url, key, "epics?select=id");
-  console.log(`      [counts] backlog_items ${beforeItems} -> ${afterItems}; ` +
-    `projects ${beforeProjects} -> ${afterProjects}; epics ${beforeEpics} -> ${afterEpics}`);
-  if (afterItems !== beforeItems) {
-    residue.push(`ZERO RESIDUE: backlog_items read ${afterItems}, not ${beforeItems} -- a fixture leaked`);
-  }
-  if (afterProjects !== beforeProjects) {
-    residue.push(`ZERO RESIDUE: projects read ${afterProjects}, not ${beforeProjects} -- a probe project leaked`);
-  }
-  if (afterEpics !== beforeEpics) {
-    residue.push(`ZERO RESIDUE: epics read ${afterEpics}, not ${beforeEpics} -- a probe epic leaked`);
+  const after = await snapshot(url, key, OWN);
+  console.log(`      [own rows] ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+  for (const k of Object.keys(OWN)) {
+    if (before[k] !== 0) residue.push(`PRECONDITION: own ${k} read ${before[k]} BEFORE the probe -- an earlier run leaked`);
+    if (after[k] !== 0) residue.push(`ZERO RESIDUE: own ${k} read ${after[k]} after the undo -- a fixture leaked`);
   }
   const standing = await req(url, key,
     "runner_decisions?select=id,backlog_id,kind&kind=in.(requirement-check,placement)&reversed_at=is.null" +
