@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1082 | scripts/ticket-owner.js | AGT-618 -- CHECK 15, `holding-aged`: A GRADED TICKET AGEING IN A CAPTURE PROJECT IS WORK NOBODY PLACED. The fourteen above read the row's own columns and the pick's own answer; none of them asks WHERE the row is sitting, so a ticket Victoria has already graded can rest in `dev-mgr-findings` (a `planned` project, capture-only, nothing builds out of it) for months and no line on this board says so -- 56 such rows over fourteen days, measured 2026-11-11. The check joins each live row to its epic's project and files JUDGMENT, never a fix: placing a ticket in an executing project is the Governance Architect's review call (AGT-280's traceable need, AGT-618's `need_source` and `home`), and no cell here is the census's to write. The predicate is all four clauses -- live, `need_score >= HOLDING_MIN_SCORE`, the project `planned`, and filed (or created) more than HOLDING_DAYS ago -- and a board with no `epics` read asks it nothing rather than guessing at a placement. THE SLUG SHIPS AFTER ITS CONSTRAINT, AGAIN: docs/design/agt-618-holding-aged-slug.sql widens ticket_owner_findings_check_slug_check to fifteen and lands BEFORE this file reaches dev, or the night's one-array ledger POST answers 23514 and loses the whole night.
 // DeepBench v7.0.972 | scripts/ticket-owner.js | AGT-614 -- CHECK 14, `pick-blocked-field`: THE OWNER GROOMS WHAT WOULD KEEP A TICKET OUT OF THE PICK. None of the thirteen read `scope_rationale`, `need_source` or the queue, so AGT-608/609/610 sat skipped for "no scope rationale (post-cut, M5-03)" and nothing on this board said so (John, decision 087d79ae, 2026-11-06: groomed every run, over the whole board). The check asks `public.pick_exclusions()` -- the pick's ONE predicate, never a second copy of it -- and files only its missing-FIELD reasons: (a) no scope rationale with a `john:runner_decisions:` / `john:runner_directives:` need_source whose row was read is DERIVABLE, `fix: {scope_rationale}` = a COPY of John's recorded words (scopeRationaleCopy, cut at SCOPE_RATIONALE_CAP), never an invented rationale; (b) no copyable source is JUDGMENT for the Governance Architect; (c) no queue number is JUDGMENT naming recompute_backlog_queue(). Not scored / project / claims / cards / blocked-by / grade are not fields and not this check's (a grade is Victoria's, AGT-613). Like check 13 it is JUDGED-ONLY: an unjudged night writes no rationale (planWrites' JUDGED_ONLY), and a refusal files a ledger row, never a removal proposal. THE SLUG SHIPS AFTER ITS CONSTRAINT AGAIN: docs/design/agt-614-pick-blocked-slug.sql widens ticket_owner_findings_check_slug_check to fourteen and must land BEFORE this file reaches dev, or the night's one-array ledger POST answers 23514 and loses the whole night.
 // DeepBench v7.0.913 | scripts/ticket-owner.js | AGT-304 slice 32 -- the runner_decisions read names the delivered ids: whole-table it passed readAll's 10,000 ceiling (10,160 rows, 2026-10-28) and the census refused itself; check 10 only ever asks it about delivered rows (170 today, 653 decisions).
 // DeepBench v7.0.687 | scripts/ticket-owner.js | AGT-166 slice 4 -- ARM (b)'S TWO EXITS. The drain
@@ -229,6 +230,10 @@ export const CHECKS = Object.freeze([
   // the PICK why it would skip the row, and files only the answers that are a missing field. Last, so
   // every earlier finding keeps its sort position and renderCensus line.
   "pick-blocked-field",
+  // AGT-618: the fifteenth. The fourteen above ask what a row is MISSING; this one asks where the
+  // row is SITTING -- a graded ticket ageing in a `planned` project nothing builds out of. Last, so
+  // every earlier finding keeps its sort position and renderCensus line.
+  "holding-aged",
 ]);
 
 // AGT-169 -- THE CHECKS THAT ARE NO LONGER ASKED, and the recorded reason each one was retired.
@@ -284,6 +289,18 @@ export const REVALIDATION_CHECK = "unrevalidated-30d";
 
 // AGT-614 -- the fourteenth check's slug, named once for the same reason as the thirteenth's.
 export const PICK_FIELD_CHECK = "pick-blocked-field";
+
+// AGT-618 -- the fifteenth check, and its whole predicate as four declared constants rather than
+// four literals at the branch (pattern:18, and this file's own convention for FENCES /
+// UNREVALIDATED_BATCH): the slug the CHECK constraint and the ledger read both quote, the age the
+// row must have reached, the grade that makes it WORK rather than a suggestion, and the project
+// status that makes its home a capture shelf. `planned` is the status of `dev-mgr-findings`, where
+// every review ticket lands until a placement moves it; an `executing` project is a build queue and
+// a row ageing there is the queue's depth, not a finding.
+export const HOLDING_CHECK = "holding-aged";
+export const HOLDING_DAYS = 14;
+export const HOLDING_MIN_SCORE = 3;
+export const HOLDING_STATUS = "planned";
 
 // The two `pick_exclusions()` reasons that are a MISSING FIELD, and the only two this check files.
 // `scope` is a PREFIX ("no scope rationale (post-cut, M5-03)"): the function owns the parenthesis, and
@@ -620,6 +637,11 @@ export function classifyBoard(board, { now, rate, retired } = {}) {
   // fourteenth check nothing, so it files nothing -- never a guess at what the pick would say.
   const pickReasons = new Map((board.pickExclusions ?? []).map(p => [p.backlog_id, Array.isArray(p.reasons) ? p.reasons : []]));
   const sourceByKey = new Map((board.needSources ?? []).map(s => [`${s.table}:${String(s.id).toLowerCase()}`, s]));
+  // AGT-618: the fifteenth check's one join, epic id -> its project `{slug, status}` as readBoard
+  // embedded it. A board with no `epicProjects` (every fixture before AGT-618) leaves this map empty,
+  // so `p` is undefined on every row and the check files NOTHING -- a row whose placement was never
+  // read is not a row sitting in the wrong place.
+  const epicProject = new Map((board.epicProjects ?? []).map(e => [e.id, e.projects]));
 
   const findings = [];
   const backlog = {
@@ -882,6 +904,23 @@ export function classifyBoard(board, { now, rate, retired } = {}) {
           `the pick skips this ${status} ticket: "${PICK_FIELD_REASONS.queue}" -- recompute_backlog_queue()` +
           " assigns it; no cell here is the census's to write.");
       }
+    }
+
+    // 15 holding-aged (AGT-618) -- a GRADED live row ageing in a `planned` project. JUDGMENT always,
+    // and with no `fix`: the row is complete, its HOME is what is missing, and a home is a placement
+    // the Governance Architect's review makes against a traceable need -- never a cell this census
+    // writes. The sentence carries the score, the project, the filing date and the row's own
+    // need_source, because those four are what the review needs to place it; it carries NO day count,
+    // so an ordinary night's detail is byte-identical as the row ages and the finding carries
+    // (censusFindingFor's fingerprint, AGT-169) instead of re-minting every night.
+    const p = epicProject.get(row.epic_id);
+    if (live && row.need_score >= HOLDING_MIN_SCORE && p?.status === HOLDING_STATUS
+        && ts(T) < nowMs - HOLDING_DAYS * DAY) {
+      file(row, HOLDING_CHECK, "judgment",
+        `this ${status} ticket is graded (need_score ${row.need_score}) and has sat in \`${p.slug}\`` +
+        ` since ${T}; that project is \`${HOLDING_STATUS}\`, so nothing is built out of it.` +
+        ` need_source reads ${row.need_source ?? "none"} -- ${RATIONALE_OWNER} places it in an` +
+        " executing project against a traceable need, or rules it, in the review.");
     }
 
     // Counts only, never findings: both are reported once as a number, not flagged per row.
@@ -1321,7 +1360,7 @@ async function readBoard(base, key, now) {
   const items = await readAll(base, key, "backlog_items",
     "backlog_items?select=id,backlog_id,status,type,tier,claimed_by,claimed_at,predicted_cycles,size_stamp," +
     "design_status,kickoff_link,cost_pct_snapshot,cost_cycles_snapshot,revalidated_at,filed_at,created_at," +
-    "updated_at,actual_tokens_attended,need_source&status=in.(open,partial,done,delivered)&order=backlog_id", 5000);
+    "updated_at,actual_tokens_attended,need_source,need_score,epic_id&status=in.(open,partial,done,delivered)&order=backlog_id", 5000);
   const matrix = await readAll(base, key, "ticket_matrix",
     "ticket_matrix?select=backlog_id,actual_cycles,predicted_cycles&order=backlog_id", 5000);
   const verdicts = await readAll(base, key, "runner_verdicts",
@@ -1409,7 +1448,13 @@ async function readBoard(base, key, now) {
       `runner_directives?select=id,created_at,body&id=in.(${dirIds.join(",")})&order=id`, dirIds.length + 1);
     needSources.push(...rows.map(r => ({ table: "runner_directives", ...r })));
   }
-  return { items, matrix, verdicts, accepts, decisions, openCycles, kickoffs, ownerFindings, premises, ownerRulings, pickExclusions, needSources };
+  // AGT-618 -- THE FIFTEENTH CHECK'S ONE JOIN. Every epic with its project's slug and status, in one
+  // embedded read: the check asks where a graded row is sitting, and `backlog_items` carries only the
+  // epic id. It is board data like the six reads above, so a short read exits 2 rather than silently
+  // shrinking the check's population (36 epics today, ceiling 1000).
+  const epicProjects = await readAll(base, key, "epics",
+    "epics?select=id,projects(slug,status)&order=id", 1000);
+  return { items, matrix, verdicts, accepts, decisions, openCycles, kickoffs, ownerFindings, premises, ownerRulings, pickExclusions, needSources, epicProjects };
 }
 
 const RULINGS_QUERY = "audit_findings?select=check_slug,status,ruling,ruled_by,ruled_at" +

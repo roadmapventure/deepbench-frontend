@@ -1,3 +1,15 @@
+// DeepBench v7.0.1082 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-618 -- NEW PART Q: CHECK
+// 15, `holding-aged`, through the REAL classifyBoard / planWrites. ONE graded row ageing in a
+// `planned` project files exactly ONE judgment finding naming that project, and then SEVEN one-variable
+// boards file NOTHING: a grade under the floor, no grade at all, a row a day too young, an `executing`
+// project, a closed row, an epic the read does not cover, and a board with no `epics` read. Each of the
+// seven is the whole predicate asserted from the other side -- a branch that fired on any of them would
+// put a ticket Victoria graded, or one already in a build queue, in front of the Architect's review as
+// an unplaced row. The ledger half pins the carry: a row still held tonight is RE-SEEN, never filed a
+// second time. Part B moves with it -- CHECKS is fifteen, the census prints sixteen lines -- and part N
+// stays red until docs/design/agt-618-holding-aged-slug.sql widens the live constraint to fifteen,
+// which is part N's job and the reason the migration lands before this file reaches dev.
+//
 // DeepBench v7.0.972 | tests/regression/agt-79-ticket-owner.test.mjs | AGT-614 -- NEW PART P: CHECK
 // 14, `pick-blocked-field`, through the REAL classifyBoard / planWrites / ingestJudgment. One-variable
 // rows over one board: a John decision source and a John directive source are DERIVABLE carrying the
@@ -217,6 +229,7 @@ import {
   REFUSED_PREFIX, PROPOSAL_KIND,
   PICK_FIELD_CHECK, PICK_FIELD_REASONS, SCOPE_RATIONALE_CAP, RATIONALE_OWNER,
   johnSourceRef, scopeRationaleCopy, pickSourceRefs,
+  HOLDING_CHECK, HOLDING_DAYS, HOLDING_MIN_SCORE, HOLDING_STATUS,
 } from "../../scripts/ticket-owner.js";
 import { SERVICE_CATALOG } from "../../shared/ai-patterns.js";
 import { renderTicketHygiene, factsSha, cst, BEGIN, END, HYGIENE_NIGHTS_READ } from "../../scripts/render-standing-brief.js";
@@ -304,6 +317,10 @@ async function main() {
     // AGT-614: the fixture board carries no `pickExclusions`, so the fourteenth check is asked nothing
     // here and files nothing -- its rows are part P's.
     "pick-blocked-field": [],
+    // AGT-618: the fixture board carries no `epicProjects`, so the fifteenth check is asked nothing
+    // here and files nothing -- its rows are part Q's. Listed rather than omitted, because the loop
+    // below walks CHECKS: an absent key would read as a check that stopped filing.
+    "holding-aged": [],
   };
   for (const check of CHECKS) {
     assert.deepStrictEqual(byCheck(r, check), expected[check], `${check} did not find exactly its fixture rows`);
@@ -612,16 +629,16 @@ async function main() {
     " · revalidation 1 left (batch 1, carried 0)"),
     `the census headline is not the agreed line:\n${text.split("\n")[0]}`);
   assert.ok(text.endsWith("\n"), "the census ends with a newline");
-  assert.strictEqual(text.replace(/\n$/, "").split("\n").length, 15, "headline plus one line per check, always fourteen (AGT-614)");
+  assert.strictEqual(text.replace(/\n$/, "").split("\n").length, 16, "headline plus one line per check, always fifteen (AGT-618)");
   const sizeLine = text.split("\n").find(l => l.includes("size-missing"));
   assert.ok(sizeLine.endsWith("—"), "a check that found nothing must still print its line, ending in an em dash");
 
   const emptyText = renderCensus(
     run({ board: { items: [], matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [] } }), F.now);
-  assert.strictEqual(emptyText.replace(/\n$/, "").split("\n").length, 15, "an empty board still prints all fourteen checks");
+  assert.strictEqual(emptyText.replace(/\n$/, "").split("\n").length, 16, "an empty board still prints all fifteen checks");
   assert.ok(emptyText.includes("0 rows · 0 findings"), "an empty board reports zero rows, not nothing");
 
-  assert.strictEqual(CHECKS.length, 14);
+  assert.strictEqual(CHECKS.length, 15);
   assert.strictEqual(CHECKS[0], "quote-missing");
   assert.strictEqual(CHECKS[11], "remainder-stranded");
   // AGT-166 slice 2. This pin and the live CHECK constraint ship together: part N feeds the table
@@ -632,6 +649,15 @@ async function main() {
   // AGT-614: the fourteenth, last, and in lockstep with docs/design/agt-614-pick-blocked-slug.sql.
   assert.strictEqual(CHECKS[13], "pick-blocked-field");
   assert.strictEqual(PICK_FIELD_CHECK, "pick-blocked-field", "one string names the slug, never a literal per site");
+  // AGT-618: the fifteenth, last, and in lockstep with docs/design/agt-618-holding-aged-slug.sql -- the
+  // same pairing the thirteenth and fourteenth ship under: this pin reddens part N until the live CHECK
+  // admits the slug, and the four constants below are the whole predicate, so a literal drifting at the
+  // branch could not move the check without moving this arm.
+  assert.strictEqual(CHECKS[14], "holding-aged");
+  assert.strictEqual(HOLDING_CHECK, "holding-aged", "one string names the slug, never a literal per site");
+  assert.strictEqual(HOLDING_DAYS, 14, "the age fence is a declared constant, not a literal at the branch");
+  assert.strictEqual(HOLDING_MIN_SCORE, 3, "a graded ticket is work; an ungraded one is not this check's");
+  assert.strictEqual(HOLDING_STATUS, "planned", "a `planned` project is a capture shelf; an `executing` one is a build queue");
   assert.strictEqual(SCOPE_RATIONALE_CAP, 1500, "a copied rationale is cut at a fixed, reproducible count");
   assert.strictEqual(UNREVALIDATED_BATCH, 25, "the Designer's call (ii): 25 premises a night");
   assert.strictEqual(PREMISE_EXCERPT, 600, "a premise reaches the judge cut at a fixed, reproducible count");
@@ -789,6 +815,88 @@ async function main() {
     assert.ok(pgPlan.ledger.insert.some(f => f.backlog_id === "QA-614-11"), "an unanswered fill degrades to a judgment row");
     assert.deepStrictEqual(pgPlan.proposals, [], "a refused fill is never a removal proposal -- only check 13 proposes");
     console.log("[AGT-614] part P: check 14 -- 3 derivable / 5 judgment over 11 rows, re-seen not re-filed, fill judged-only");
+  }
+
+  // --- Q: check 15, holding-aged (AGT-618), pure ------------------------------------------------
+  // ONE row, otherwise CLEAN -- open, quoted, sized, on-taxonomy, unclaimed and freshly revalidated --
+  // so the fifteenth check is the only one that can fire on the base board, and every arm below reads
+  // the findings FILTERED to the slug so the closed-row arm grades check 15 and not its neighbours.
+  // `now` is fixed: an age fence measured against a moving clock is a different board every run.
+  {
+    const QNOW = "2026-11-20T15:00:00Z";
+    const qDay = n => new Date(Date.parse(QNOW) - n * 24 * 60 * 60 * 1000).toISOString();
+    const AGED = qDay(15);
+    const qRow = (patch = {}) => ({
+      id: "00000000-0000-4000-8000-000000000618",
+      backlog_id: "QA-618-1", status: "open", type: "Tooling", predicted_cycles: 1, size_stamp: "S",
+      design_status: null, kickoff_link: null, claimed_by: null, claimed_at: null,
+      filed_at: AGED, created_at: AGED, updated_at: AGED, revalidated_at: qDay(1),
+      cost_pct_snapshot: null, actual_tokens_attended: null, need_source: null,
+      need_score: 3, epic_id: "e1", ...patch,
+    });
+    const HOME = [{ id: "e1", projects: { slug: "dev-mgr-findings", status: HOLDING_STATUS } }];
+    const qBoard = (rowPatch = {}, over = {}) => ({
+      items: [qRow(rowPatch)], matrix: [], verdicts: [], accepts: [], decisions: [], openCycles: [],
+      epicProjects: HOME, ...over,
+    });
+    const qRun = (rowPatch = {}, over = {}) =>
+      classifyBoard(qBoard(rowPatch, over), { now: QNOW, rate: 0.5, retired: NO_RETIREMENT });
+    const held = res => res.findings.filter(f => f.check === HOLDING_CHECK);
+
+    // THE BASE BOARD: a graded row, fifteen days old, in a `planned` project -> exactly one finding.
+    const qr = qRun();
+    assert.strictEqual(held(qr).length, 1, "a graded row ageing in a planned project files exactly one finding");
+    const q1 = held(qr)[0];
+    assert.deepStrictEqual([...new Set(qr.findings.map(f => f.check))], [HOLDING_CHECK],
+      "the row is clean but for where it is sitting, so check 15 is the only check that fires");
+    assert.strictEqual(q1.verdict, "judgment", "a placement is the Architect's review call, never a derivable cell");
+    assert.ok(!("fix" in q1), "a judgment finding carries no fix: nothing here writes a home");
+    assert.ok(!("proposal" in q1), "and it proposes no removal -- only check 13 proposes");
+    // The sentence carries the four facts the review needs, and NO day count (the fingerprint carries).
+    assert.ok(q1.detail.includes("dev-mgr-findings"), `the project must be named; got ${q1.detail}`);
+    assert.ok(q1.detail.includes("need_score 3"), `the grade must be named; got ${q1.detail}`);
+    assert.ok(q1.detail.includes(AGED), `the filing date must be named; got ${q1.detail}`);
+    assert.ok(q1.detail.includes("none"), "a null need_source reads `none`, never `null` or nothing at all");
+    assert.ok(q1.detail.includes(RATIONALE_OWNER), `the review owner must be named; got ${q1.detail}`);
+    assert.ok(!/\b1[45]\s*days?\b/.test(q1.detail),
+      `the detail must carry no day count -- an ageing row would re-mint its fingerprint nightly; got ${q1.detail}`);
+    // A row that DOES name a John record says so instead of `none`.
+    assert.ok(held(qRun({ need_source: "john:runner_decisions:087d79ae-0000-4000-8000-000000000618" }))[0]
+      .detail.includes("john:runner_decisions:087d79ae-0000-4000-8000-000000000618"),
+      "a row that names its need source carries it into the sentence for the review to read");
+
+    // THE WHOLE PREDICATE, ONE VARIABLE AT A TIME: each of these must file NOTHING.
+    const qNone = [
+      ["a grade under the floor", { need_score: HOLDING_MIN_SCORE - 1 }, {}],
+      ["no grade at all", { need_score: null }, {}],
+      ["a day too young", { filed_at: qDay(13), created_at: qDay(13) }, {}],
+      ["an executing project", {}, { epicProjects: [{ id: "e1", projects: { slug: "deepbench-runner", status: "executing" } }] }],
+      ["a closed row", { status: "delivered" }, {}],
+      ["an epic the read does not cover", { epic_id: "e2" }, {}],
+      ["no epics read at all", {}, { epicProjects: undefined }],
+    ];
+    for (const [why, rowPatch, over] of qNone) {
+      assert.deepStrictEqual(held(qRun(rowPatch, over)), [],
+        `${why}: check 15 must file nothing -- the base board differs from this one in exactly that input`);
+    }
+    // ...and the two ages straddle the fence by one day, so the fence itself is pinned, not just its sign.
+    assert.strictEqual(held(qRun({ filed_at: qDay(HOLDING_DAYS + 1), created_at: qDay(HOLDING_DAYS + 1) })).length, 1);
+    assert.strictEqual(held(qRun({ filed_at: qDay(HOLDING_DAYS - 1), created_at: qDay(HOLDING_DAYS - 1) })).length, 0);
+    // `filed_at ?? created_at` (Designer's call D3): a row with no filed_at ages by created_at.
+    assert.strictEqual(held(qRun({ filed_at: null })).length, 1, "a row with no filed_at ages by created_at");
+
+    // THE LEDGER: a row still held tonight is RE-SEEN, never filed a second time.
+    const qItems = [qRow()];
+    const qJudged = { confirmed: 1, refused: 0, unconfirmed: 0, model: "m" };
+    const qFresh = planWrites(qr, [], qItems, { rate: 0.5, judged: qJudged });
+    assert.deepStrictEqual(qFresh.ledger.insert.map(f => [f.backlog_id, f.check_slug]), [["QA-618-1", HOLDING_CHECK]],
+      "a newly held row is filed once, under the fifteenth slug");
+    const qPrior = [{ id: "qq1", backlog_id: "QA-618-1", check_slug: HOLDING_CHECK }];
+    const qPlan = planWrites(qr, qPrior, qItems, { rate: 0.5, judged: qJudged });
+    assert.deepStrictEqual(qPlan.ledger.reseen, ["qq1"], "a ticket still held tonight is re-seen");
+    assert.ok(!qPlan.ledger.insert.some(f => f.backlog_id === "QA-618-1"), "and is NOT filed a second row");
+    assert.deepStrictEqual(qPlan.fixes, [], "check 15 writes no cell, judged or not");
+    console.log(`[AGT-618] part Q: check 15 -- 1 judgment over 1 row, ${qNone.length} one-variable boards file nothing, re-seen not re-filed`);
   }
 
   // --- C: the CLI over the fixture (spawn, no creds) -------------------------------------------
