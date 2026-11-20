@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1074 | scripts/read-usage-meter.js | AGT-310 -- a plan-limit rejection becomes one alert and, after it lifts, a no-run row per missed window.
 // DeepBench v7.0.1067 | scripts/read-usage-meter.js | AGT-617 -- the 5h headers are optional; a reading without them is written with session NULL.
 // DeepBench v7.0.484 | scripts/read-usage-meter.js | SES-388 -- --via-headers: the always-on reader.
 // DeepBench v7.0.455 | scripts/read-usage-meter.js | SES-374 -- the scheduled meter reader.
@@ -221,7 +222,10 @@ async function probeMeter(model, token, fetchImpl) {
     if (!(res.status >= 200 && res.status < 300)) {
       let text = "";
       try { text = await res.text(); } catch { /* a body we cannot read is still a refusal */ }
-      return { error: "headers-refused", detail: `${model} HTTP ${res.status}: ${String(text).slice(0, 200)}` };
+      // AGT-310: the status and the response headers ride back with the refusal. A 429 on the
+      // general probe is the plan refusing the reader itself, and its anthropic-ratelimit-unified-*
+      // headers are the only facts anyone will ever have about that refusal.
+      return { error: "headers-refused", detail: `${model} HTTP ${res.status}: ${String(text).slice(0, 200)}`, status: res.status, headers: headerBag(res) };
     }
     return { headers: headerBag(res) };
   } catch (e) {
@@ -233,7 +237,9 @@ async function probeMeter(model, token, fetchImpl) {
 
 export async function readViaHeaders(token, fetchImpl = fetch) {
   const general = await probeMeter(HEADER_MODELS.general, token, fetchImpl);
-  if (general.error) return general;
+  // AGT-310: marked as the GENERAL probe's refusal. Only this call's 429 means the plan refused us;
+  // the Fable probe's 429 is a refusal of the Fable model and must not raise a plan-limit alert.
+  if (general.error) return { ...general, general: true };
   const fable = await probeMeter(HEADER_MODELS.fable, token, fetchImpl);
   if (fable.error) return fable;
   return parseRateLimitHeaders(general.headers, fable.headers);
@@ -340,10 +346,144 @@ async function report(parsed, viaHeaders) {
   if (creds.error) return fail(creds.error, creds.detail);
   try {
     const row = await insertReading(creds, parsed, viaHeaders);
+    // AGT-310: the reading is the job and the notice rides on it -- noteLimit() swallows its own
+    // failures and never touches the exit code.
+    await noteLimit({ allModelsPct: parsed.allModelsPct, resets: parsed.resets.week });
     return finish(0, { id: row.id, takenAt: row.taken_at, ...parsed, credentials: creds.from },
       `wrote runner_usage_readings ${row.id}: week all models ${parsed.allModelsPct}% · Fable ${parsed.fablePct}% · session ${parsed.session5hPct ?? "?"}% (credentials: ${creds.from})`);
   } catch (e) {
     return fail("insert-refused", e.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AGT-310 (v7.0.1074): the plan-limit notice. Both halves are the blocks `P` (pure) and `W` (I/O)
+// of docs/harvests/AGT-310.md, where every QA number in the kickoff was produced by running them.
+// ---------------------------------------------------------------------------
+export const NOTICE_SOURCE = "meter-reader";
+export const NO_RUN_STAMP = "meter-reader (no run)";
+export const NO_RUN_STEP = "no run -- pre-boot refusal (plan limit rejected)";
+export const MAX_WINDOWS = 400;
+
+// Pure: the one decision. null = write nothing. `sinceKey` is the taken_at of the newest reading
+// BELOW the warning line, so every fire of one climb or one outage builds the same fingerprint.
+export function limitNotice({ schedulerOn, warnPct, allModelsPct = null, rejected = false, sinceKey, seenAtMs, resets = null, overage = null, headers = "" }) {
+  if (schedulerOn !== true) return null;
+  const pct = allModelsPct === null ? null : Number(allModelsPct);
+  const bound = rejected === true || (pct !== null && pct >= 100);
+  const warn = !bound && Number.isFinite(Number(warnPct)) && warnPct !== null && pct !== null && pct >= Number(warnPct);
+  if (!bound && !warn) return null;
+  const seen = formatResetInstant(Math.floor(seenAtMs / 1000)) || "?";
+  const key = sinceKey || "none";
+  if (warn) return {
+    kind: "warn", fingerprint: `plan-limit-warn:${key}`, john_call: null,
+    summary: `Claude plan week is at ${pct}% (warning line ${Number(warnPct)}%). At 100% scheduled cloud runs are refused before they start. Resets ${resets || "not reported"}.`,
+    detail: `Read ${seen} by the meter reader, outside any run. Scheduler is on. Last reading under the line: ${key}. Nothing is changed or bought by this notice.`,
+  };
+  return {
+    kind: "bound", fingerprint: `plan-limit-bound:${key}`, john_call: "money",
+    summary: `Claude plan limit reached: scheduled cloud runs are being refused before they start. First seen ${seen}. Resets ${resets || "not reported"}. Extra usage (overage): ${overage || "not reported"}.`,
+    detail: `Seen by the meter reader, outside any run: ${rejected ? "the plan answered HTTP 429 to the reader's own call" : `the meter read ${pct}%`}. Scheduler is on. Last reading under the warning line: ${key}. This notice changes no limit and buys nothing; buying extra usage stays yours.${headers ? ` Headers: ${headers}` : ""}`,
+  };
+}
+
+// Pure: what a 429 said about itself. Only anthropic-ratelimit-unified-* headers, verbatim.
+export function rejectionFacts(headers) {
+  const bag = Object.entries(headers || {}).map(([k, v]) => [String(k).toLowerCase(), String(v)])
+    .filter(([k]) => k.startsWith("anthropic-ratelimit-unified-")).sort();
+  const over = bag.filter(([k]) => k.includes("overage")).map(([k, v]) => `${k}=${v}`).join(", ");
+  const reset = bag.find(([k]) => k === "anthropic-ratelimit-unified-7d-reset");
+  return {
+    headers: bag.map(([k, v]) => `${k}=${v}`).join(", ").slice(0, 900),
+    overage: over || null,
+    resets: reset ? formatResetInstant(reset[1]) : null,
+  };
+}
+
+// Pure: the scheduled windows in [fromIso, toIso) that hold no routine fire.
+export function missedWindows({ fromIso, toIso, cronMinute, intervalHours, fireIsos }) {
+  const H = 3600000, step = Math.max(1, Number(intervalHours) || 1) * H;
+  const from = Date.parse(fromIso), to = Date.parse(toIso);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return [];
+  const fires = (fireIsos || []).map((s) => Date.parse(s));
+  let w = Math.floor(from / H) * H + Number(cronMinute) * 60000;
+  if (w < from) w += H;
+  const out = [];
+  for (; w < to && out.length < MAX_WINDOWS; w += step) {
+    if (!fires.some((f) => f >= w && f < w + step)) out.push(new Date(w).toISOString());
+  }
+  return out;
+}
+
+export function noRunRow(windowIso, fingerprint) {
+  return {
+    started_at: windowIso, ended_at: windowIso, heartbeat_at: windowIso,
+    stamp: NO_RUN_STAMP, trigger: "scheduled", outcome: "did_not_run", last_step: NO_RUN_STEP,
+    notes: `No run: the Claude plan limit refused this scheduled fire before it started. Written after the limit lifted by scripts/read-usage-meter.js (AGT-310) from john_alerts ${fingerprint}.`,
+  };
+}
+
+async function rest(creds, pathAndQuery, init, fetchImpl) {
+  const res = await fetchImpl(`${creds.url.replace(/\/+$/, "")}/rest/v1/${pathAndQuery}`, {
+    ...(init || {}),
+    headers: { apikey: creds.key, Authorization: `Bearer ${creds.key}`, "Content-Type": "application/json", ...((init && init.headers) || {}) },
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${pathAndQuery.split("?")[0]} HTTP ${res.status}: ${String(text).slice(0, 160)}`);
+  return text ? JSON.parse(text) : [];
+}
+const enc = encodeURIComponent;
+
+// obs is { allModelsPct, resets } after a reading was written, or { rejected: true, headers } after
+// the GENERAL probe answered 429. Throws on any refused call; the caller prints and carries on.
+export async function watchLimit(creds, obs, fetchImpl = fetch, nowMs = Date.now()) {
+  const [s] = await rest(creds, "runner_settings?select=scheduler_on,plan_limit_warn_pct,cron_minute,interval_hours&id=eq.1", null, fetchImpl);
+  if (!s) throw new Error("runner_settings row 1 not found");
+  const warnPct = Number(s.plan_limit_warn_pct);
+  const [under] = await rest(creds, `runner_usage_readings?select=taken_at&all_models_pct=lt.${warnPct}&order=taken_at.desc&limit=1`, null, fetchImpl);
+  const rejected = obs.rejected === true;
+  const facts = rejected ? rejectionFacts(obs.headers) : { headers: "", overage: null, resets: obs.resets || null };
+  const notice = limitNotice({
+    schedulerOn: s.scheduler_on, warnPct, allModelsPct: rejected ? null : obs.allModelsPct, rejected,
+    sinceKey: under ? under.taken_at : null, seenAtMs: nowMs, resets: facts.resets, overage: facts.overage, headers: facts.headers,
+  });
+  const out = { kind: notice ? notice.kind : "clear", wrote: false, noRunRows: 0 };
+  if (notice) {
+    const rows = await rest(creds, "john_alerts?on_conflict=fingerprint", {
+      method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
+      body: JSON.stringify({ source: NOTICE_SOURCE, summary: notice.summary, detail: notice.detail, fingerprint: notice.fingerprint, john_call: notice.john_call, ref_table: "runner_usage_readings" }),
+    }, fetchImpl);
+    out.wrote = rows.length === 1;
+  }
+  // The ledger is written only AFTER the limit lifts: a `scheduled` row written during the outage
+  // would reset public.runner_silence()'s clock and hide the silence it exists to report.
+  if (!rejected && Number(obs.allModelsPct) < warnPct) {
+    const [alert] = await rest(creds, `john_alerts?select=fingerprint,created_at&source=eq.${NOTICE_SOURCE}&fingerprint=like.plan-limit-bound:*&order=created_at.desc&limit=1`, null, fetchImpl);
+    if (alert) {
+      const [end] = await rest(creds, `runner_usage_readings?select=taken_at&taken_at=gt.${enc(alert.created_at)}&all_models_pct=lt.${warnPct}&order=taken_at.asc&limit=1`, null, fetchImpl);
+      if (end) {
+        const fires = await rest(creds, `runner_cycles?select=started_at&trigger=neq.supervised&started_at=gte.${enc(alert.created_at)}&started_at=lt.${enc(end.taken_at)}&order=started_at.asc&limit=2000`, null, fetchImpl);
+        const windows = missedWindows({ fromIso: alert.created_at, toIso: end.taken_at, cronMinute: s.cron_minute, intervalHours: s.interval_hours, fireIsos: fires.map((f) => f.started_at) });
+        if (windows.length) {
+          await rest(creds, "runner_cycles", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(windows.map((w) => noRunRow(w, alert.fingerprint))) }, fetchImpl);
+          out.noRunRows = windows.length;
+        }
+      }
+    }
+  }
+  return out;
+}
+// Best-effort by construction: the reading is the job, the notice rides on it. Nothing here may
+// change the exit code, and --dry-run writes nothing.
+async function noteLimit(obs) {
+  if (DRY) return;
+  try {
+    const creds = loadCredentials();
+    if (creds.error) throw new Error(`${creds.error}: ${creds.detail}`);
+    const w = await watchLimit(creds, obs);
+    console.error(`limit-watch: ${w.kind} wrote=${w.wrote} no-run rows=${w.noRunRows}`);
+  } catch (e) {
+    console.error(`limit-watch: could not check -- ${(e && e.message) || String(e)}`);
   }
 }
 
@@ -353,6 +493,9 @@ async function main() {
     const token = process.env.CLAUDE_CODE_OAUTH_TOKEN;
     if (!token) return fail("no-token", "--via-headers needs CLAUDE_CODE_OAUTH_TOKEN in the environment (mint one with `claude setup-token`); the token is never printed or stored");
     const viaHeaders = await readViaHeaders(token);
+    // AGT-310: the meter reader is the only sensor that runs OUTSIDE a cycle, so it is the only
+    // thing that can report a limit refusing cycles before they boot. The read still fails: exit 2.
+    if (viaHeaders.status === 429 && viaHeaders.general) await noteLimit({ rejected: true, headers: viaHeaders.headers });
     if (viaHeaders.error) return fail(viaHeaders.error, viaHeaders.detail);
     return report(viaHeaders, true);
   }
