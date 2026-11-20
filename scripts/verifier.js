@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1065 | scripts/verifier.js | AGT-328 -- the delta counts failing arms; a pin rides the ship that changes it.
 // DeepBench v7.0.1056 | scripts/verifier.js | AGT-673 -- a kickoff naming apply_migration says who applies it.
 // DeepBench v7.0.991 | scripts/verifier.js | AGT-629 -- a test the pre-build tree genuinely LACKED is not an unmeasured red: `absentPreBuildFrom()` reads the `— ABSENT pre-build` lines `renderOut()` now writes, both baseline readers carry `absent` beside `measured`, and `baselineCoverageFinding()` exempts ONLY a name on such a line. Every other uncovered name still refuses (AGT-457) and `regressionDelta()` is untouched, so a red new test still blocks.
 // DeepBench v7.0.978 | scripts/verifier.js | AGT-609 -- every verdict carries a rules fingerprint; gradeDelivery() is the ONE grading path verify-ship and the re-grade lane share.
@@ -1096,6 +1097,58 @@ export function baselineCoverageFinding({ measured, graded, instrument, absent }
 //     exits 1 after crashing before its first `[FAIL]` line has an empty failing set, and an empty
 //     set is trivially a subset of any baseline -- so the naive rule would read the most total
 //     failure the suite can have as the cleanest possible green. It stays red.
+// ---- FEATURE: AGT-328 -- THE DELTA COUNTS FAILING ARMS INSIDE A STANDING-RED FILE. ----------
+// `regressionDelta()` compared failing FILE NAMES, so a file red on 1 arm before a ship and on 3
+// after it was "standing" and the ship passed. The count was on disk all along: a multi-arm test
+// throws `N arm(s) failed:`, `run-all.js` prints it after `[FAIL] <file> -- `, and both baseline
+// instruments carry that same line. A count is read ONLY from a line that names its own file, and
+// growth is charged ONLY when BOTH sides declared one -- an undeclared count is null, never 1, so
+// no red is manufactured from a line nobody could parse (pattern:162). Equal counts are not graded.
+export const ARM_COUNT_RE = /^(\d+) (?:arm|check|case|assertion)(?:\(s\)|s)? failed\b/;
+
+// Pure. { <file basename>: <declared failing-arm count> | null } for every `[FAIL] <file>` line and
+// every `- <path> — RED` block line in a text.
+export function failingArmsFrom(text) {
+  const out = {};
+  for (const raw of String(text ?? "").split("\n")) {
+    const line = raw.trim();
+    const block = raw.match(/^\s*-\s+`?([^`\s]+)`?\s+—\s+RED\b[^:]*:\s*(.*)$/);
+    const name = line.startsWith("[FAIL]") ? line.slice("[FAIL]".length).trim().split(/\s+/)[0]
+      : block ? path.basename(block[1]) : "";
+    if (!name || typeof out[name] === "number") continue;
+    const key = `[FAIL] ${name} -- `;
+    let rest = block ? block[2].trim() : line;
+    let stripped = 0;
+    while (rest.startsWith(key)) { rest = rest.slice(key.length); stripped++; }
+    const hit = stripped ? rest.match(ARM_COUNT_RE) : null;
+    out[name] = hit ? Number(hit[1]) : null;
+  }
+  return out;
+}
+
+// Pure. The standing names whose declared count GREW, each rendered with both counts.
+export function armGrowth(standing, baselineArms, postArms) {
+  const out = [];
+  for (const n of standing ?? []) {
+    const b = baselineArms ? baselineArms[n] : null;
+    const p = postArms ? postArms[n] : null;
+    if (typeof b === "number" && typeof p === "number" && p > b) out.push(`${n} (${b} -> ${p} failing arms)`);
+  }
+  return out;
+}
+
+// Pure. The red `regressionDelta()` returns when a standing file grew, else null. Absent arms ->
+// null -> every existing caller grades byte for byte as before.
+export function armGrowthVerdict({ standing, newlyRed, unverifiedInBaseline, neverMeasured, baselineArms, postArms }) {
+  const grown = armGrowth(standing, baselineArms, postArms);
+  if (!grown.length) return null;
+  return { status: "red", standing, newlyRed, unverifiedInBaseline, neverMeasured, grown,
+    reason: `regression RED: ${grown.length} standing-red ${grown.length === 1 ? "file fails" : "files fail"} ` +
+      `MORE ARMS than on the unchanged tree, and a new failure inside an already-red file is this ` +
+      `delivery's to answer for: ${grown.join(", ")}. ${newlyRed.length} newly red by name` +
+      `${newlyRed.length ? ` (${newlyRed.join(", ")})` : ""}; ${standing.length} standing by name (AGT-328, AGT-170)` };
+}
+
 export const REGRESSION_NO_BASELINE_REASON =
   "no baseline handed to the gate; the absolute exit code stands — fail closed (AGT-170)";
 
@@ -1117,7 +1170,7 @@ export const REGRESSION_NO_BASELINE_REASON =
 // name goes into its own list with its own sentence instead of into an accusation this delivery
 // cannot answer. Nothing is cleared, which is the whole safety argument for touching a red -> green
 // rule a third time.
-export function regressionDelta({ absolute, baseline, post, unverified, measured }) {
+export function regressionDelta({ absolute, baseline, post, unverified, measured, baselineArms, postArms }) {
   // Every fail-closed exit reports `unverifiedInBaseline: null` for the same reason it reports the other
   // two lists as null -- nothing was graded, so no list may be published as if it had been. `[]` here
   // would read as the positive fact "the baseline ran everything", off a baseline nobody parsed.
@@ -1180,6 +1233,8 @@ export function regressionDelta({ absolute, baseline, post, unverified, measured
       reason: `regression exited non-zero and named NO failing test, so there is no failing set to ` +
         `prove against the ${baselineNames.length}-name baseline -- fail closed (AGT-170)` };
   }
+  const grownRed = armGrowthVerdict({ standing, newlyRed, unverifiedInBaseline, neverMeasured, baselineArms, postArms });
+  if (grownRed) return grownRed;
   if (newlyRed.length) {
     return { status: "red", standing, newlyRed, unverifiedInBaseline, neverMeasured,
       reason: `regression RED on ${newlyRed.length} newly red ${newlyRed.length === 1 ? "test" : "tests"} ` +
@@ -1282,7 +1337,7 @@ export function readRegressionBaseline(baselinePath, readFile = (f) => fs.readFi
   const names = failingTestsFrom(text);
   const unverified = notRunTestsFrom(text).filter(n => !names.includes(n));
   const measured = measuredTestsFrom(text);
-  return { names, unverified,
+  return { names, unverified, arms: failingArmsFrom(text),
     measured: measured.length ? measured : null,
     instrument: baselineInstrumentFrom(text),
     // AGT-629: the FOURTH list off the SAME read of the SAME file, for the reason the third one's
@@ -1413,7 +1468,7 @@ export function readKickoffBaseline(text) {
     return { names: null, unverified: null, measured: null, instrument, present: true,
       source: `the kickoff's BASELINE block says Red set: ${r} of ${count[2]} but names ${unique.length}; the gate grades the absolute exit code (AGT-391)` };
   }
-  return { names: unique, unverified: [],
+  return { names: unique, unverified: [], arms: failingArmsFrom(para),
     measured: measuredNames.length ? measuredNames : null, instrument, present: true,
     source: `the kickoff's BASELINE block (${r} red of ${count[2]} on the unchanged tree, related set)` };
 }
@@ -2191,7 +2246,7 @@ export async function runGate(gate, repoRoot, env = process.env) {
   const fails = gate.key === "regression"
     ? failingTestsFrom(`${res.stdout || ""}\n${res.stderr || ""}`)
     : null;
-  return { status, fails, detail: `exit ${res.status === null ? "signal " + res.signal : res.status}${tail ? " -- " + tail.slice(0, DETAIL_CAP) : ""}` };
+  return { status, fails, arms: fails ? failingArmsFrom(`${res.stdout || ""}\n${res.stderr || ""}`) : null, detail: `exit ${res.status === null ? "signal " + res.signal : res.status}${tail ? " -- " + tail.slice(0, DETAIL_CAP) : ""}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -2649,6 +2704,103 @@ export function kickoffApplyFinding(text, out = {}) {
   return { kind: "kickoff-no-lanes", clause: APPLY_CLAUSE, remedy_owner: KICKOFF_REMEDY_OWNER,
     remedy: 're-assemble design-kickoff ONCE with "no_lanes":true; the caller never writes the Apply line',
     reason: "kickoff apply declaration (AGT-673): apply_migration is named and no line starts `" + APPLY_LINE + "`. The apply is the orchestrator's connector call, never a Builder task; no connector, the step stops and the ticket parks." };
+}
+
+// ---- FEATURE: AGT-328 -- A PINNED LITERAL IS RE-PINNED IN THE SHIP THAT CHANGES IT. ----------
+// The `anchors` block already declares every literal a build acts on and `--check-kickoff` already
+// resolves each with `git grep -F -l`. A `tests/regression/` file among the holders PINS that
+// literal, so the kickoff must say what happens to it: one fenced `pins` block, one line per test,
+// `<tests/regression/...> | repin|keep | <why>`. `repin` = the test is edited in this ship, and 7a
+// blocks a ship that leaves it out; `keep` = the build does not alter what the test pins. COVERAGE,
+// NEVER THE DECISION (the risk clause's rule): whether `keep` is right is a judgement this never
+// reads. Graded from v7.0.1066; a block that is present is graded whatever the stamp.
+export const PINS_CLAUSE = "pins";
+export const PINS_BLOCK_FROM = [7, 0, 1066];
+export const PIN_DISPOSITIONS = Object.freeze(["repin", "keep"]);
+const pinPath = p => String(p ?? "").replace(/\\/g, "/").replace(/^\.\//, "").trim();
+
+// The FIRST fenced block whose info string is exactly `pins`; null when there is none.
+export function pinsBlockLines(text) {
+  const lines = String(text ?? "").split("\n");
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const fence = lines[i].match(/^\s*`{3,}\s*(.*?)\s*$/);
+    if (fence && fence[1] === PINS_CLAUSE) { start = i + 1; break; }
+  }
+  if (start === -1) return null;
+  const out = [];
+  for (let i = start; i < lines.length; i++) {
+    if (/^\s*`{3,}/.test(lines[i])) break;
+    const raw = lines[i];
+    if (!raw.trim()) continue;
+    const p1 = raw.indexOf("|");
+    const p2 = p1 === -1 ? -1 : raw.indexOf("|", p1 + 1);
+    if (p2 === -1) { out.push({ raw, test: null, disposition: null, why: null }); continue; }
+    out.push({ raw, test: pinPath(raw.slice(0, p1)), disposition: raw.slice(p1 + 1, p2).trim(), why: raw.slice(p2 + 1).trim() });
+  }
+  return out;
+}
+
+// Step 6. `resolve` is the anchors clause's own resolver: literal -> { files } | null.
+export function kickoffPinsFinding(text, resolve, out = {}) {
+  const lines = pinsBlockLines(text);
+  const refuse = (why) => ({
+    kind: "kickoff-no-lanes",
+    clause: PINS_CLAUSE,
+    remedy_owner: KICKOFF_REMEDY_OWNER,
+    remedy: 're-assemble design-kickoff ONCE with "no_lanes":true; the caller never writes the pins block',
+    reason: `kickoff pins declaration (AGT-328): ${why} A regression test that holds a literal the build acts on `
+      + "pins it, and a ship that changes the literal without re-pinning the test grows the standing red set by "
+      + "omission. Declare one line per test in a fenced pins block: <tests/regression/...> | repin|keep | <why> "
+      + "-- repin rides this ship (name the test in a task), keep says the build does not alter what it pins.",
+  });
+  const s = kickoffStampVersion(text), f = PINS_BLOCK_FROM;
+  const graded = lines !== null || (s !== null && (s[0] !== f[0] ? s[0] > f[0] : s[1] !== f[1] ? s[1] > f[1] : s[2] >= f[2]));
+  if (!graded) { out.note = `NOT GRADED (AGT-328): no pins block and stamp ${s ? "v" + s.join(".") : "absent"} predates v7.0.1066.`; return null; }
+  for (const l of lines ?? []) {
+    if (!l.test || !l.test.startsWith("tests/regression/") || !PIN_DISPOSITIONS.includes(l.disposition) || !l.why) {
+      return refuse(`the line \`${l.raw.trim()}\` is not <tests/regression/...> | repin|keep | <why>.`);
+    }
+  }
+  const declared = new Set((lines ?? []).map(l => l.test));
+  const holders = new Map();
+  let unresolved = 0;
+  for (const a of anchorBlockLines(text)) {
+    if (a.path === null || a.literal === null) continue;
+    let r = null;
+    try { r = typeof resolve === "function" ? resolve(a.literal) : null; } catch { r = null; }
+    if (!r || !Array.isArray(r.files)) { unresolved++; continue; }
+    for (const file of r.files.map(pinPath)) {
+      if (file.startsWith("tests/regression/") && file !== pinPath(a.path) && !holders.has(file)) holders.set(file, a.literal);
+    }
+  }
+  out.holders = holders.size;
+  const missing = [...holders.keys()].filter(t => !declared.has(t));
+  if (missing.length) {
+    return refuse(`${missing.length} regression ${missing.length === 1 ? "test holds" : "tests hold"} an anchored literal and `
+      + `${missing.length === 1 ? "has" : "have"} no pins line: ${missing.map(t => `${t} (holds \`${holders.get(t)}\`)`).join("; ")}.`);
+  }
+  const repin = (lines ?? []).filter(l => l.disposition === "repin").length;
+  out.note = `pins: ${holders.size} regression test(s) hold an anchored literal, all declared; ${(lines ?? []).length} line(s), `
+    + `${repin} repin (AGT-328).` + (unresolved ? ` ${unresolved} anchor(s) NOT GRADED -- the resolver could not answer.` : "");
+  return null;
+}
+
+// 7a. Every `repin` test must be among the delivery's changed files. No block, or no repin -> null.
+export function pinsShipFinding({ text, changedFiles } = {}) {
+  const repin = (pinsBlockLines(text) ?? []).filter(l => l.disposition === "repin" && l.test).map(l => l.test);
+  if (!repin.length) return null;
+  const changed = Array.isArray(changedFiles) ? changedFiles.map(pinPath) : null;
+  const left = changed === null ? repin : repin.filter(t => !changed.includes(t));
+  if (!left.length) return null;
+  return {
+    kind: "pin-left-behind",
+    tests: left,
+    reason: `pin left behind (AGT-328): the kickoff declares ${repin.length} regression ${repin.length === 1 ? "test" : "tests"} `
+      + `repin and ${left.length} ${left.length === 1 ? "is" : "are"} not in this delivery's changed files`
+      + `${changed === null ? " (the changed-file list could not be read -- fail closed)" : ""}: ${left.join(", ")}. `
+      + "The re-pin rides the ship that changes the literal; it is never owed to a later one.",
+  };
 }
 
 export function anchorBlockLines(text) {
@@ -3498,6 +3650,7 @@ export async function gradeDelivery({ repoRoot, regressionRoot = repoRoot, cycle
   const gateResults = {};
   const gateDetail = {};
   const gateFails = {};
+  let postArms = null;
   for (const gate of GATES) {
     // AGT-265: the regression gate waits in the one test-slot line; no slot is RED, naming the level.
     let r;
@@ -3515,6 +3668,7 @@ export async function gradeDelivery({ repoRoot, regressionRoot = repoRoot, cycle
     gateResults[gate.key] = r.status;
     gateDetail[gate.key] = r.detail;
     if (r.fails) gateFails[gate.key] = r.fails;
+    if (r.arms) postArms = r.arms;
   }
 
   // ---- FEATURE: AGT-170 -- THE REGRESSION GATE'S STATUS BECOMES THE DELTA'S. -------------------
@@ -3540,6 +3694,7 @@ export async function gradeDelivery({ repoRoot, regressionRoot = repoRoot, cycle
     absolute: regressionAbsolute,
     baseline: baselineRead.names,
     post: gateFails.regression ?? null,
+    baselineArms: baselineRead.arms, postArms,
     unverified: baselineRead.unverified,
     // AGT-457: the THIRD list off the SAME read of the SAME file, for the reason slice 2's comment
     // above gives -- three facts read from three reads can describe three baselines.
@@ -3867,7 +4022,7 @@ async function main() {
     // runner's own environment. So 2-and-anything-else returns null, the anchor is NOT GRADED, the
     // exit code is untouched, and the green says which anchors it skipped.
     const anchorOut = {};
-    const anchors = kickoffAnchorFinding(text, (literal) => {
+    const resolveLiteral = (literal) => {
       const g = spawnSync("git",
         ["-C", repoRoot, "grep", "-F", "-l", "-e", literal, "--", ".", ":(exclude)docs/kickoffs", ":(exclude)docs/harvests"],
         { encoding: "utf8" });
@@ -3875,7 +4030,8 @@ async function main() {
       if (g.status === 0) return { files: String(g.stdout || "").split("\n").map(s => s.trim()).filter(Boolean) };
       if (g.status === 1) return { files: [] };
       return null;
-    }, anchorOut);
+    };
+    const anchors = kickoffAnchorFinding(text, resolveLiteral, anchorOut);
     if (anchors) {
       return emit({ code: 1, payload: { ok: false, exitCode: 1, ...anchors, anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared }, prose: anchors.reason });
     }
@@ -3893,6 +4049,7 @@ async function main() {
       return emit({ code: 1, payload: { ok: false, exitCode: 1, ...risk, risk_parts: riskOut.parts, risk_covered: riskOut.covered }, prose: risk.reason });
     }
     const applyOut = {}; const apply = kickoffApplyFinding(text, applyOut); if (apply) return emit({ code: 1, payload: { ok: false, exitCode: 1, ...apply }, prose: apply.reason });
+    const pinsOut = {}; const pins = kickoffPinsFinding(text, resolveLiteral, pinsOut); if (pins) return emit({ code: 1, payload: { ok: false, exitCode: 1, ...pins }, prose: pins.reason });
     // ---- AGT-187: THE THIRD CLAUSE -- the green says WHOSE declaration it graded. -------------
     //
     // ORDER IS cap -> lanes -> attestation, and it is not interchangeable: the first two grade the
@@ -3943,7 +4100,7 @@ async function main() {
         baseline_note: baselineNote,
       anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
         risk_note: riskOut.note,
-        apply_note: applyOut.note,
+        apply_note: applyOut.note, pins_note: pinsOut.note,
         attests: "the Designer's own answer carries these exact bytes -- the Lanes: line is the Designer's" },
         prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376), and ATTESTED: the Designer's answer carries these exact bytes (AGT-187)` });
     }
@@ -3952,7 +4109,7 @@ async function main() {
       baseline_note: baselineNote,
       anchors_graded: anchorOut.graded, anchors_declared: anchorOut.declared, anchors_note: anchorOut.note,
       risk_note: riskOut.note,
-      apply_note: applyOut.note,
+      apply_note: applyOut.note, pins_note: pinsOut.note,
       attests: "a Lanes: line is present -- NOT that the Designer wrote it" },
       prose: `kickoff ${bytes} bytes, within ${KICKOFF_BYTE_CAP} (SES-376). UNATTESTED (AGT-187): a Lanes: line is present -- NOT that the Designer wrote it. Pass --answer=<path> to attest it.` });
   }
@@ -4449,6 +4606,8 @@ async function main() {
   // this point into every lane. Both judged lanes read it back out of the context file rather than
   // calling this again: see recordJudgedVerdict()'s note on why a second read is a different fact.
   const gradedSha = gradedShaFor(repoRoot);
+  const pinLeft = kickoffText !== null ? pinsShipFinding({ text: kickoffText, changedFiles }) : null;
+  if (pinLeft) { verdict = "block"; reasoning = pinLeft.reason + " | " + reasoning; }
 
   // FEATURE: AGT-562 -- the two reads behind `shipOrphanFinding()`, taken ONCE here and carried from
   // this point into the finding, the prose line and the --json payload.
