@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1087 | scripts/audit-ledger.js | AGT-553 -- intakeProblems(): the intake refuses a place-less location and a fingerprint it did not compute.
 // DeepBench v7.0.661 | scripts/audit-ledger.js | AGT-239
 // FEATURE: AGT-239 -- toRow() passes a finding's `family` through (null when it names none), so a
 // flow check's `blocked`/`flow` and a run review's `outcome` land as written; a null is filled at
@@ -196,6 +197,25 @@ export function fingerprint(f) {
   const keys = (f?.locations ?? []).map(locationKey).sort();
   const material = `${f?.kind ?? ""}|${keys.join(",")}|${normalize(f?.governing_fact)}`;
   return createHash("sha256").update(material, "utf8").digest("hex").slice(0, 16);
+}
+
+// AGT-553 -- the ONE validator of what the intake admits: the week, every location, the fingerprint.
+// FINGERPRINT_FORM is the pattern the parked trigger in docs/design/agt-553-ledger-shape-guard.sql holds (agt-553 arm C pins the pair).
+export const FINGERPRINT_FORM = /^[0-9a-f]{16}$/;
+export const WEEK_FORM = /^\d{4}-W\d{2}$/;
+export function intakeProblems({ week, findings, thisWeek = isoWeek(new Date()) } = {}) {
+  if (!WEEK_FORM.test(String(week))) return [`week must be YYYY-Www (got ${JSON.stringify(week)}) -- omit it to stamp this ISO week.`];
+  if (String(week) > thisWeek) return [`week ${week} has not begun -- this ISO week is ${thisWeek}; omit week to stamp it.`];
+  const out = [];
+  (Array.isArray(findings) ? findings : []).forEach((f, i) => {
+    const locs = Array.isArray(f?.locations) ? f.locations : [];
+    if (!locs.length) out.push(`findings[${i}].locations must hold at least one {location, text} entry`);
+    locs.forEach((l, j) => {
+      if (typeof l?.location !== "string" || !l.location.trim()) out.push(`findings[${i}].locations[${j}].location is required and non-empty (an entry is {location, text}, never a bare string)`);
+    });
+    if (f?.fingerprint != null && f.fingerprint !== fingerprint(f)) out.push(`findings[${i}].fingerprint is not the one this ledger computes (${fingerprint(f)}) -- omit it`);
+  });
+  return out;
 }
 
 const STATUS_ORDER = { open: 0, resolved: 1, "not-a-defect": 2, ticketed: 3, carried: 4, escalated: 5 };
@@ -447,13 +467,10 @@ export async function ingestFindings({
   // CLI's `--ingest --week=` back-ingest and auditor-write.js's context week are the callers that
   // legitimately mean an earlier week, and `null` fails the form because a destructuring default
   // fires on `undefined` alone.
-  const WEEK_FORM = /^\d{4}-W\d{2}$/;
-  if (!WEEK_FORM.test(String(week))) throw new Error(`ingestFindings: week must be YYYY-Www (got ${JSON.stringify(week)}) -- omit it to stamp this ISO week.`);
-  const thisWeek = isoWeek(new Date());
-  // Zero-padded `YYYY-Www` orders lexicographically, so this comparison needs no date arithmetic.
-  if (String(week) > thisWeek) throw new Error(`ingestFindings: week ${week} has not begun -- this ISO week is ${thisWeek}; omit week to stamp it.`);
 
   const all = Array.isArray(findings) ? findings : [];
+  const problems = intakeProblems({ week, findings: all });
+  if (problems.length) throw new Error(`ingestFindings: ${problems.join("; ")}`);
   // Resolve-and-discard: this throws for the batch before anything is read or written.
   if (apply) for (const f of all) findingTypeOf(f, findingType);
 
