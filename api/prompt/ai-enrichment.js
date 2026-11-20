@@ -1,3 +1,4 @@
+// DeepBench v7.0.1077 | api/prompt/ai-enrichment.js | AGT-354 -- when the prompt already carries the taught section, the RAG fetch excludes that agent's always-given items.
 // DeepBench v7.0.430 | api/prompt/ai-enrichment.js | SES-341 -- fetchSection() gains an inline
 // branch: a knowledge section whose fetch_instruction declares method/source "inline" renders its
 // own text through db-assembly.js renderInlineKnowledge() and performs NO retrieval (it must sit
@@ -277,7 +278,7 @@ async function fetchWithTimeout(promise, timeoutMs) {
 // the CURRENT execution's own trace (the judge's), while task_context.trace_id is the trace being
 // JUDGED. Conflating them would have the judge grade itself. Defaults to null, so every existing
 // call site is byte-identical.
-async function fetchSection(section, taskContext, tenantId, requestingAgentId, traceId = null, spanId = null, taskContextObj = null) {
+async function fetchSection(section, taskContext, tenantId, requestingAgentId, traceId = null, spanId = null, taskContextObj = null, taughtAgentId = null) {
   if (section.type === "stored") return { ...section };
 
   if (section.type === "rag") {
@@ -349,6 +350,7 @@ async function fetchSection(section, taskContext, tenantId, requestingAgentId, t
               tenantId,
               matchCount: fi.match_count || 5,
               scope: fi.scope || "agent",
+              excludeAlwaysFor: taughtAgentId,
             }),
             RAG_TIMEOUT_MS
           );
@@ -488,6 +490,8 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
 
   // STEP 1 — FETCH: run stored pass-through + RAG fetches in parallel
   const nonReflectSections = sections.filter(s => s.type !== "reflect");
+  // AGT-354: when this prompt already carries the agent's taught section, the search leaves those items out.
+  const taughtAgentId = sections.some(s => s.slug === "taught") ? (pr_agent_id || effectiveAgentId) : null;
   const fetchedSections = await Promise.all(
     // FEATURE: AA-179c -- completion-only, one frame per RAG fetch, attached as each individual
     // fetch resolves: this .then() runs before Promise.all's barrier, so the stream shows real
@@ -502,7 +506,7 @@ export async function enrichPrompt({ prompt_request, agent_id, capability_slug, 
     // about the same event. `stored` sections emit nothing either: no work happened.
     // FEATURE: LOG-143 (d1) -- the raw task_context rides alongside the flattened string; only the
     // trace_facts source reads it, every other branch ignores the extra argument.
-    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id, effectiveAgentId, trace_id, span_id, task_context).then(fetched => {
+    nonReflectSections.map(s => fetchSection(s, taskContextStr, tenant_id, effectiveAgentId, trace_id, span_id, task_context, taughtAgentId).then(fetched => {
       // FEATURE: SES-341 -- an inline Knowledge section performs no fetch, so it emits no fetch
       // frame, for the same reason the comment above gives for `stored`: no work happened. Emitting
       // one would put a "retrieved 0 records" line on the Evidence card for a section whose text

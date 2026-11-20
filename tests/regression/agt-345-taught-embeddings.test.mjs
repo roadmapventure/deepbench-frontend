@@ -1,3 +1,4 @@
+// DeepBench v7.0.1077 | tests/regression/agt-345-taught-embeddings.test.mjs | AGT-354 -- arms h and i: the sweep also names a long item that has no pieces.
 // DeepBench v7.0.775 | tests/regression/agt-345-taught-embeddings.test.mjs | AGT-345
 //
 // FEATURE: AGT-345 -- a user-taught item saved with no embedding is never found by in-app search,
@@ -109,6 +110,27 @@ function sweepFetch({ nullRows, allRows }) {
   return { impl, calls };
 }
 
+// AGT-354 arms (h)/(i): their own fetchImpl, because they are the only arms that care what the
+// third read (the pieces read) answers. sweepFetch() above is deliberately NOT changed -- it answers
+// that read with allRows, whose rows carry no content and no entry_id, which is exactly what keeps
+// arms (d)-(f) grading as they did before pieces existed.
+const ELEVEN_ROWS = Array.from({ length: 11 }, (_, i) => ({
+  id: `row-${i + 1}`, title: `T${i + 1}`, agent_id: "bob", tenant_id: "global",
+  content: i + 1 === 10 ? "x".repeat(12001) : i + 1 === 11 ? "y".repeat(12000) : "short",
+}));
+
+function piecesFetch(pieceRows) {
+  const calls = [];
+  const impl = async (url, init = {}) => {
+    const u = String(url);
+    calls.push({ url: u, init });
+    if (u.includes("embedding=is.null")) return answer(200, []);
+    if (u.includes("knowledge_entry_pieces")) return answer(200, pieceRows);
+    return answer(200, ELEVEN_ROWS);
+  };
+  return { impl, calls };
+}
+
 const loadSweep = async () => (await import("../../scripts/check-taught-embeddings.js")).sweep;
 
 // ---------------------------------------------------------------------------------------------
@@ -205,6 +227,36 @@ const ARMS = {
       return;
     }
     assert.strictEqual(out.code, 0, `${out.lines.join(" | ")} -- live data, not this build`);
+  },
+
+  // (h) AGT-354 -- the sweep is the platform's only sensor for a long taught item that never got
+  // its pieces, and such an item is unsearchable past character 12,000 exactly as a null embedding
+  // is unsearchable at all. row-11 sits at exactly 12,000 and is correctly NOT named.
+  async "h-sweep-names-a-long-item-with-no-pieces"() {
+    const sweep = await loadSweep();
+    const f = piecesFetch([]);
+    const out = await sweep({ url: SWEEP_URL, key: SWEEP_KEY, fetchImpl: f.impl });
+    assert.strictEqual(out.code, 1, `a long item with no pieces must answer code 1, got ${out.code}`);
+    assert.deepStrictEqual(out.lines, [
+      '[FAIL] long user-taught item with no pieces: row-10 "T10" (agent bob, tenant global, 12001 characters)',
+      "Repair: PATCH /api/load-entries with the item's id and its own unchanged title.",
+    ], `the sweep must name row-10 and only row-10, got ${JSON.stringify(out.lines)}`);
+    assert.strictEqual(out.rows.length, 0, "no item here lacks an embedding -- this is the pieces gap on its own");
+    assert.ok(!out.lines.some(l => l.includes(SWEEP_KEY)), "no line may hold the key");
+    assert.strictEqual(f.calls.length, 3, `the sweep must read three times, got ${f.calls.length}`);
+    assert.ok(f.calls[2].url.endsWith("/rest/v1/knowledge_entry_pieces?piece_no=eq.1&select=entry_id"),
+      `the third read is the pieces read, got ${f.calls[2].url}`);
+  },
+
+  // (i) CONTROL for (h): one piece row is enough for the item to count as pieced.
+  async "i-sweep-passes-when-every-long-item-has-pieces"() {
+    const sweep = await loadSweep();
+    const f = piecesFetch([{ entry_id: "row-10" }]);
+    const out = await sweep({ url: SWEEP_URL, key: SWEEP_KEY, fetchImpl: f.impl });
+    assert.strictEqual(out.code, 0, `every long item pieced must answer code 0, got ${out.code} ${JSON.stringify(out.lines)}`);
+    assert.deepStrictEqual(out.lines, [
+      "[PASS] check-taught-embeddings -- 11 of 11 active user-taught items have an embedding; 1 of 1 over 12000 characters have pieces",
+    ], `the pass line must count both sweeps, got ${JSON.stringify(out.lines)}`);
   },
 };
 
