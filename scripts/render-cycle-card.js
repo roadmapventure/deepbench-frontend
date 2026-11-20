@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1073 | scripts/render-cycle-card.js | AGT-319 -- a render writes the card and nothing else: `--write` no longer re-pins the live dm-knowledge-cycle-card row, refuses the flags only the re-pin reads, and prints RE-PIN OWED when the card changed. The re-pin is its own command, run once on the final card (`--sync-knowledge --repin`), and the ship gate holds it: ses-378d is in the related set of any card change.
 // DeepBench v7.0.977 | scripts/render-cycle-card.js | AGT-610 -- the pre-boot gate note names the redesign pickup: a find-work-only boot runs `node scripts/redesign-pickup.js --next` FIRST, so a refused ticket is picked up by the team rather than waiting for John (John's standing decision 6e94edcb). DEVIATION, recorded: the kickoff's literal outcome was 180 chars and render() throws over OUTCOME_MAX 90, so it is cut to 90 carrying both branches and the pickup command -- the runbook pointer (docs/runbooks/redesign-after-refusal.md) travels in record_skip()'s own refusal instead, exactly as v7.0.505 (AGT-79 slice 5) cut a 169-char outcome to 90.
 // DeepBench v7.0.843 | scripts/render-cycle-card.js | AGT-451 -- step 7's NOTES block list is [1, 2, 5]: AGT-451 inserted the credentialed pre-build baseline measurement as step 7's SECOND fence, so the card now carries the assembly (1), that measurement + its --check-kickoff arming (2) and the agent-log row (5) -- the generated card is the only door a cycle reads, and an index left at [1, 4] would have carried the measurement's old neighbour instead of the measurement.
 // DeepBench v7.0.840 | scripts/render-cycle-card.js | AGT-449 -- step 5a's NOTES outcome names the Manager's door: a cap case → node scripts/rule-cap-case.js.
@@ -454,11 +455,11 @@ async function repinKnowledge(base, key, live, row) {
   }
 }
 
-async function syncKnowledge(opts = {}) {
+async function syncKnowledge() {
   const apply = process.argv.includes("--apply");
-  // AGT-112: `opts.repin` is how the --write branch falls into the SAME repair below rather than
-  // growing a second one. The flags it re-pins under are the flags already on the command line.
-  const repin = opts.repin === true || process.argv.includes("--repin");
+  // AGT-319: the re-pin is reached from its own flag and from nowhere else. `--write` used to
+  // fall in here; a render now ends at the card.
+  const repin = process.argv.includes("--repin");
   const cardPath = path.join(WORKTREE, CARD_REL);
 
   let cardText;
@@ -622,11 +623,11 @@ async function syncKnowledge(opts = {}) {
 // no flag  -> check: 0 the committed card equals render(runbook); 1 it differs or is over cap
 //             (prints the first differing line and the --write command); 2 the runbook or the card
 //             could not be read, a step has no NOTES entry, or NOTES names a step the runbook lacks.
-// --write [--cycle-id=<uuid> --ticket=<ID>]
-//          -> write the card. Refuses over CARD_BYTE_CAP. A write that CHANGES the card refuses
-//             with exit 2 unless it carries --cycle-id, --ticket and live credentials (AGT-112,
-//             writeGate below), and on success re-pins the Knowledge row in the same run under the
-//             same decision handle. A write that changes nothing is ungated and exits 0.
+// --write  -> write the card and NOTHING ELSE (AGT-319). Refuses over CARD_BYTE_CAP. Reads no
+//             credentials and sends no request, so it runs anywhere, any number of times. Exit 2,
+//             nothing written, when it is handed --cycle-id, --ticket or --decision: only the
+//             re-pin reads those. A write that CHANGED the card prints one RE-PIN OWED line naming
+//             the command below, and exits 0.
 // --sync-knowledge [--apply --cycle-id=<uuid> [--decision=<uuid>]]
 //          -> 0 the live Knowledge row is absent or current, 1 it is DRIFTED, 2 it cannot be read
 //             (missing card, missing env, REST failure) or --apply could not complete.
@@ -634,40 +635,49 @@ async function syncKnowledge(opts = {}) {
 //          -> repairs a DRIFTED row: 0 re-pinned (or already current, nothing written), 2 the row is
 //             absent, a required flag is missing, or the write could not complete. SES-424 slice 5.
 
-// AGT-112 -- WHY A RENDER MAY NOT SHIP ALONE. Measured this cycle: the committed card was
-// re-rendered twice in one night (187df12b -> 385a4688 -> a3c4ac6d) and the live Knowledge row was
-// re-pinned neither time, so the Development Manager spent ~4 hours being assembled from a cycle
-// two renders old. Nothing coupled the two: `grep "sync-knowledge\|repin" runner-cycle.md` returned
-// 0 hits, and the re-pin was a separate command a human had to remember. That is the wrong shape --
-// the fix is not a third wording of the instruction but a structural one (pattern:10), and the
-// structure is to gate the dangerous operation through the atomic correct path instead of blocking
-// it (pattern:19): a render that CHANGES the card cannot be written at all unless it arrives with
-// what the re-pin needs, and then it re-pins in the same run under the same handle.
+// AGT-319 -- A RENDER NEVER WRITES AN AGENT'S ROW. From AGT-112 (v7.0.577) to v7.0.1072 a `--write`
+// that changed the card re-pinned the live Knowledge row in the same run. That closed the drift it
+// was built for (two renders shipped on 2026-09-24 with no re-pin), and it moved the row on EVERY
+// render, not on the one that ships. Measured 2026-11-20 on runner_decisions: 23 re-pins since
+// 2026-10-10 over 16 commits that changed the card; 6 of the 23, in 5 cycles, pinned the live
+// Development Manager to card bytes that were never committed to dev -- a draft a build rendered,
+// tested and rendered again. And because a render needed credentials, a ticket and a cycle id, the
+// card could not be measured at design time without a private copy of this script.
 //
-// A NO-OP RE-RENDER IS NOT GATED. `changed === false` writes bytes identical to the ones already
-// committed, so it cannot put the pin out of date and owes nothing -- gating it would only train
-// everyone to pass flags that mean nothing, and would break `--write` as an idempotent check.
-//
-// Pure, and the whole of the gate's decision: null when the write may proceed, else the refusal
-// string. It names every missing thing at once, so a caller fixes one command line instead of
-// discovering the requirements one exit at a time.
-export function writeGate({ changed, ticket, cycleId, hasCreds }) {
+// SO THE TWO ARE TWO COMMANDS, AND THE GUARD MOVED RATHER THAN WENT AWAY. A render is free and
+// repeatable. The re-pin is `--sync-knowledge --repin`, run ONCE on the card the build will commit,
+// by the build whose edit moved the card (MANAGER-AUTHORITY-MATRIX row 1, unchanged). What stops a
+// card shipping with no re-pin is no longer this script's memory but the ship gate: the related
+// set of any change to the card holds ses-378d-manager-skill-rows, which reads the live row
+// against the card and is red until the re-pin runs, and the regression-delta gate (AGT-170)
+// blocks a ship on a newly red test. Neither gate existed on 2026-09-24.
+// tests/regression/agt-112-card-write-repins.test.mjs holds both halves.
+export const REPIN_COMMAND = "node scripts/render-cycle-card.js --sync-knowledge --repin --cycle-id=<uuid> --ticket=<ID>";
+
+// Pure. null when the write may proceed, else the refusal. The flags below are read by the re-pin
+// alone, so on a render they can only mean a caller still expects the old one-command behaviour --
+// and that caller must hear it from an exit 2, never from a row it believes it moved.
+export function writeFlagsRefusal({ ticket, cycleId, decision } = {}) {
+  const given = [];
+  if (ticket) given.push("--ticket");
+  if (cycleId) given.push("--cycle-id");
+  if (decision) given.push("--decision");
+  if (!given.length) return null;
+  return `render-cycle-card --write: a render writes ${CARD_REL} and nothing else — it no longer ` +
+    `re-pins the live ${KNOWLEDGE_SLUG} row (AGT-319).\n` +
+    // ONE LINE, NOTHING ELSE ON IT (STANDARDS §4, LOO-013: assert WHICH branch fired).
+    `  given: ${given.join(", ")}\n` +
+    `Nothing was written. Render with no flags:  node scripts/render-cycle-card.js --write\n` +
+    `Then ONCE, when the card is final and before the commit:  ${REPIN_COMMAND}`;
+}
+
+// Pure. null when the write changed nothing -- bytes identical to the ones on disk cannot have put
+// the pin out of date -- else the one line that says what the changed card now owes.
+export function repinOwed({ changed } = {}) {
   if (changed !== true) return null;
-  const missing = [];
-  if (!ticket) missing.push("--ticket=<ID>");
-  if (!cycleId) missing.push("--cycle-id=<uuid>");
-  if (!hasCreds) missing.push("SUPABASE_URL and SUPABASE_SERVICE_KEY in the environment");
-  if (!missing.length) return null;
-  return `render-cycle-card --write: this render CHANGES ${CARD_REL}, and the live ` +
-    `${KNOWLEDGE_SLUG} Knowledge row pins the card's bytes — so writing it here would leave the ` +
-    `Development Manager assembled from a procedure that is no longer the committed one, which is ` +
-    `exactly what happened twice on 2026-09-24 (AGT-112). The write and the re-pin are ONE ` +
-    `operation under one decision handle.\n` +
-    // ONE LINE, NOTHING ELSE ON IT. The hint below names every flag, so a test that only grepped
-    // the whole message for "--ticket" would pass on the --cycle-id refusal too (STANDARDS §4,
-    // LOO-013: assert WHICH branch fired). This line is the machine-readable answer to that.
-    `  missing: ${missing.join(", ")}\n` +
-    `Nothing was written. Re-run as:  node scripts/render-cycle-card.js --write --cycle-id=<uuid> --ticket=<ID>`;
+  return `render-cycle-card --write: RE-PIN OWED — ${CARD_REL} changed and the live ` +
+    `${KNOWLEDGE_SLUG} row still pins the previous bytes. This render wrote no row. ONCE, when ` +
+    `the card is final and before the commit:  ${REPIN_COMMAND}`;
 }
 
 function firstDiff(a, b) {
@@ -713,9 +723,20 @@ function main() {
       process.exit(1);
     }
 
-    // AGT-112. `changed` is measured against the bytes on disk, not assumed from the flags: a card
-    // that is missing entirely is a change, and a re-render that produces what is already committed
-    // is not. The gate runs BEFORE the write, so a refusal leaves the card byte-for-byte as it was.
+    // AGT-319. A flag only the re-pin reads is refused BEFORE the write, so a refusal leaves the
+    // card byte-for-byte as it was.
+    const flagRefusal = writeFlagsRefusal({
+      ticket: flagValue("ticket"),
+      cycleId: flagValue("cycle-id"),
+      decision: flagValue("decision"),
+    });
+    if (flagRefusal) {
+      console.error(flagRefusal);
+      process.exit(2);
+    }
+
+    // `changed` is measured against the bytes on disk, not assumed: a card that is missing entirely
+    // is a change, and a re-render that produces what is already there is not.
     let onDisk = null;
     try {
       onDisk = lf(fs.readFileSync(cardPath, "utf8"));
@@ -723,27 +744,15 @@ function main() {
       onDisk = null;
     }
     const changed = onDisk !== card;
-    const refusal = writeGate({
-      changed,
-      ticket: flagValue("ticket"),
-      cycleId: flagValue("cycle-id"),
-      hasCreds: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY),
-    });
-    if (refusal) {
-      console.error(refusal);
-      process.exit(2);
-    }
 
     fs.writeFileSync(cardPath, card);
     console.log(`render-cycle-card: wrote ${CARD_REL} — ${bytes} bytes, ${parseSteps(md).length} steps, from ${RUNBOOK_REL} sha256 ${runbookSha(md)}`);
 
-    // An unchanged write cannot have moved the pin, so it ends here and touches no database.
-    if (!changed) process.exit(0);
-
-    // THE COUPLING. Same process, same flags, one handle: the repair below is the existing
-    // repinKnowledge(), reached through the existing classifier, never a second copy of it.
-    console.log("render-cycle-card --write: the card changed — re-pinning the Knowledge row in the same run.");
-    return syncKnowledge({ repin: true });
+    // THE SPLIT. The write ends here whatever it changed: no credential is read and no request is
+    // sent. A changed card says what it now owes, and the ship gate holds the debt.
+    const owed = repinOwed({ changed });
+    if (owed) console.log(owed);
+    process.exit(0);
   }
 
   let committed;

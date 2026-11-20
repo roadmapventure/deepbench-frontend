@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1073 | scripts/verifier.js | AGT-319 -- the coupled-files note records who pays for a runbook edit's dragged files: the kickoff that makes the edit (comment only, no clause changed).
 // DeepBench v7.0.1071 | scripts/verifier.js | AGT-326 -- a test that asserts a piece of an anchored line pins it; a runbook edit's dragged files are counted before the Builder runs.
 // DeepBench v7.0.1065 | scripts/verifier.js | AGT-328 -- the delta counts failing arms; a pin rides the ship that changes it.
 // DeepBench v7.0.1056 | scripts/verifier.js | AGT-673 -- a kickoff naming apply_migration says who applies it.
@@ -2869,8 +2870,11 @@ export function regressionSources(root) {
 // ship that changes the coupling. `files` are dragged by ANY edit and must be named; `says` is a
 // word the kickoff must carry because the drag is conditional (the Designer states re-pin or
 // byte-neutral); `conditional` is counted only when the kickoff names it. WHO PAYS for the card
-// re-render is AGT-319's question and is not decided here: this clause counts what today's tree
-// drags, and AGT-319's ship edits this map.
+// re-render was AGT-319's question and is decided (v7.0.1073): the kickoff whose edit moves the
+// runbook pays. The card, and the ses-413d re-pin unless byte-neutral, are files in ITS list; over
+// the cap it is a cap case, and no sweep re-renders on a build's behalf. The map stands as shipped.
+// The render itself writes no agent row any more: that kickoff names the re-pin as its own command
+// (scripts/render-cycle-card.js --sync-knowledge --repin), run once on the final card.
 //
 // THE COUNT IS A FLOOR: distinct anchored paths plus the dragged files. A kickoff's new files are
 // not anchored, so the real count is this or more -- a floor over the cap is a certain cap case
