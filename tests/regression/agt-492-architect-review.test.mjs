@@ -1,3 +1,4 @@
+// DeepBench v7.0.1075 | tests/regression/agt-492-architect-review.test.mjs | AGT-571 slice 1 -- arm B live grades its own key.
 // DeepBench v7.0.906 | tests/regression/agt-492-architect-review.test.mjs | AGT-304 slice 25 -- arm B grades the five rows its own ship seeded; the Rule #1 scan still covers every live ga-* row.
 // DeepBench v7.0.869 | tests/regression/agt-492-architect-review.test.mjs | AGT-492 -- the findings review
 // moves from the Development Manager (GV-01) to the Governance Architect (GV-09) and gains John's tested
@@ -32,6 +33,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { gradeOwnWrites } from "./_lib/scoped-count.js";
+const QA_SESSION = "agt-492-qa";
+const OWN_B = { decisions: `runner_decisions?select=id&session_name=eq.${QA_SESSION}`, images: `runner_before_images?select=id&session_name=eq.${QA_SESSION}`,
+  tickets: `backlog_items?select=id&session_ref=like.${QA_SESSION}*` };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = path.join(ROOT, "scripts/audit-review.js");
@@ -119,13 +124,6 @@ async function run() {
       if (!res.ok) throw new Error(`GET ${q} -> HTTP ${res.status} ${text.slice(0, 240)}`);
       return JSON.parse(text);
     };
-    const count = async t => {
-      const res = await fetch(`${url}/rest/v1/${t}?select=id`, {
-        headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact", Range: "0-0" },
-      });
-      await res.text();
-      return Number((res.headers.get("content-range") ?? "/0").split("/")[1]);
-    };
 
     await arm("B live", async () => {
       // GATE 1 -- the six links, in display_order.
@@ -207,16 +205,12 @@ async function run() {
         notRun("AGT-492 arm B (the rpc refusal)",
           `only ${open.length} open/carried finding(s) -- the probe needs at least two so that it is ALSO short on coverage`);
       } else {
-        const before = {
-          findings: await count("audit_findings"),
-          decisions: await count("runner_decisions"),
-          backlog: await count("backlog_items"),
-        };
+        await gradeOwnWrites(url, key, OWN_B, async () => {
         const res = await fetch(`${url}/rest/v1/rpc/apply_audit_review`, {
           method: "POST",
           headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            p_cycle_id: null, p_session_name: "agt-492-qa", p_week: WEEK,
+            p_cycle_id: null, p_session_name: QA_SESSION, p_week: WEEK,
             p_review: review([{ kind: "root-cause", title: "t", root_cause: "rc", fix: "f", finding_ids: [open[0]] }]),
           }),
         });
@@ -227,12 +221,7 @@ async function run() {
         assert.match(body?.message ?? "", /needs test/,
           `the refusal must name the missing test, not coverage; got ${JSON.stringify(body?.message)}`);
         assert.match(body?.message ?? "", /apply_audit_review: /, "the function's refusals carry its prefix");
-        const after = {
-          findings: await count("audit_findings"),
-          decisions: await count("runner_decisions"),
-          backlog: await count("backlog_items"),
-        };
-        assert.deepEqual(after, before, "a refused review writes nothing -- findings, decisions and backlog re-read equal");
+        }, { label: "AGT-492 arm B" });
       }
     });
   }

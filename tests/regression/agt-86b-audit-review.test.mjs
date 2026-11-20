@@ -1,3 +1,4 @@
+// DeepBench v7.0.1075 | tests/regression/agt-86b-audit-review.test.mjs | AGT-571 slice 1 -- arm F refusals grades its own key.
 // DeepBench v7.0.936 | tests/regression/agt-86b-audit-review.test.mjs | AGT-528 -- arm D's key
 // list is RETARGETED, never deleted: buildTaskContext() ships ticket heads now, so the default
 // context's open_audit_tickets[0] carries backlog_id, title and status only. The whole-row form
@@ -65,6 +66,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { gradeOwnWrites } from "./_lib/scoped-count.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CAPABILITY = "review-audit-worklist";
@@ -78,6 +80,10 @@ const SEED_DECISION = "aefd0627-f371-469d-a0a1-0fbac32db4bf"; // 2a's seed decis
 const LINKS = ["ga-identity", "ga-knowledge-review", "ga-behavior", INTENT, "ga-guardrails", "dm-knowledge-patterns"];
 const WEEK = "2026-W37";
 const SESSION_TAG = "agt-86b-qa";
+const PROBE_CYCLE = "00000000-0000-4000-8000-0000000086b1";
+const OWN = `or=(session_name.eq.${SESSION_TAG},cycle_id.eq.${PROBE_CYCLE})`;
+const OWN_F = { decisions: `runner_decisions?select=id&${OWN}`, images: `runner_before_images?select=id&${OWN}`,
+  tickets: `backlog_items?select=id&session_ref=like.${SESSION_TAG}*` };
 
 function restHeaders(key, extra = {}) {
   return { apikey: key, Authorization: `Bearer ${key}`, ...extra };
@@ -211,15 +217,6 @@ async function run() {
     if (!r.ok) throw new Error(`GET ${q} -> ${describe(r)}`);
     return r.json;
   };
-  const count = async (table, filter = "") => {
-    const res = await fetch(`${url}/rest/v1/${table}?select=id${filter}`, {
-      method: "HEAD", headers: restHeaders(key, { Prefer: "count=exact" }),
-    });
-    const range = res.headers.get("content-range") || "";
-    const n = Number(range.split("/")[1]);
-    if (!Number.isFinite(n)) throw new Error(`count ${table} -> HTTP ${res.status} content-range '${range}'`);
-    return n;
-  };
 
   // --- R. rows ------------------------------------------------------------------------------------
   await arm("R rows", async () => {
@@ -283,12 +280,6 @@ async function run() {
       notRun("AGT-86b arm F (refusals)", `only ${open.length} open/carried finding(s) -- the coverage probes need at least two`);
       return;
     }
-    const before = {
-      findings: await count("audit_findings"),
-      decisions: await count("runner_decisions"),
-      backlog: await count("backlog_items"),
-      ruled: (await get("audit_findings?ruled_at=not.is.null&select=id")).length,
-    };
     const unknown = "00000000-0000-4000-8000-0000000086b0";
     const missing = open[open.length - 1];
     const probes = [
@@ -303,10 +294,11 @@ async function run() {
         /john_call/],
       ["carry without reason", { p_session_name: SESSION_TAG, p_review: review([{ kind: "carry", finding_ids: [open[0]] }]) },
         /reason/],
-      ["both cycle and session", { p_cycle_id: "00000000-0000-4000-8000-0000000086b1", p_session_name: SESSION_TAG,
+      ["both cycle and session", { p_cycle_id: PROBE_CYCLE, p_session_name: SESSION_TAG,
         p_review: review([{ kind: "not-a-defect", reason: "qa", finding_ids: [open[0]] }]) },
         /exactly one/],
     ];
+    await gradeOwnWrites(url, key, OWN_F, async () => {
     for (const [name, args, want] of probes) {
       const body = { p_cycle_id: null, p_session_name: null, p_week: WEEK, ...args };
       const r = await call(url, key, "POST", "rpc/apply_audit_review", body);
@@ -315,13 +307,7 @@ async function run() {
       assert.equal(r.code, "P0001", `${name}: the refusal must be the function's RAISE (P0001); got ${describe(r)}`);
       assert.match(r.json?.message ?? "", want, `${name}: the refusal must name its cause; got ${describe(r)}`);
     }
-    const after = {
-      findings: await count("audit_findings"),
-      decisions: await count("runner_decisions"),
-      backlog: await count("backlog_items"),
-      ruled: (await get("audit_findings?ruled_at=not.is.null&select=id")).length,
-    };
-    assert.deepEqual(after, before, "no refused probe may write anything");
+    }, { label: "AGT-86b arm F" });
   });
 
   // --- A. anon ------------------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+// DeepBench v7.0.1075 | tests/regression/agt-86i-learning-loop.test.mjs | AGT-571 slice 1 -- arm R edit refusals grades its own key.
 // DeepBench v7.0.554 | tests/regression/agt-86i-learning-loop.test.mjs | AGT-86 slice 9b -- the manager
 // ACTS: apply_audit_review() takes p_review.checklist_edits (migration `agt86_s9b_checklist_edits`), the
 // allowlist refuses au-identity / au-guardrails / non-au rows before the per-group loop, the intent row
@@ -43,6 +44,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { selfRun, notRun } from "./_lib/self-run.js";
+import { countScoped, gradeOwnWrites } from "./_lib/scoped-count.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = path.join(ROOT, "scripts/audit-review.js");
@@ -68,6 +70,8 @@ const frow = (id, fingerprint, iso_week, status, check_slug = "other") =>
 // coverage behind it. Edit validation runs BEFORE that loop, so a refused edit is what the probe reads.
 const ZERO = "00000000-0000-0000-0000-000000000000";
 const QA_SESSION = "agt-86-qa";
+const OWN_R = { decisions: `runner_decisions?select=id&session_name=eq.${QA_SESSION}`, images: `runner_before_images?select=id&session_name=eq.${QA_SESSION}`,
+  tickets: `backlog_items?select=id&session_ref=like.${QA_SESSION}*` };
 const probeReview = edits => ({
   groups: [{ kind: "carry", finding_ids: [ZERO] }],
   summary_for_john: "qa", patterns_applied: [],
@@ -94,13 +98,6 @@ async function rpc(url, key, body) {
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch { /* not json */ }
   return { ok: res.ok, status: res.status, text, json, code: json && !Array.isArray(json) ? json.code : undefined };
-}
-async function count(url, key, q) {
-  const res = await fetch(`${url}/rest/v1/${q}`, { method: "HEAD", headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact" } });
-  const cr = res.headers.get("content-range") ?? "";
-  const n = Number(cr.split("/")[1]);
-  if (!res.ok || !Number.isFinite(n)) throw new Error(`count ${q} -> HTTP ${res.status} content-range=${cr}`);
-  return n;
 }
 
 async function run() {
@@ -276,16 +273,10 @@ async function run() {
       const rows = await call(url, key, "skill_profiles?slug=in.(au-identity,au-guardrails,au-behavior,au-knowledge-homes)&select=slug,objective,method&order=slug");
       assert.equal(rows.status, 200, `au-* rows must be readable; got ${describe(rows)}`);
       assert.equal(rows.json.length, 4, "the four au-* rows exist");
-      return {
-        rows: JSON.stringify(rows.json),
-        qaDecisions: await count(url, key, `runner_decisions?session_name=eq.${QA_SESSION}&select=id`),
-        qaImages: await count(url, key, `runner_before_images?session_name=eq.${QA_SESSION}&select=id`),
-        spImages: await count(url, key, "runner_before_images?table_name=eq.skill_profiles&select=id"),
-        qaTickets: await count(url, key, `backlog_items?session_ref=like.${QA_SESSION}*&select=id`),
-        findings: await count(url, key, "audit_findings?select=id"),
-      };
+      return JSON.stringify(rows.json);
     };
     const before = await snapshot();
+    await gradeOwnWrites(url, key, OWN_R, async () => {
     for (const [edit, want] of EDIT_SHAPES) {
       const r = await rpc(url, key, { p_cycle_id: null, p_session_name: QA_SESSION, p_week: "2026-W39", p_review: probeReview([edit]) });
       const label = `${edit.skill_slug}.${edit.field}`;
@@ -306,8 +297,8 @@ async function run() {
         assert.equal(`apply_audit_review: ${d.refusals[0]}`, msg, `${label}: the dry-run mirror reads the same text`);
       }
     }
-    const after = await snapshot();
-    assert.deepEqual(after, before, "no probe wrote: au-* rows, qa decisions/images/tickets, skill_profiles images, findings unchanged");
+    }, { label: "AGT-86i arm R" });
+    assert.equal(await snapshot(), before, "no probe wrote: the four au-* rows read back identical");
   });
 
   // --- I. the intent row (live, read-only) -- slice 9b ---------------------------------------------
@@ -344,7 +335,7 @@ async function run() {
     const kh = ctx.checklist.find(c => c.skill_slug === "au-knowledge-homes");
     assert.ok(typeof kh.objective === "string" && typeof kh.method === "string", "objective and method as they read today");
 
-    const open = await count(url, key, "audit_findings?status=in.(open,carried)&select=id");
+    const open = await countScoped(url, key, "audit_findings?status=in.(open,carried)&select=id");
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agt86i-"));
     const out = path.join(dir, "prepare.json");
     try {
