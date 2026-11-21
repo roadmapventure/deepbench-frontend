@@ -219,3 +219,50 @@ Source: the stated menu of 2026-11-17 and its amendment; product name updated; c
 - An item can sit inside an association consulting engagement or be offered on its own.
 
 Closing line: as record 1. Changes from the menu's wording, both the principal's: the warehouse line (design and modeling, if the customer wants one) and the fractional line above.
+
+### 9c. RMV consulting automation: benefits and partnering (approved 2026-11-21, "Yes, store it")
+
+Source: the principal's partnership proposal of 2026-10-17, reframed on his word the same day: "i can do all this without [the association], so i don't want these offerings and benefits to be seen as partnership only, it should be seen as rmv's". The association is named in the record's own text, as on the principal's public page; this design record keeps to "the association" except where the record text is quoted.
+
+**What it is**
+- These are RMV's own products and benefits. RMV delivers all of them directly, with or without a partner.
+- RMV has automated consulting work into web products: interview notes, spend extracts and assessment drafts become validated KPIs, tech diagrams, visual insights and a client web portal.
+- RMV believes 60% of an assessment's information is reusable across GovTech engagements.
+- A consulting partner can deliver the same products under its own brand. RMV has proposed this to NIGP; it is a proposal, not a signed agreement.
+
+**What it gives a consulting engagement**
+- Speed: fieldwork to findings in days, not weeks.
+- Margin: the analysis phases cost less every time.
+- Differentiation: a client portal no competitor is offering, with all findings converted into dashboards.
+
+**Why it works**
+- Clients are asking for more: executives want follow-up, a return on the consulting investment, and transparency.
+- Domain history and staffing are becoming scarce.
+- A living assessment, not one-and-done.
+- A partner's domain knowledge, powered by RMV, works anywhere and is both competitive and preferred.
+- Complements a consulting partner with white-labeled product branding and services.
+- Consultants move to leading strategy, with repeatability, not content assembly.
+- A consulting partner does not have to hire a data team.
+
+**What the client receives**
+- The dashboard portal as a standard offer in RFP responses.
+- New findings added anytime; updates and metrics are instant.
+- First dashboard in under a week; no data lakehouse or integration costs; maintenance-free access.
+- All project deliverables in one portal after the project ends, with AI as its information assistant.
+
+**How the business grows, for RMV and for a partner**
+- An annual subscription to dashboards and portal, tiered by refresh cadence; recurring revenue after the project ends.
+- An AI agent subscription.
+- A pipeline to the next project.
+- Marketing: a client showcase, and past assessments or public datasets pre-loaded as a teaser.
+
+**Where it leads**
+- Industry-first AI consulting automation and a lower cost per engagement.
+- A government procurement meta-dashboard: procurement data aggregated across governments.
+- Industry insights, trends and benchmarking from the only organization with a deep dataset.
+- A five-level maturity model: Reactive, Aware, Structured, Strategic, Intelligence-led.
+
+**Proposed to NIGP**
+- The commodity code server upgrade.
+
+Closing line: as record 1.
