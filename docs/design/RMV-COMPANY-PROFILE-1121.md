@@ -273,3 +273,13 @@ Closing line: as record 1.
 - **Live wording loaded.** Four Library items added from the LinkedIn working folder, the principal's own wording, section `identity`, trust `john_authored`: the Company Page Overview, the Services description, and the two product descriptions as submitted. The sync versions them by sha256, so a later Page edit saved to those files becomes a new version on the next sync.
 - **Not embedded yet.** The sync ran without the embedding key, so the four items are found by full-text search until the next keyed sync embeds them.
 - **Production.** AGT-784 released the pin read to production the same day (one file); verified live over the production endpoint.
+
+## 11. The weekly mismatch check (AGT-783): walkthrough
+
+Measured 2026-11-21: the strategy consultant's weekly review carries the three records on every call (pins) and reads the Library; the governance auditor's weekly run routes findings to the Development Manager as dev tickets; a plain script can compare exact strings and numbers only. The four live-wording Library items sit in section `identity`, which the weekly review lists by title and does not read in full (`LIBRARY_SECTIONS` in `scripts/personal-agent.js`).
+
+| Q | Question | Answer | Date |
+|---|---|---|---|
+| Q1 | Who carries the check | The strategy consultant's weekly review ("Yes, Harry"). It needs the live-wording items readable in full, and one added step in the review's instructions | 2026-11-21 |
+| Q2 | What counts as a mismatch | open | |
+| Q3 | How an already-seen mismatch stops being re-filed | open | |
