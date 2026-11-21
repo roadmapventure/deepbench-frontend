@@ -282,4 +282,4 @@ Measured 2026-11-21: the strategy consultant's weekly review carries the three r
 |---|---|---|---|
 | Q1 | Who carries the check | The strategy consultant's weekly review ("Yes, Harry"). It needs the live-wording items readable in full, and one added step in the review's instructions | 2026-11-21 |
 | Q2 | What counts as a mismatch | Substance only ("Yes, substance only"): a number differs; a product, service or practice name differs; a claim contradicts; a wording rule is broken. Phrasing, length, order and synonyms do not count | 2026-11-21 |
-| Q3 | How an already-seen mismatch stops being re-filed | open | |
+| Q3 | How an already-seen mismatch stops being re-filed | "Yes, adopt it": one open gap per mismatch, never filed twice while open; fixing either side closes it at the next review; the principal's "leave it" is stored as a correction in the strategy store (what differs, accepted, date), which the consultant reads on every run, so the difference is not raised again unless a text changes. The tick list covers facts and methods only, hence a correction | 2026-11-21 |
