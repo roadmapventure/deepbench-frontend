@@ -266,3 +266,10 @@ Source: the principal's partnership proposal of 2026-10-17, reframed on his word
 - The commodity code server upgrade.
 
 Closing line: as record 1.
+
+## 10. Correction and follow-through (2026-11-21, AGT-782)
+
+- **Correction to row 20, D1 and section 8.** The Library never held two KPI catalog items marked current: the 528 catalog was already superseded, and the inventory query that reported it lacked the status filter. One catalog item was current, and its content had already been refreshed to release 50 (560 KPIs) by the library session; only its title still read "release 49: 554". The title and date are corrected in the manifest and on the row.
+- **Live wording loaded.** Four Library items added from the LinkedIn working folder, the principal's own wording, section `identity`, trust `john_authored`: the Company Page Overview, the Services description, and the two product descriptions as submitted. The sync versions them by sha256, so a later Page edit saved to those files becomes a new version on the next sync.
+- **Not embedded yet.** The sync ran without the embedding key, so the four items are found by full-text search until the next keyed sync embeds them.
+- **Production.** AGT-784 released the pin read to production the same day (one file); verified live over the production endpoint.
