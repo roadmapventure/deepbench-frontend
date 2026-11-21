@@ -170,8 +170,8 @@ export default async function run() {
   for (const k of INTENT_REQUIRED) {
     assert.ok(schema.required.includes(k), `the Intent's schema must require "${k}"`);
   }
-  assert.deepEqual(schema.properties.premise.enum, ["alive", "dead"],
-    "premise must be a two-value enum -- a free-text premise cannot be graded, and 'dead' is the " +
+  assert.deepEqual(schema.properties.premise.enum, ["alive", "dead", "delivered"],
+    "premise must be a three-value enum (AGT-596) -- a free-text premise cannot be graded, and 'dead' is the " +
     "whole point of revalidation (a Designer that can only say 'alive' always designs)");
 
   // See header note (2): without this the design standard never reaches the model.

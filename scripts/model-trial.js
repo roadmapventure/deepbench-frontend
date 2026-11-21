@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1100 | scripts/model-trial.js | AGT-596 -- premise delivered.
 // DeepBench v7.0.1066 | scripts/model-trial.js | AGT-522 -- replayableRows(): a build job's cycle shipped a push_sha.
 // DeepBench v7.0.1060 | scripts/model-trial.js | AGT-522 -- changedFiles(): the node_modules link the replay itself makes is not a change the candidate made.
 // DeepBench v7.0.881 | scripts/model-trial.js | AGT-502 -- usageSplit(): the envelope's four token quantities reach their own four columns. --input-tokens is usage.input_tokens ALONE; the trial's `tokens:` keeps the total under its own name. One exported derivation, read by scripts/audit-cluster.js's second home of it.
@@ -133,6 +134,7 @@ export function scoreAnswer({ envelope, required, checkKickoffExit }) {
   const missing = (required ?? []).filter(k => !Object.prototype.hasOwnProperty.call(answer, k));
   if (missing.length) return { passed: false, why: `missing ${missing.join(",")}` };
   if (answer.premise === "dead" && answer.premise_evidence) return { passed: true, why: "premise-dead" };
+  if (answer.premise === "delivered" && answer.premise_evidence) return { passed: true, why: "premise-delivered" };
   if (answer.kickoff_markdown && checkKickoffExit === 0) return { passed: true, why: "kickoff-within-cap" };
   return { passed: false, why: "no-kickoff-exit-0" };
 }

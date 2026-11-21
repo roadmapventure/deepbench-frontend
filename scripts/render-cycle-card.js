@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1100 | scripts/render-cycle-card.js | AGT-596 -- premise delivered.
 // DeepBench v7.0.1073 | scripts/render-cycle-card.js | AGT-319 -- a render writes the card and nothing else: `--write` no longer re-pins the live dm-knowledge-cycle-card row, refuses the flags only the re-pin reads, and prints RE-PIN OWED when the card changed. The re-pin is its own command, run once on the final card (`--sync-knowledge --repin`), and the ship gate holds it: ses-378d is in the related set of any card change.
 // DeepBench v7.0.977 | scripts/render-cycle-card.js | AGT-610 -- the pre-boot gate note names the redesign pickup: a find-work-only boot runs `node scripts/redesign-pickup.js --next` FIRST, so a refused ticket is picked up by the team rather than waiting for John (John's standing decision 6e94edcb). DEVIATION, recorded: the kickoff's literal outcome was 180 chars and render() throws over OUTCOME_MAX 90, so it is cut to 90 carrying both branches and the pickup command -- the runbook pointer (docs/runbooks/redesign-after-refusal.md) travels in record_skip()'s own refusal instead, exactly as v7.0.505 (AGT-79 slice 5) cut a 169-char outcome to 90.
 // DeepBench v7.0.843 | scripts/render-cycle-card.js | AGT-451 -- step 7's NOTES block list is [1, 2, 5]: AGT-451 inserted the credentialed pre-build baseline measurement as step 7's SECOND fence, so the card now carries the assembly (1), that measurement + its --check-kickoff arming (2) and the agent-log row (5) -- the generated card is the only door a cycle reads, and an index left at [1, 4] would have carried the measurement's old neighbour instead of the measurement.
@@ -146,7 +147,7 @@ export const NOTES = {
   "4e":       { outcome: "already run today → step 5; exit 3 → ticketowner judges; no Agent/exit 2 → re-run unjudged", block: 1 },
   "5":        { outcome: "the queue's first admitted row is the pick; ONE item; rename at the pick", block: 1 },
   "5a":       { outcome: "write files N (+k) / tasks M (+k) into notes; a cap case → node scripts/rule-cap-case.js", block: 1 },
-  "6":        { outcome: "alive → commit-kickoff.js --push, then designed; dead → removal proposed", block: 1 },
+  "6":        { outcome: "alive → commit-kickoff.js --push, designed; dead → removal proposed; delivered → 7a", block: 1 },
   "7":        { outcome: "7a: --related=<set> vs the kickoff BASELINE, else exit 2; settle-ship.js writes the status", block: [1, 2, 5] },
   "7b":       { outcome: "every judgment write is a decision row with a handle and a reversal window", block: 2 },
   "8":        { outcome: "your own ship broke dev → revert-forward, restore before-images, 'reverted'", block: 0 },

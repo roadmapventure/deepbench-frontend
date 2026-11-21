@@ -77,7 +77,7 @@ live from `runner_model_lanes`, logged with `scripts/agent-log.js`. Four outcome
    in `harvest_markdown`) → `node scripts/rule-cap-case.js --prepare` / `--apply`, exactly as step
    5a. The Development Manager rules it split or waive; a split's parts are filed first per step
    8b-bis and enter the queue normally.
-3. **Premise dead** → removal proposed, as step 6.
+3. **Premise dead** → removal proposed, as step 6; **premise delivered** → 7a and the settle, as step 6.
 4. **Attended-only** (the remaining work needs John, a credential, a `.claude/` write or an attended
    apply) → `node scripts/redesign-pickup.js --park --ticket=<id> --cycle-id=<uuid> --reason=<what only an attended session can do>`.
    The ticket leaves the redesign list until an attended session deletes the row. Never park a

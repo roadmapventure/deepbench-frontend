@@ -2742,7 +2742,7 @@ gap still exist, or did an intervening ship close it? Premise holds → set
 `revalidated_at = now()` and build. Premise dead → set `status = 'removal proposed'`, file a
 briefing card carrying the ticket (ID — title) plus the evidence the premise died (commit,
 measurement, superseding ticket), run the queue recompute, and **drop to the next queued
-ticket per B24** — never build a dead premise and never remove unattended. <!-- FEATURE: SES-336 — the revalidation is performed INSIDE design-kickoff now; the outcome handling below is still this step's. --> **AMENDED BY `SES-336` (`v7.0.439`): the revalidation itself is PERFORMED BY THE DESIGNER, inside `design-kickoff` (`ds-identity`'s first act, `ds-guardrails`' first `must`), and reaches this step as `premise` plus `premise_evidence` — the two branches above are unchanged and are still yours to execute.**
+ticket per B24** — never build a dead premise and never remove unattended. <!-- FEATURE: SES-336 — the revalidation is performed INSIDE design-kickoff now; the outcome handling is this step's. --> **AMENDED BY `SES-336` (`v7.0.439`): the revalidation itself is PERFORMED BY THE DESIGNER, in `design-kickoff` (`ds-identity`) and reaches this step as `premise` plus `premise_evidence`; act on it.**
 
 **`design_status = 'designed'` MEANS THE DESIGN ALREADY EXISTS — build from `kickoff_link`,
 do not re-design it (`SES-114`, `v7.0.165`).** The row cannot claim it without its artifact — `SES-112`'s CHECK,
@@ -2790,10 +2790,10 @@ node scripts/agent-log.js --agent=designer --capability=design-kickoff --model=<
    PAIR (`v7.0.530`):** omit both when the harness reported no usage and let the row land with
    NULL tokens — unmeasured, never free — but a lone flag, or a negative or non-numeric value,
    still exits 2.
-2. **`premise = 'dead'` is the Designer's answer to this step's own first question, and you act on
-   it rather than re-checking it.** Take its `premise_evidence` into the removal proposal this step
-   opens with — `status = 'removal proposed'`, the card, `SELECT public.recompute_backlog_queue();`,
-   drop to the next ticket — and record it as a decision per **7b**.
+2. **`premise = 'dead'` is the Designer's answer; act on it, never re-check it:** `premise_evidence`,
+   `status = 'removal proposed'`, the card, `SELECT public.recompute_backlog_queue();`, next
+   ticket, recorded per **7b**. **`premise = 'delivered'` (`AGT-596`: its OWN `kickoff_link` shipped the fix) is NEVER that write — `removal_refusal()` refuses it:**
+   no kickoff, no Builder; `revalidated_at = now()`, 7a on that `kickoff_link` and its version, then the settle, `--builder=none`.
 3. **`premise = 'alive'` → write the returned `kickoff_markdown` to the returned `kickoff_path`**
    (`docs/kickoffs/<version>-<ID>-<slug>.md`) and commit it with `node scripts/commit-kickoff.js --kickoff=<path> --harvest=docs/harvests/<ID>.md --message-file=$S/msg.txt --push` (`AGT-607`), then set that path as the ticket's
    `kickoff_link` and `design_status = 'designed'` in ONE write, before-image first. `SES-112`'s
