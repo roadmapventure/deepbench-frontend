@@ -1,3 +1,4 @@
+// DeepBench v7.0.1098 | AccessGateModal.jsx | AGT-772 -- third variant: budget
 // DeepBench v7.0.77 | AccessGateModal.jsx | HAR-33
 // FEATURE: HAR-33 (part b) — the friendly face of the edge access gate's 403 refusal.
 //
@@ -10,7 +11,7 @@
 
 import { useEffect, useState } from 'react';
 import { T, display, body, mono } from '../tokens.js';
-import { subscribeGate } from '../lib/gate-intercept.js';
+import { subscribeGate, budgetCopy } from '../lib/gate-intercept.js';
 
 // Treasury palette washes. Every colour in this file resolves from `T` — the alpha values
 // are the mock's, the RGB never is (`.claude/rules/design-tokens.md`).
@@ -44,6 +45,12 @@ const VARIANTS = {
     showStats: false,
   },
 };
+
+// AGT-772 -- the third variant: John's copy (decision 97dcfccb); no badge, no tiles, no IP line.
+function budgetVariant(gate) {
+  const c = budgetCopy(gate.period, gate.reopens_at);
+  return { badge: null, heading: c.heading, lead: c.body, ipLead: null, ipTail: null, showStats: false };
+}
 
 function StatTile({ label, value, valueColor }) {
   return (
@@ -84,7 +91,7 @@ export default function AccessGateModal() {
 
   if (!gate) return null;
 
-  const v = gate.reason === 'spend_cap' ? VARIANTS.spend_cap : VARIANTS.beta;
+  const v = gate.reason === 'spend_cap' ? VARIANTS.spend_cap : gate.reason === 'budget' ? budgetVariant(gate) : VARIANTS.beta;
   const close = () => setGate(null);
 
   // PATCH-1 (part a) makes `stats` accompany every spend_cap refusal; the one documented
@@ -129,6 +136,7 @@ export default function AccessGateModal() {
         </button>
 
         {/* Badge */}
+        {v.badge && (
         <span style={{
           display: 'inline-block',
           fontFamily: mono, fontSize: 10, fontWeight: 700,
@@ -138,6 +146,7 @@ export default function AccessGateModal() {
         }}>
           {v.badge}
         </span>
+        )}
 
         {/* Heading */}
         <div style={{
@@ -164,6 +173,7 @@ export default function AccessGateModal() {
         )}
 
         {/* IP line */}
+        {v.ipLead && (<>
         <div style={{ fontFamily: body, fontSize: 14, color: T.ink, lineHeight: 1.5, marginTop: 14 }}>
           {v.ipLead}
         </div>
@@ -179,6 +189,7 @@ export default function AccessGateModal() {
             <span style={{ fontFamily: body, fontSize: 14, color: T.ink }}>{v.ipTail}</span>
           )}
         </div>
+        </>)}
 
         {/* Dismiss — "Keep browsing" */}
         <div style={{ marginTop: 18, textAlign: 'right' }}>
