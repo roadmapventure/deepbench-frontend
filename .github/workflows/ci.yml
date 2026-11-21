@@ -1,3 +1,4 @@
+# DeepBench v7.0.1103 | .github/workflows/ci.yml | AGT-698 -- a suite that did not run is published skipped.
 # DeepBench v7.0.1102 | .github/workflows/ci.yml | AGT-611 -- a HEAD red also red on the $BASE_SHA tree is [STANDING], not graded (scripts/ci-new-reds.js).
 # DeepBench v7.0.958 | .github/workflows/ci.yml | AGT-573 — THE BLOCKING SUITE GRADES THE CHANGE (pattern:162), as the
 # scan's `--base` below does: all 900 dev conclusions since 2026-09-16 read the suite job = failure and the anchor sat 49 days.
@@ -256,6 +257,8 @@ jobs:
   checks:
     name: Tripwire + regression (blocking)
     runs-on: ubuntu-latest
+    outputs:
+      regression: ${{ steps.regression.outputs.regression }}
     steps:
       - uses: actions/checkout@v4
 
@@ -298,6 +301,7 @@ jobs:
       # halves then declare not-run exactly as they did before this ship, which is the correct and
       # safe degradation, not a failure. Named in the header rather than papered over here.
       - name: Regression suite (credentialed)
+        id: regression
         if: always()
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -319,6 +323,14 @@ jobs:
           if [ "$HEAD_CODE" -eq 0 ]; then
             exit 0
           fi
+          # AGT-698 not-run >>>
+          if [ "$HEAD_CODE" -eq 2 ] && ! grep -qF '[FAIL] ' /tmp/head-run.txt; then
+            grep -F -e '[NOT RUN]' -e 'Nothing was run' /tmp/head-run.txt || true
+            echo "AGT-698: the suite did not run -- published skipped"
+            echo "regression=not-run" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # AGT-698 not-run <<<
           git worktree add --detach /tmp/agt611-base "$BASE_SHA"
           ln -s "$PWD/node_modules" /tmp/agt611-base/node_modules
           node scripts/ci-new-reds.js --head-log=/tmp/head-run.txt --head-code="$HEAD_CODE" --base-root=/tmp/agt611-base
@@ -373,6 +385,7 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           BUILD_RESULT: ${{ needs.build.result }}
           CHECKS_RESULT: ${{ needs.checks.result }}
+          CHECKS_REGRESSION: ${{ needs.checks.outputs.regression }}
         run: |
           set -euo pipefail
           if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_KEY:-}" ]; then
@@ -380,13 +393,19 @@ jobs:
             echo "The anchor stays stale, which is the safe direction. Not a failure."
             exit 0
           fi
+          # AGT-698 publish >>>
+          CHECKS="${CHECKS_RESULT}"
+          if [ "$CHECKS" = "success" ] && [ "${CHECKS_REGRESSION:-}" = "not-run" ]; then
+            CHECKS="skipped"
+          fi
+          # AGT-698 publish <<<
           # jq composes the body so a job name containing a quote cannot break the JSON.
           jq -n \
             --arg sha "${GITHUB_SHA}" \
             --argjson run_id "${GITHUB_RUN_ID}" \
             --arg ref "${GITHUB_REF_NAME}" \
             --arg build "${BUILD_RESULT}" \
-            --arg checks "${CHECKS_RESULT}" \
+            --arg checks "${CHECKS}" \
             '{commit_sha: $sha, run_id: $run_id, ref: $ref, jobs: [
                {name: "Build (blocking)", conclusion: $build},
                {name: "Tripwire + regression (blocking)", conclusion: $checks}

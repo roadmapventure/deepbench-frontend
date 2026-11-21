@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1103 | scripts/verifier.js | AGT-698 -- a suite that did not run is not-run, never red.
 // DeepBench v7.0.1101 | scripts/verifier.js | AGT-598 -- a cycle-measured BASELINE block is graded against the cycle's measurement.
 // DeepBench v7.0.1073 | scripts/verifier.js | AGT-319 -- the coupled-files note records who pays for a runbook edit's dragged files: the kickoff that makes the edit (comment only, no clause changed).
 // DeepBench v7.0.1071 | scripts/verifier.js | AGT-326 -- a test that asserts a piece of an anchored line pins it; a runbook edit's dragged files are counted before the Builder runs.
@@ -726,10 +727,13 @@ function arg(name, fallback) {
 // the command never produced an exit status (spawn error, binary missing, killed by signal), and
 // that is 'skipped', never 'green'. Collapsing skipped into either green or red loses the one
 // distinction the charter's bar is written in ("any red OR SKIPPED check still cards John").
-export function gateStatus({ ran, exitCode }) {
+export const SUITE_NOT_RUN_EXIT = 2;
+export function gateStatus({ ran, exitCode, notRunExit = null, fails = null }) {
   if (!ran) return "skipped";
   if (exitCode === null || exitCode === undefined) return "skipped";
-  return exitCode === 0 ? "green" : "red";
+  if (exitCode === 0) return "green";
+  if (notRunExit !== null && exitCode === notRunExit && Array.isArray(fails) && fails.length === 0) return "not-run";
+  return "red";
 }
 
 // How much of a gate's output the ledger keeps. Four [FAIL] lines plus a summary line legitimately
@@ -1583,6 +1587,7 @@ export function verdictFor(gates) {
   }
   const parts = [];
   if (red.length) parts.push(`RED: ${red.map(r => r.label).join(", ")}`);
+  if (rows.some(r => r.status === "not-run")) parts.push("NOT RUN: regression suite (AGT-698)");
   if (skipped.length) {
     parts.push(`COULD NOT RUN (fail-closed, counted as not green): ${skipped.map(r => r.label).join(", ")}`);
   }
@@ -2263,7 +2268,9 @@ export async function runGate(gate, repoRoot, env = process.env) {
   if (res.error) return { status: "skipped", fails: null, detail: `could not run: ${res.error.message}` };
   // A signal kill leaves status null -- gateStatus() reads that as skipped, which is why the raw
   // status is passed through rather than defaulted to a number here.
-  const status = gateStatus({ ran: true, exitCode: res.status });
+  const suite = gate.key === "regression";
+  const status = gateStatus({ ran: true, exitCode: res.status, notRunExit: suite ? SUITE_NOT_RUN_EXIT : null,
+    fails: suite ? failingTestsFrom(`${res.stdout || ""}\n${res.stderr || ""}`) : null });
   const tail = summarizeGateOutput({ stdout: res.stdout, stderr: res.stderr });
   // AGT-170: the FAILING SET BY NAME, for the regression gate only. `[FAIL] <file>` is
   // `tests/regression/run-all.js`'s vocabulary and nothing else prints it -- `npm run build` and the
@@ -3850,6 +3857,11 @@ export async function gradeDelivery({ repoRoot, regressionRoot = repoRoot, cycle
     if (r.arms) postArms = r.arms;
   }
 
+  // AGT-698
+  const suiteNotRun = gateResults.regression === "not-run";
+  const restGreen = GATES.every(g => g.key === "regression" || gateResults[g.key] === "green");
+  if (suiteNotRun && !restGreen) gateResults.regression = "skipped";
+
   // ---- FEATURE: AGT-170 -- THE REGRESSION GATE'S STATUS BECOMES THE DELTA'S. -------------------
   //
   // ONLY WHAT "REGRESSION GREEN" MEANS CHANGES, and everything downstream is deliberately untouched:
@@ -3917,7 +3929,7 @@ export async function gradeDelivery({ repoRoot, regressionRoot = repoRoot, cycle
   // graded nothing, so a --no-baseline=<reason> run's reasoning is byte-identical to before.
   reasoning += deltaVerdictNote(delta, baselineRead.names);
 
-  return { coverage: null, gateResults, gateDetail, gateFails, regressionAbsolute, delta, verdict, reasoning };
+  return { coverage: null, notRun: suiteNotRun && restGreen ? gateDetail.regression : null, gateResults, gateDetail, gateFails, regressionAbsolute, delta, verdict, reasoning };
 }
 
 async function main() {
@@ -4543,6 +4555,11 @@ async function main() {
         + `  Exiting 2 and recording NOTHING -- no gate ran, no row was written, and this is NOT a verdict (AGT-457).\n`
         + `  ${coverage.remedy}`
         + (relatedPath ? "" : `\n  No --related= was passed: the graded width is the FULL suite (${suiteTests(repoRoot).length} tests, AGT-572).`) });
+  }
+
+  if (graded.notRun) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, kind: "cannot-run", error: "regression-not-run", gate_detail: graded.gateDetail },
+      prose: `verifier: the suite did not run (exit 2, no failing test named). NOT a verdict, nothing recorded (AGT-698): ${graded.notRun}` });
   }
 
   const { gateResults, gateDetail, gateFails, regressionAbsolute, delta } = graded;
