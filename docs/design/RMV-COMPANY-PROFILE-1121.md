@@ -159,3 +159,32 @@ Correction recorded with the scope: the weekly audit runs where it cannot read t
 - D13: the two "all agents" Library items are behind the 11-17..20 positioning.
 - The Library holds two KPI catalog items marked current (528 and 554); the live figure is 560.
 - Twenty-one writer fact candidates from the two 11-20 reviews wait for a tick.
+
+## 9. Record text approved by the principal
+
+### 9a. Company profile (approved 2026-11-21, "Yes"; two lines still being walked: the unique-measures figure and the data-warehouse phrase)
+
+1. **What RMV does.** RoadMap Venture (RMV) architects and builds AI products end to end: agents, data platforms, and the governance to run them.
+2. **Two practices.**
+   - AI product management across industries. The problem: AI agents drift, forget what they learn, struggle to carry domain expertise, and stay locked in one AI client. Customers drive new revenue by licensing the use of their self-built domain expert agent.
+   - GovTech, for state and local government, with the same AI and data product. The problem: every system exports its own report and none combines them into one view leadership trusts. RMV turns the exports an agency already has into full procurement analysis, AI dashboards and KPIs.
+3. **Three products.**
+   - DeepBench: a multi-agent AI platform for building, running and governing specialized AI agents, available over MCP.
+   - Procurement Intelligence: a procurement analytics platform for state and local government: spend analysis, KPI dashboards and AI agents built from an agency's reports or system exports.
+   - Procurement KPI Library: a curated catalog of procurement KPIs and assessment questions for state and local government, with KPI Packs, a five-level maturity scale, and every KPI tagged Inform, Track or Act.
+4. **Services.** Product management from 0 to 1 and scaling a roadmap strategy: design, build and release.
+   - AI: multi-agent build-out, governance; readiness assessments
+   - Data practice: data platforms, custom dashboards, KPIs
+   - Enterprise SaaS: design and implementation
+   - Fractional staff augmentation
+   - Specialties: GovTech procurement technology and data assessments; strategic sourcing (procurement KPIs, spend analysis and analytics)
+5. **Numbers.**
+   - In anything public: "500+ KPIs", "200+ assessment questions", "nearly 90 published sources".
+   - Measured at release 50 (2026-11-20): 560 KPIs, 215 questions, 91 organizations, 501 publications.
+6. **Wording rules.**
+   - Say "practice", never "division".
+   - A product is a product or a platform, never a service.
+   - No client name or client data in anything public.
+   - Every price reads "Contact sales". The principal alone sets prices, offers and what is published.
+
+Closing line: This record wins. If your evidence disagrees with a line here, flag it as a gap naming the line; do not state it differently.
