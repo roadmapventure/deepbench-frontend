@@ -1,3 +1,4 @@
+// DeepBench v7.0.1098 | middleware.js | AGT-772 -- a platform budget (day / week / month, US Central) refuses every outside caller once spent
 // DeepBench v7.0.1097 | middleware.js | AGT-771 -- a known site key may pass the person's address; the address rules run on that person
 // DeepBench v7.0.1096 | middleware.js | AGT-770 -- an unknown MCP key is refused 401; a site key refuses site_cap / site_blocked, no ip
 // DeepBench v7.0.1001 | middleware.js | AGT-297 -- keyed MCP callers
@@ -232,6 +233,48 @@ async function fetchCallerGate(url, key, presented) {
   return Array.isArray(rows) && rows[0] && rows[0].caller_name ? rows[0] : null;
 }
 
+// FEATURE: AGT-772 -- one platform-wide budget over EVERY priced ai_activity_log row, by calendar
+// day / week / month in America/Chicago (runner_settings.platform_budget_*_usd). Address and key
+// ceilings stay lifetime; this total is what a caller arriving from new addresses cannot reset.
+// One RPC per gated request; any infra error skips the check (one console.error line) and the rest
+// of the gate runs exactly as before.
+const BUDGET_PERIODS = ['day', 'week', 'month'];
+
+async function fetchBudget(url, key) {
+  const res = await fetch(`${url}/rest/v1/rpc/platform_budget_status`, {
+    method: 'POST',
+    headers: { ...supabaseAuth(key), 'Content-Type': 'application/json' },
+    body: '{}',
+    signal: timeoutSignal(SUPABASE_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`status ${res.status}`);
+  const body = await res.json();
+  const row = Array.isArray(body) ? body[0] : body;
+  if (!row || typeof row !== 'object') throw new Error('empty budget');
+  return row;
+}
+
+// The spent period that reopens LAST, or null. Throws on any missing or non-numeric field.
+function spentPeriod(row) {
+  let hit = null;
+  for (const p of BUDGET_PERIODS) {
+    const spent = Number(row[`${p}_spent_usd`]);
+    const limit = Number(row[`${p}_limit_usd`]);
+    const at = Date.parse(row[`${p}_reopens_at`]);
+    if (!Number.isFinite(spent) || !Number.isFinite(limit) || !Number.isFinite(at)) throw new Error(`budget field ${p}`);
+    if (spent >= limit && (!hit || at > hit.at)) hit = { period: p, at };
+  }
+  return hit;
+}
+
+function refuseBudget(period, at) {
+  const body = { deepbench_gate: true, reason: 'budget', period, reopens_at: new Date(at).toISOString() };
+  return new Response(JSON.stringify(body), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+  });
+}
+
 const END_USER_IP_HEADER = 'x-deepbench-end-user-ip';
 const END_USER_COUNTRY_HEADER = 'x-deepbench-end-user-country';
 const ALLOWED_COUNTRIES = new Set(['US', 'CA']);
@@ -296,6 +339,14 @@ export default async function middleware(request, context) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
     if (!supabaseUrl || !supabaseKey) return failOpen('env', ip, new Error('supabase env missing'));
+
+    // 3a. AGT-772 -- the platform budget, ahead of every key and address rule.
+    try {
+      const hit = spentPeriod(await fetchBudget(supabaseUrl, supabaseKey));
+      if (hit) return refuseBudget(hit.period, hit.at);
+    } catch (err) {
+      console.error(`[AGT-772 gate] budget lookup failed, check skipped for ip=${ip}: ${err && err.message ? err.message : String(err)}`);
+    }
 
     // 3b. AGT-297 -- a known MCP key is the caller; the IP gate below is the fallback.
     //     AGT-770: unknown key 401, failed lookup -> IP gate.
