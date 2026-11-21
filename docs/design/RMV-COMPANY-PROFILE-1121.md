@@ -116,6 +116,9 @@ A short record, target about 2,500 characters (the north star is 2,606), in six 
 
 It points to the current public wording by file and by page, and carries none of it verbatim beyond the tagline. **Stays out:** client names, prices and price proposals, personal facts, competitor lists, the vote history, LinkedIn mechanics.
 
+**Ruling 2026-11-21, no pointers.** The profile carries its facts itself, as data points written client-free; it does not send an agent to a website or a session file. This replaces "pointers to sources" in parts 4 and 7 and the closing sentence of this section. Provenance (which source each data point came from, and its date) is kept in this design record and in the row's edit history, not in the text agents read. Consequence: the profile grows past the north star's size (its text is 2,540 characters in the row's `method` column); the build ticket sets a ceiling.
+
+
 A populated sample is shown to the principal in the walkthrough, tagged as a sample.
 
 ## 5. Keeping it current, and catching contradictions (proposal, Q3)
@@ -127,16 +130,16 @@ A populated sample is shown to the principal in the walkthrough, tagged as a sam
 
 ## 6. Which agents get it (the principal's call, Q4)
 
-Ruling 2026-11-21: the entire product team, pinned as the north star is. Measured the same day: the Bench "Product Team" view is the nine governance-lane agents (GV-01 to GV-09), all pinned to the north star. The north-star pin set is 16: those nine, plus Harry, Laura, Jerry, Nathan, Victoria, and two switched-off agents (Dilbert, Trenton). Not pinned to anything: Malcolm and Paul. Open: whether "product team" means the nine, the sixteen, or the sixteen plus Malcolm and Paul. Pinning changes agent configuration, so nothing is pinned by this session.
+Ruling 2026-11-21: the entire product team, pinned as the north star is. Measured the same day: the Bench "Product Team" view is the nine governance-lane agents (GV-01 to GV-09), all pinned to the north star. The north-star pin set is 16: those nine, plus Harry, Laura, Jerry, Nathan, Victoria, and two switched-off agents (Dilbert, Trenton). Not pinned to anything: Malcolm and Paul. RULED 2026-11-21: the sixteen plus Malcolm (17 pin rows); Paul stays out. Pinning changes agent configuration, so nothing is pinned by this session.
 
 ## 7. Walkthrough record
 
 | Q | Question | Answer | Date |
 |---|---|---|---|
-| Q1 | What the profile holds and leaves out | YES to the six parts, and ADD the partnership proposal and the RMV/association offerings (section 4, part 7) | 2026-11-21 |
+| Q1 | What the profile holds and leaves out | YES to the six parts, and ADD the partnership proposal and the RMV/association offerings (section 4, part 7). RULED the same day: both come in as data points written into the profile itself; the profile does not point to websites or to session files | 2026-11-21 |
 | Q2 | Where the single copy lives | open | |
 | Q3 | How it stays current and how a contradiction is caught | open | |
-| Q4 | Which agents get it | "The entire product team", pinned the way the north star is. Exact membership being confirmed (section 6) | 2026-11-21 |
+| Q4 | Which agents get it | "The entire product team", pinned the way the north star is. RULED: the sixteen north-star agents plus Malcolm (17 pins); Paul stays out | 2026-11-21 |
 
 ## 8. Open items the inventory raised (not part of this design)
 
