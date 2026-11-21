@@ -162,7 +162,7 @@ Correction recorded with the scope: the weekly audit runs where it cannot read t
 
 ## 9. Record text approved by the principal
 
-### 9a. Company profile (approved 2026-11-21, "Yes"; two lines still being walked: the unique-measures figure and the data-warehouse phrase)
+### 9a. Company profile (approved 2026-11-21, "Yes"; unique-measures line settled the same day; the data-warehouse phrase still being walked)
 
 1. **What RMV does.** RoadMap Venture (RMV) architects and builds AI products end to end: agents, data platforms, and the governance to run them.
 2. **Two practices.**
@@ -181,6 +181,7 @@ Correction recorded with the scope: the weekly audit runs where it cannot read t
 5. **Numbers.**
    - In anything public: "500+ KPIs", "200+ assessment questions", "nearly 90 published sources".
    - Measured at release 50 (2026-11-20): 560 KPIs, 215 questions, 91 organizations, 501 publications.
+   - RMV has contributed 80+ measures to the library: 26 KPIs RMV created, and 67 industry KPIs that carry an RMV-defined measure. (The principal's wording, 2026-11-21. Counted at build 554; the public page still says "unique to RMV assessments", left as it is.)
 6. **Wording rules.**
    - Say "practice", never "division".
    - A product is a product or a platform, never a service.
