@@ -189,3 +189,33 @@ Correction recorded with the scope: the weekly audit runs where it cannot read t
    - Every price reads "Contact sales". The principal alone sets prices, offers and what is published.
 
 Closing line: This record wins. If your evidence disagrees with a line here, flag it as a gap naming the line; do not state it differently.
+
+### 9b. Offerings (approved 2026-11-21, "this is good", with the principal's change to the fractional line)
+
+Source: the stated menu of 2026-11-17 and its amendment; product name updated; counts left to record 1.
+
+**Getting started**
+- Public-Data Preview (free): a first look at an agency's procurement picture, peer comparison and expiring contracts, built from its own published data.
+
+**Services**
+- Assessments
+  - Procurement Organization Assessment: systems, data, AI and KPIs; full scope or a single topic.
+  - Data Centralization & Modernization: review of current systems and data, data modeling, and the design and modeling of a data warehouse if the customer wants one.
+  - AI Readiness Assessment: organizational readiness, an AI use policy, and an adoption plan.
+- Implementation
+  - Implementation Management: oversight, guidance or hands-on delivery of an assessment's technology, data or AI recommendations.
+  - Procurement Software Design & Development: requirements, design and build for new or existing procurement systems.
+- Staff augmentation: fractional staffing delivered by RMV's founder himself, from individual contributor up to executive level, whatever the client's need. (The principal, 2026-11-21: "the fractional staffing is me".)
+- Training: staff training on dashboards, KPIs and AI tools, plus AI policy workshops.
+
+**Products**
+- Procurement dashboards and reporting: Executive Dashboards; Operations & Performance Dashboards; Analyzers (ready-made spend, contract, KPI and interview-findings analysis); Custom Dashboards; Managed Analytics (ongoing refreshes, quality checks and upkeep).
+- Data centralization views: Contract, Supplier & Department Views (data from multiple systems joined into one searchable view); Living Assessment Portal (every assessment and deliverable in one hosted place, kept current after the engagement).
+- Libraries and benchmarks: Procurement KPI Library (licensed or included in an assessment); Assessment Question Library; Peer Benchmark (an agency's KPIs compared with peer governments).
+- AI agents, pilot stage: AI Search Agent; AI Procurement Assistant.
+- Commodity-code platform services (proposal sent separately).
+
+**How it is sold**
+- An item can sit inside an association consulting engagement or be offered on its own.
+
+Closing line: as record 1. Changes from the menu's wording, both the principal's: the warehouse line (design and modeling, if the customer wants one) and the fractional line above.
