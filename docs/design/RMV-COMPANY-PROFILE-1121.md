@@ -141,6 +141,16 @@ Ruling 2026-11-21: the entire product team, pinned as the north star is. Measure
 | Q3 | How it stays current and how a contradiction is caught | YES to all three rules: (1) only the principal's word changes a record, with the previous text kept and the change logged the same turn; (2) the session that changes a source updates its record the same turn, and a library release re-checks the number line; (3) the record wins until he changes it, an agent that disagrees flags a gap naming the line, and a weekly audit files any mismatch as a finding and fixes nothing | 2026-11-21 |
 | Q4 | Which agents get it | "The entire product team", pinned the way the north star is. RULED: the sixteen north-star agents plus Malcolm (17 pins); Paul stays out | 2026-11-21 |
 
+## 7b. Scope approved and tickets filed (2026-11-21, "Yes, this scope")
+
+| Ticket | Priority class | What |
+|---|---|---|
+| AGT-781 | P6 - Agent Enhancement | The three records with the principal's approved text, 51 pins, and the consulting writer's north-star pin. Data rows, one seed mirror, one guard test; no code change |
+| AGT-782 | P6 - Agent Enhancement | Live public wording and newest release counts into the Library; stale catalog and summary items retired on his word |
+| AGT-783 | P10 - Tooling | Weekly mismatch check of the records against the Library; needs its own short design; depends on the two above |
+
+Correction recorded with the scope: the weekly audit runs where it cannot read the local working folder, so rule 3's check compares against Library items (AGT-782), not local files. Rule 2 was written the same day into the LinkedIn handoff file and the library's release notes, both outside this repository. With three records, section 4's "stated menu" part moves into the offerings record and its "partnership" part into the partnership record.
+
 ## 8. Open items the inventory raised (not part of this design)
 
 - D3: the "80+" figure against 26 created / 67 contributed.
