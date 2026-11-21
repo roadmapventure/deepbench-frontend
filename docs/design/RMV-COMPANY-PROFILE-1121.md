@@ -112,6 +112,8 @@ A short record, target about 2,500 characters (the north star is 2,606), in six 
 5. **Numbers**: the public figure, the measured figure, and where each is counted (section 5).
 6. **Wording rules**: practice not division; no client names or client data in anything public; "500+" style rounding in public copy; the principal decides prices, offers and publishing.
 
+7. **The partnership** (added by the principal, 2026-11-21). Two written pieces, held as pointers plus two or three distilled lines: (a) the partnership proposal with the procurement association, which is the public Procurement Intelligence web page (Library item, the principal's own, dated 10-17, read today by the strategy and writing agents only); (b) the offerings stated to the association's consulting lead, which this design takes to be the stated menu (strategy decisions d28c9f52 and 96e0785f; to be confirmed). Distilled lines: what the client receives, how each business grows, and that an offering can sit inside an association engagement or stand alone. The proposal page quotes a client by name and predates the product-never-a-service rule, so it is pointed to, never copied; the sub-contract terms stay out.
+
 It points to the current public wording by file and by page, and carries none of it verbatim beyond the tagline. **Stays out:** client names, prices and price proposals, personal facts, competitor lists, the vote history, LinkedIn mechanics.
 
 A populated sample is shown to the principal in the walkthrough, tagged as a sample.
@@ -125,16 +127,16 @@ A populated sample is shown to the principal in the walkthrough, tagged as a sam
 
 ## 6. Which agents get it (the principal's call, Q4)
 
-Candidates: Harry, Nathan, Laura, Jerry (the review team); Malcolm (writes the government-practice pieces); Paul, Trenton, Dilbert. Proposed default: the four team agents plus Malcolm. Pinning changes agent configuration, so nothing is pinned without his yes.
+Ruling 2026-11-21: the entire product team, pinned as the north star is. Measured the same day: the Bench "Product Team" view is the nine governance-lane agents (GV-01 to GV-09), all pinned to the north star. The north-star pin set is 16: those nine, plus Harry, Laura, Jerry, Nathan, Victoria, and two switched-off agents (Dilbert, Trenton). Not pinned to anything: Malcolm and Paul. Open: whether "product team" means the nine, the sixteen, or the sixteen plus Malcolm and Paul. Pinning changes agent configuration, so nothing is pinned by this session.
 
 ## 7. Walkthrough record
 
 | Q | Question | Answer | Date |
 |---|---|---|---|
-| Q1 | What the profile holds and leaves out | open | |
+| Q1 | What the profile holds and leaves out | YES to the six parts, and ADD the partnership proposal and the RMV/association offerings (section 4, part 7) | 2026-11-21 |
 | Q2 | Where the single copy lives | open | |
 | Q3 | How it stays current and how a contradiction is caught | open | |
-| Q4 | Which agents get it | open | |
+| Q4 | Which agents get it | "The entire product team", pinned the way the north star is. Exact membership being confirmed (section 6) | 2026-11-21 |
 
 ## 8. Open items the inventory raised (not part of this design)
 
