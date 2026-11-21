@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1107 | scripts/personal-agent.js | AGT-783 -- a per-capability read-first rule (LIBRARY_READ_FIRST, libraryFirst): the Library items a capability names by section and trust are read ahead of the search hits, inside the same LIBRARY_BYTES; a capability absent from the map reads exactly as before.
+// Kickoff: docs/kickoffs/v7.0.1107-AGT-783-weekly-records-check.md.
 // DeepBench v7.0.1053 | scripts/personal-agent.js | AGT-725 -- a fixed read `profile_facts` (readProfileFacts) on four writing slugs: every current facts-section item in full, the newest LinkedIn profile's headline/About and current-role sections, and the current master resume, outside the ranked Library budget and capped at PROFILE_FACTS_BYTES (the master resume cut first, the facts never); readLibrary drops the same items from its text plan (libraryTextSkips) so nothing travels twice, catalog unchanged.
 // Kickoff: docs/kickoffs/v7.0.1053-AGT-725-laura-fixed-reads.md.
 // DeepBench v7.0.1052 | scripts/personal-agent.js | AGT-722 -- a fifth record store (writing_records): WRITING_READ_MAP over the ten writing kinds, every correction and grade on every render, the deny-aware Library read (personal_source_denies drops items before ranking; a client_private item outside LIBRARY_PRIVATE_SECTIONS drops too), the writing team reads (career, strategy facts, market messaging, the idea board as direction only, the postings marked apply), validateWritingAnswer() with two write guards (blocked client terms; a waiting fact stated as fact), and writeWriting() (one insert, never a DELETE or PATCH).
@@ -310,6 +312,12 @@ export const LIBRARY_SECTIONS = {
   'strategy-advise': ['value', 'approach', 'facts', 'evidence', 'works'],
   'strategy-weekly-study': [],
   'strategy-mentor-review': ['goals', 'value'],
+};
+// AGT-783: the Library items a capability reads FIRST -- ahead of the search hits, inside the same
+// LIBRARY_BYTES -- selected by the labels an item already carries (its section and its trust), never by an
+// id and never by who is reading. A capability absent from this map reads exactly as before.
+export const LIBRARY_READ_FIRST = {
+  'strategy-weekly-review': { sections: ['identity'], trust: ['john_confirmed', 'john_authored'] },
 };
 // AGT-722: the writing slugs' Library sections, in their OWN map (agt-644 pins LIBRARY_SECTIONS to the
 // seven strategy slugs); readLibrary reads either. Every writing slug reads the same eight sections' text.
@@ -1088,7 +1096,9 @@ async function readLibrary(db, args) {
   const { skipSections, skipIds } = libraryTextSkips(args.capability, catalog);
   const query = strategyQuery(args);
   const search = query ? await libraryHits(db, query, { agentId: args.agent }) : { hits: [], method: 'trust' };
-  const plan = libraryPlan(catalog, search.hits, { wanted, skipKinds, skipSections, skipIds });
+  // AGT-783: the capability's read-first items lead the plan (libraryFirst is [] for every other slug).
+  const first = libraryFirst(args.capability, catalog);
+  const plan = libraryPlan(catalog, search.hits, { wanted, skipKinds, skipSections, skipIds, first });
   const full = plan.map(p => p.id);
   const onlySections = new Map(plan.filter(p => p.sections).map(p => [p.id, p.sections]));
   const heads = headChars ? catalog.filter(c => !c.section).map(c => c.id) : [];
@@ -1179,10 +1189,21 @@ export async function libraryHits(db, query, opts = {}) {
   }
 }
 
+// AGT-783. Pure. The ids a capability reads first (LIBRARY_READ_FIRST), in trust order; [] when the
+// capability names no rule. `catalog` has already lost the denied and the count-only items; libraryPlan
+// applies the skip rules.
+export function libraryFirst(capability, catalog) {
+  const rule = LIBRARY_READ_FIRST[capability];
+  if (!rule) return [];
+  const sections = new Set(rule.sections ?? []);
+  const trust = new Set(rule.trust ?? []);
+  return trustOrder((catalog ?? []).filter(c => c && c.section && sections.has(c.section) && trust.has(c.trust))).map(c => c.id);
+}
+
 // Pure. Which catalog items are read as text, in what order, and (for an item the search reached only
-// through some of its sections) which sections: search hits first by best score, then the capability's
-// own sections in trust order. A skipped kind or section is never text.
-export function libraryPlan(catalog, hits, { wanted = new Set(), skipKinds = new Set(), skipSections = new Set(), skipIds = new Set() } = {}) {
+// through some of its sections) which sections: the `first` ids whole (AGT-783), then search hits by best
+// score, then the capability's own sections in trust order. A skipped kind or section is never text.
+export function libraryPlan(catalog, hits, { wanted = new Set(), skipKinds = new Set(), skipSections = new Set(), skipIds = new Set(), first = [] } = {}) {
   const byId = new Map(catalog.map(c => [c.id, c]));
   const eligible = c => c && !skipKinds.has(c.kind) && !(c.section && skipSections.has(c.section)) && !skipIds.has(c.id);
   const best = new Map();
@@ -1196,10 +1217,13 @@ export function libraryPlan(catalog, hits, { wanted = new Set(), skipKinds = new
     else { if (!sections.has(c.id)) sections.set(c.id, new Set()); sections.get(c.id).add(h.section_id); }
   }
   const trustRank = new Map(trustOrder(catalog).map((c, i) => [c.id, i]));
-  const hitIds = [...best.keys()].sort((a, b) => best.get(b) - best.get(a) || trustRank.get(a) - trustRank.get(b));
+  const firstIds = [...new Set(first ?? [])].filter(id => eligible(byId.get(id)));
+  const lead = new Set(firstIds);
+  const hitIds = [...best.keys()].filter(id => !lead.has(id)).sort((a, b) => best.get(b) - best.get(a) || trustRank.get(a) - trustRank.get(b));
   const inWanted = c => Boolean(c.section && wanted.has(c.section));
-  const plan = hitIds.map(id => ({ id, sections: whole.has(id) || inWanted(byId.get(id)) ? null : sections.get(id) }));
-  const seen = new Set(hitIds);
+  const plan = [...firstIds.map(id => ({ id, sections: null })),
+    ...hitIds.map(id => ({ id, sections: whole.has(id) || inWanted(byId.get(id)) ? null : sections.get(id) }))];
+  const seen = new Set([...firstIds, ...hitIds]);
   for (const c of trustOrder(catalog.filter(c => eligible(c) && inWanted(c) && !seen.has(c.id)))) plan.push({ id: c.id, sections: null });
   return plan;
 }

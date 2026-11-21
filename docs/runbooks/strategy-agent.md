@@ -1,3 +1,4 @@
+<!-- DeepBench v7.0.1107 | docs/runbooks/strategy-agent.md | AGT-783 -- step 6c: an accepted difference between a company record and the live wording is stored as a correction record. -->
 <!-- DeepBench v7.0.1019 | docs/runbooks/strategy-agent.md | AGT-665 -- step 4: leads -->
 <!-- DeepBench v7.0.1012 | docs/runbooks/strategy-agent.md | AGT-652 -- step 1 and the four routine prompt blocks read and export OPENAI_API_KEY by name, so routine renders rank the Library by meaning (full text + vector), as attended runs do. -->
 <!-- DeepBench v7.0.1011 | hire 2026-11-12: four routines created and switched on (their ids stay out of this public file; the routine list holds them); each block gained the npm ci line the scripts need -->
@@ -46,6 +47,7 @@ Personal-agent.md section (b), with `--agent=harry` and these differences. Work 
 5. **Log the turn.** `node scripts/agent-log.js --agent=harry --capability=<slug> --model=<printed model> --ai-type=agent-turn --feature=<slug>:<intent>:depth0`, where `<intent>` is the capability's `default_intent_slug` (`sc-<suffix>-intent`, e.g. `sc-advise-intent`). Pass token counts only when the session observed them.
 6. **Answer the principal.** Verdict first, in plain words; every recommendation carries its evidence (the Library item or record it rests on) and a confidence. A proposed price always comes with its basis; the principal sets the number. Say what was written back.
 6b. **Session-end tick list (AGT-651).** After any attended `/harry` session, list every `fact` record (pending) and every `method` record (proposed) written this session as numbered checkboxes, each in one plain sentence. The principal answers in the form "yes 1, 3; no 2"; run `node scripts/personal-agent.js --tick=<the ids he said yes to> --untick=<the ids he said no to>`. Nothing on the list is confirmed until he ticks it.
+6c. **An accepted difference (AGT-783).** The weekly review reads the Library's `identity` items of principal trust first (`LIBRARY_READ_FIRST`), compares the three pinned company records with them and with the newest library release, and files one `gap` per mismatch. When the principal says "leave it" about one, write one `correction` record (what differs, accepted, date) with `--write --capability=strategy-weekly-review`; every later render reads it, so that difference is not raised again unless one of the two texts changes.
 
 ### The principal's standing mandate (goals interview, 2026-11-12)
 
