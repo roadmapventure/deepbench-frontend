@@ -296,3 +296,9 @@ The step, approved verbatim:
 COMPANY RECORDS CHECK: compare your three pinned company records (company profile, offerings, consulting automation) with the Library's live public wording items and the newest KPI Library release. A mismatch is a difference in substance only: a number differs; a product, service or practice name differs; a claim contradicts; or the live text breaks one of the record's wording rules. Phrasing, length, order and synonyms are not mismatches. For each mismatch write one gap naming the record, its line and the live text, unless an open gap already names it or a correction records that the principal accepted it. When a gap you filed no longer holds, say it is resolved. Never edit a record and never state it differently; the record wins until the principal changes it.
 
 Proof after the build: one attended weekly review; report the gaps it actually files. Not in scope: any edit to a record, the public Page or the stated menu; any routine's schedule or switch.
+
+### 11b. Scope item 2 replaced (2026-11-21, "Yes, change the read")
+
+The Designer replayed the weekly review's Library read on live rows and found that item 2 of 11a does nothing: the read takes search hits first, then the capability's sections in trust order, and stops at 60,000 bytes; with the four items in `value` they sit past that cap and are never read, and the Library search returns none of them. Section 10's line that the four items are found by full-text search is therefore wrong.
+
+Ruled by the principal: the four items stay in section `identity` (no relabel, no manifest edit), and `scripts/personal-agent.js` gains a per-capability read-first rule so the weekly review reads the `identity` items of principal trust ahead of the search hits (six items, 8,729 characters when measured). Items 1, 3 and 4 of 11a and the step text are unchanged. This is one code file more than 11a stated; the cap case goes to the Development Manager.
