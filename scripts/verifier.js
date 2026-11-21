@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1101 | scripts/verifier.js | AGT-598 -- a cycle-measured BASELINE block is graded against the cycle's measurement.
 // DeepBench v7.0.1073 | scripts/verifier.js | AGT-319 -- the coupled-files note records who pays for a runbook edit's dragged files: the kickoff that makes the edit (comment only, no clause changed).
 // DeepBench v7.0.1071 | scripts/verifier.js | AGT-326 -- a test that asserts a piece of an anchored line pins it; a runbook edit's dragged files are counted before the Builder runs.
 // DeepBench v7.0.1065 | scripts/verifier.js | AGT-328 -- the delta counts failing arms; a pin rides the ship that changes it.
@@ -1055,6 +1056,32 @@ export function baselineCoverageFinding({ measured, graded, instrument, absent }
       `${uncovered.length === 1 ? "it" : "them"} would be graded against a measurement nobody took: ` +
       `${uncovered.join(", ")} (AGT-457).`,
   };
+}
+
+// ---- FEATURE: AGT-598 -- A BLOCK THAT SAYS cycle-measured IS THE CYCLE'S MEASUREMENT, OR REFUSED.
+export function baselineStampFrom(text) {
+  const para = baselineParagraph(text).trimStart();
+  if (!para) return null;
+  const head = para.split("\n")[0];
+  const count = para.match(/Red set:\s*(\d+)\s+of\s+(\d+)/);
+  const tree = head.match(/\btree\s+([0-9a-f]{7,40})\b/);
+  return { cycleMeasured: /^BASELINE \(cycle-measured\b/.test(head),
+    red: count ? Number(count[1]) : null, of: count ? Number(count[2]) : null, tree: tree ? tree[1] : null };
+}
+
+export function baselineProvenanceFinding({ block: b, measurement: m }) {
+  if (!b || !m || !b.cycleMeasured) return null;
+  const differs = [];
+  if (m.of !== null && (b.red !== m.red || b.of !== m.of)) {
+    differs.push(`count: the block says Red set ${b.red} of ${b.of}, the cycle measured ${m.red} of ${m.of}`);
+  }
+  if (m.tree !== null && !(b.tree !== null && (b.tree.startsWith(m.tree) || m.tree.startsWith(b.tree)))) {
+    differs.push(`tree: the block says ${b.tree ?? "none"}, the cycle measured ${m.tree}`);
+  }
+  if (!differs.length) return null;
+  return { kind: "kickoff-baseline-not-the-measurement", differs, block: b, measurement: m,
+    remedy: "paste the handed file's BASELINE header and Red set lines over the kickoff's block, verbatim; never edit a number into shape",
+    reason: `kickoff-baseline-not-the-measurement: the block says cycle-measured and is not this cycle's measurement -- ${differs.join("; ")} (AGT-598).` };
 }
 
 // Pure. The regression gate's status once the delta is taken into account.
@@ -4112,6 +4139,21 @@ async function main() {
             baseline_source: kb.source, pre_build_baseline: preBuildBaselinePath,
             pre_build_baseline_source: handed.source,
             remedy_owner: "cycle", reason }, prose: reason });
+      }
+    }
+    // ---- AGT-598: A cycle-measured BLOCK MUST BE THE MEASUREMENT THE CYCLE HANDED. ----------
+    {
+      const stamp = baselineStampFrom(text);
+      let handedText = "";
+      if (preBuildBaselinePath && !kb.uncredentialed) {
+        try { handedText = fs.readFileSync(preBuildBaselinePath, "utf8"); } catch { handedText = ""; }
+      } else if (!preBuildBaselinePath && stamp?.cycleMeasured && !baselineNote) {
+        baselineNote = "NOT GRADED (AGT-598): cycle-measured block, no --pre-build-baseline= handed";
+      }
+      const provenance = baselineProvenanceFinding({ block: stamp, measurement: baselineStampFrom(handedText) });
+      if (provenance) {
+        return emit({ code: 1, payload: { ok: false, exitCode: 1, ...provenance,
+            pre_build_baseline: preBuildBaselinePath, remedy_owner: "cycle" }, prose: provenance.reason });
       }
     }
     // ---- AGT-189: the Builder's DECLARED MODEL, graded against the lane row, read live. ------
