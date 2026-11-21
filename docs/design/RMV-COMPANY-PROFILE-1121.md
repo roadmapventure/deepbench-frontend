@@ -162,12 +162,12 @@ Correction recorded with the scope: the weekly audit runs where it cannot read t
 
 ## 9. Record text approved by the principal
 
-### 9a. Company profile (approved 2026-11-21, "Yes"; unique-measures line settled the same day; the data-warehouse phrase still being walked)
+### 9a. Company profile (approved 2026-11-21, "Yes"; both open lines settled the same day in his wording; record 1 text is final)
 
 1. **What RMV does.** RoadMap Venture (RMV) architects and builds AI products end to end: agents, data platforms, and the governance to run them.
 2. **Two practices.**
    - AI product management across industries. The problem: AI agents drift, forget what they learn, struggle to carry domain expertise, and stay locked in one AI client. Customers drive new revenue by licensing the use of their self-built domain expert agent.
-   - GovTech, for state and local government, with the same AI and data product. The problem: every system exports its own report and none combines them into one view leadership trusts. RMV turns the exports an agency already has into full procurement analysis, AI dashboards and KPIs.
+   - GovTech, for state and local government, with the same AI and data product. The problem: every system exports its own report and none combines them into one view leadership trusts. RMV turns the exports an agency already has into full procurement analysis, AI dashboards and KPIs. A benefit of the dashboards is that they do not need a data warehouse. As part of the services offered, RMV can help design and model a data warehouse if the customer wants one. (The principal's wording, 2026-11-21.)
 3. **Three products.**
    - DeepBench: a multi-agent AI platform for building, running and governing specialized AI agents, available over MCP.
    - Procurement Intelligence: a procurement analytics platform for state and local government: spend analysis, KPI dashboards and AI agents built from an agency's reports or system exports.
