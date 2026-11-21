@@ -130,7 +130,7 @@ A populated sample is shown to the principal in the walkthrough, tagged as a sam
 
 ## 6. Which agents get it (the principal's call, Q4)
 
-Ruling 2026-11-21: the entire product team, pinned as the north star is. Measured the same day: the Bench "Product Team" view is the nine governance-lane agents (GV-01 to GV-09), all pinned to the north star. The north-star pin set is 16: those nine, plus Harry, Laura, Jerry, Nathan, Victoria, and two switched-off agents (Dilbert, Trenton). Not pinned to anything: Malcolm and Paul. RULED 2026-11-21: the sixteen plus Malcolm (17 pin rows); Paul stays out. Pinning changes agent configuration, so nothing is pinned by this session.
+Ruling 2026-11-21: the entire product team, pinned as the north star is. Measured the same day: the Bench "Product Team" view is the nine governance-lane agents (GV-01 to GV-09), all pinned to the north star. The north-star pin set is 16: those nine, plus Harry, Laura, Jerry, Nathan, Victoria, and two switched-off agents (Dilbert, Trenton). Not pinned to anything: Malcolm and Paul. RULED 2026-11-21: the sixteen plus Malcolm (17 pin rows); Paul stays out. Also ruled the same day: Malcolm is pinned to the north star too (one new pin row on the existing Skill). Pinning changes agent configuration, so nothing is pinned by this session.
 
 ## 7. Walkthrough record
 
