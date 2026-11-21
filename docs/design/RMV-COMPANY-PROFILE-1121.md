@@ -1,8 +1,8 @@
-<!-- DeepBench (version claimed at kickoff) | docs/design/RMV-COMPANY-PROFILE-1121.md | design-rmv-profile-1121 — DRAFT design record for one central company profile every relevant agent reads. Sections 1-2 are measured; sections 3-6 are proposals until the principal answers each walkthrough question (section 7). No agent row, Skill row, pin or routine is changed by this document. -->
+<!-- DeepBench v7.0.1106 | docs/design/RMV-COMPANY-PROFILE-1121.md | AGT-781 (design-rmv-profile-1121) — the design record for three pinned company knowledge records every product-team agent reads on every call: inventory measured 2026-11-21, four walkthrough questions answered by the principal the same day, three record texts approved verbatim (section 9). Tickets AGT-781, AGT-782, AGT-783. No agent row, Skill row, pin or routine is changed by this document. -->
 
-# One central company profile for the agents (design, DRAFT)
+# Company knowledge records for the agents (design record)
 
-**Status:** inventory measured 2026-11-21; design questions Q1-Q4 open with the principal (section 7).
+**Status:** inventory measured 2026-11-21; Q1-Q4 answered and scope approved by the principal the same day (sections 7, 7b); record texts approved (section 9). Sections 3-6 are kept as the proposals he ruled on; where a ruling changed one, the ruling in sections 7-9 governs.
 
 This document follows the personal-lane convention: the owner is "the principal", no client is named, and no price or personal fact appears. The working files it points to live outside this repository; they are named by file, never copied in.
 
