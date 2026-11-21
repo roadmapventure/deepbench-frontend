@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1099 | scripts/settle-ship.js | AGT-591 -- a `blocked` Builder return settles `partial` (sixth trigger); --may-push refuses its push.
 // DeepBench v7.0.1094 | scripts/settle-ship.js | AGT-582 -- SES-247 branch (c) gets its writer.
 // DeepBench v7.0.988 | scripts/settle-ship.js | AGT-634 -- an id-less STOP LINE sentence closes partial only when it DECLARES it, never when it describes the behaviour shipped.
 // DeepBench v7.0.985 | scripts/settle-ship.js | AGT-628 -- the cost patch verifies the clause it promises; one settle mints one decision.
@@ -209,6 +210,48 @@ export function readRemainder(text, ticketId = null) {
   return { slice, stopPartial };
 }
 
+// AGT-591 -- THE SIXTH TRIGGER READS THE BUILDER'S OWN RETURN. `answer` is the build-ticket JSON as
+// the Builder returned it (`outcome` pushed|blocked, `tasks` = the tasks completed, by title, in
+// order); `kickoffText` supplies the denominator, so nobody retypes "task 5 of 5". Pure.
+export function kickoffTaskCount(kickoffText) {
+  const s = typeof kickoffText === "string" ? kickoffText : "";
+  const head = s.match(/^##\s*5\.?\s*TASKS.*$/im);
+  if (!head) return 0;
+  const rest = s.slice(head.index + head[0].length);
+  const end = rest.search(/^##\s/m);
+  const ids = new Set();
+  for (const m of (end === -1 ? rest : rest.slice(0, end)).matchAll(/^\s*(?:\*\*T(\d+)\b|(\d+)\.\s)/gm)) ids.add(m[1] ?? m[2]);
+  return ids.size;
+}
+
+// null = not a Builder return at all (no object, or an `outcome` outside the two-value enum).
+export function readBuilderReturn(answer, kickoffText = "") {
+  if (!answer || typeof answer !== "object" || Array.isArray(answer)) return null;
+  if (answer.outcome !== "pushed" && answer.outcome !== "blocked") return null;
+  const built = Array.isArray(answer.tasks) ? answer.tasks.filter(t => typeof t === "string" && t.trim() !== "").length : 0;
+  return { outcome: answer.outcome, built, total: kickoffTaskCount(kickoffText) };
+}
+
+// The trigger's reason, or null. `blocked` ALWAYS fires: a Builder that built every task and could
+// not push has still shipped nothing. The unbuilt span is positional (built+1..total) because the
+// contract returns completed tasks in order and the Builder works one task at a time.
+export function builderReason(b) {
+  if (!b || b.outcome !== "blocked") return null;
+  if (b.total > b.built) {
+    const first = b.built + 1;
+    return `the Builder returned \`blocked\` with ${first === b.total ? `task ${first}` : `tasks ${first}-${b.total}`} of ${b.total} not built`;
+  }
+  return `the Builder returned \`blocked\` with ${b.built} tasks reported built and nothing pushed by it`;
+}
+
+// The ship point's refusal, or null. Runbook step 7 statement 3: a blocked build is never pushed
+// from the orchestrator's HEAD; the tail pushes its own two files via scripts/tail-push.js.
+export function pushRefusal(b) {
+  return b && b.outcome === "blocked"
+    ? "the Builder returned `blocked`, so this HEAD is not pushed (runner-cycle.md step 7 statement 3, AGT-525). Close the cycle `gated_before_build`, or settle the ticket with this same --builder so it reads `partial`; step 9's tail pushes its two files via scripts/tail-push.js."
+    : null;
+}
+
 // decideStatus({ kickoffText, ticketId, gatedOpen, gateReworked, remainder }) -> { status, reasons[] }
 //
 // `reasons` is every trigger that fired, not the first: an operator reading the plan needs to know
@@ -219,7 +262,7 @@ export function readRemainder(text, ticketId = null) {
 // before this ship (`main()` below and `scripts/ticket-owner.js` check 12) keep byte-identical
 // answers until they pass it, so adding trigger 5 cannot move a single existing verdict; the new
 // trigger reaches the board only through `resettleTicket()`, which reads the ruled card itself.
-export function decideStatus({ kickoffText = "", ticketId = null, gatedOpen = false, gateReworked = false, remainder = null } = {}) {
+export function decideStatus({ kickoffText = "", ticketId = null, gatedOpen = false, gateReworked = false, remainder = null, builder = null } = {}) {
   const { slice, stopPartial } = readRemainder(kickoffText, ticketId);
   const reasons = [];
   if (slice && slice.n < slice.m) reasons.push(`the kickoff declares slice ${slice.n} of ${slice.m}`);
@@ -227,6 +270,7 @@ export function decideStatus({ kickoffText = "", ticketId = null, gatedOpen = fa
   if (gatedOpen) reasons.push("an undecided `gated_before_build` card is open on this ticket");
   if (gateReworked) reasons.push("a `gated_before_build` card on this ticket was ruled `rework`");
   if (typeof remainder === "string" && remainder.trim() !== "") reasons.push(`a remainder was declared: ${remainder.trim()}`);
+  const blockedWhy = builderReason(builder); if (blockedWhy) reasons.push(blockedWhy);
   if (reasons.length > 0) return { status: "partial", reasons };
   return { status: "delivered", reasons: ["the record names no unbuilt work: no slice remainder, no STOP LINE `partial`, no open card, no card ruled `rework`, no declared remainder"] };
 }
@@ -478,7 +522,7 @@ export function planShip({ status, ticket, verdict = null, cycleRow = null, exis
 // ---------------------------------------------------------------------------------------------
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainder", "apply", "resettle", "ship", "release", "defer-reason"]);
+export const ALLOWED_FLAGS = new Set(["ticket", "kickoff", "cycle-id", "remainder", "apply", "resettle", "ship", "release", "defer-reason", "builder", "may-push"]);
 
 // AGT-167 -- ONE DIRECTION, and the constant is here rather than inline so the guard has a name a
 // test can point at. `resettleTicket()` moves a row OFF `delivered` and nothing else: `partial` is
@@ -555,6 +599,24 @@ function arg(argv, name) {
   const hit = argv.find(a => a === `--${name}` || a.startsWith(`--${name}=`));
   if (hit === undefined) return undefined;
   return hit.includes("=") ? hit.slice(hit.indexOf("=") + 1) : true;
+}
+
+// AGT-591 -- the one loader both doors use: the Builder's JSON saved verbatim, or null for `none`,
+// which is a DECLARATION that no Builder ran (an attended cycle). Anything else is refused, never
+// guessed, and before any network read.
+function loadBuilder(value) {
+  if (typeof value !== "string" || value === "") {
+    fail("--builder=<path to the Builder's returned JSON, saved verbatim | none> is required — the Builder's own `outcome` is the sixth trigger, read from its record and never retyped; pass `none` only when no Builder ran this cycle (AGT-591).");
+  }
+  if (value === "none") return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(path.resolve(value), "utf8"));
+  } catch (e) {
+    fail(`--builder=${value}: not readable JSON (${e.message}) — save the Builder's returned JSON verbatim and pass its path (AGT-591).`);
+  }
+  if (!readBuilderReturn(parsed)) fail(`--builder=${value}: carries no \`outcome\` of \`pushed\` or \`blocked\`, so it is not a build-ticket return (AGT-591).`);
+  return parsed;
 }
 
 // Copied from scripts/ticket-owner.js:653 -- one fetch path every read AND every write goes
@@ -1144,7 +1206,7 @@ async function main() {
   for (const a of argv) {
     const name = a.startsWith("--") ? a.slice(2).split("=")[0] : a;
     if (!a.startsWith("--") || !ALLOWED_FLAGS.has(name)) {
-      fail(`unknown flag ${a} — this script takes --ticket=<ID>, --kickoff=<path>, --cycle-id=<uuid>, --remainder=<text>, --defer-reason=<condition>, --resettle, --ship, --release and --apply.`);
+      fail(`unknown flag ${a} — this script takes --ticket=<ID>, --kickoff=<path>, --cycle-id=<uuid>, --remainder=<text>, --defer-reason=<condition>, --resettle, --ship, --release, --builder=<path|none>, --may-push and --apply.`);
     }
   }
 
@@ -1161,6 +1223,15 @@ async function main() {
   // trim in `planSettle()` does the same for `--defer-reason=""`.
   const deferReasonArg = arg(argv, "defer-reason");
   const deferReason = typeof deferReasonArg === "string" ? deferReasonArg : null;
+
+  // AGT-591 -- THE FIFTH DOOR: the ship point's gate, chained ahead of the push. No ticket, no
+  // credentials, no read but the file: exit 0 lets the `&&` chain reach `git push`, exit 2 stops it.
+  if (arg(argv, "may-push") !== undefined) {
+    const refusal = pushRefusal(readBuilderReturn(loadBuilder(arg(argv, "builder"))));
+    if (refusal) fail(`--may-push refused: ${refusal}`);
+    process.stdout.write("settle-ship: push allowed — no Builder return of `blocked` on this cycle\n");
+    process.exit(0);
+  }
 
   if (typeof ticket !== "string" || ticket === "") fail("--ticket=<ID> is required — this script settles exactly one ticket.");
 
@@ -1338,6 +1409,7 @@ async function main() {
   if (applyArg !== undefined && (typeof cycleId !== "string" || cycleId === "")) {
     fail("--apply needs --cycle-id=<uuid> — every write is attributed to the cycle that made it.");
   }
+  const builderAnswer = loadBuilder(arg(argv, "builder"));
   const remainder = typeof remainderArg === "string" ? remainderArg : null;
 
   const kickoffAbs = path.isAbsolute(kickoffArg) ? kickoffArg : path.join(ROOT, kickoffArg);
@@ -1366,7 +1438,7 @@ async function main() {
 
   // AGT-128 -- the `--ticket` value read at :404, so trigger 2 knows which ticket the STOP LINE
   // has to be talking about. Without it the reader is id-blind and settles on anyone's `partial`.
-  let decided = decideStatus({ kickoffText, ticketId: ticket, gatedOpen, remainder });
+  let decided = decideStatus({ kickoffText, ticketId: ticket, gatedOpen, remainder, builder: readBuilderReturn(builderAnswer, kickoffText) });
   let plan;
   try {
     plan = planSettle(row, kickoffArg, decided.status, deferReason);

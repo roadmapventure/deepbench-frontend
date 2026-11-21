@@ -107,8 +107,8 @@ async function run() {
   for (const f of ANCHOR_FLAGS) {
     assert.ok(ALLOWED_FLAGS.has(f), `ALLOWED_FLAGS lost \`${f}\` — the new flag is APPENDED, never a replacement`);
   }
-  assert.strictEqual(ALLOWED_FLAGS.size, ANCHOR_FLAGS.length + 1,
-    `ALLOWED_FLAGS holds ${ALLOWED_FLAGS.size} flags — expected the anchor's ${ANCHOR_FLAGS.length} plus defer-reason and nothing else`);
+  assert.strictEqual(ALLOWED_FLAGS.size, ANCHOR_FLAGS.length + 3,
+    `ALLOWED_FLAGS holds ${ALLOWED_FLAGS.size} flags — expected the anchor's ${ANCHOR_FLAGS.length} plus defer-reason, builder and may-push (AGT-591) and nothing else`);
   assert.ok(!ALLOWED_FLAGS.has("verdict"),
     "no `--verdict` flag: the verdict is not an input to the status (decideStatus() takes none) and must not become one through a flag");
   results.push("the-flag-is-reachable-and-the-eight-survived");
@@ -143,7 +143,7 @@ async function run() {
   results.push("source-arms-are-proven-capable-of-failing");
 
   console.log(`[AGT-582] branch (c) writer: planSettle 3 cells unflagged / 5 flagged (trimmed) · blank + empty defer nothing · ` +
-    `\`delivered\` + defer refused · ALLOWED_FLAGS ${ALLOWED_FLAGS.size} = 8 anchor + defer-reason, no \`verdict\` · ` +
+    `\`delivered\` + defer refused · ALLOWED_FLAGS ${ALLOWED_FLAGS.size} = 8 anchor + defer-reason + builder + may-push (AGT-591), no \`verdict\` · ` +
     `rpc/recompute_backlog_queue after the read-back loop in applySettle()'s slice, both anchors proven red when deleted`);
   return results;
 }

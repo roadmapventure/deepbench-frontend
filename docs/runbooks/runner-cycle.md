@@ -2954,11 +2954,11 @@ node scripts/agent-log.js --agent=builder --capability=build-ticket --model=<the
    returned no `files` array is a finding, not a file you write empty:** an empty or unwritten list
    blocks the auto-done bar (correctly), so say so in `notes` rather than inventing paths.
 3. **`outcome = 'blocked'` → nothing shipped, and you do not finish it by hand.** Do not push on
-   the Builder's behalf — step 9's tail pushes via `scripts/tail-push.js`, never this HEAD
-   (`AGT-525`) — and do not widen the kickoff to get past the blocker: close the cycle
-   `gated_before_build`, or `shipped` when part finished and pushed (`partial` settles the TICKET), carry
-   the Builder's `deviations` into `notes` and onto the card, and let 7a grade what actually
-   happened.
+   its behalf (`scripts/tail-push.js`, `AGT-525`) or widen the kickoff:
+   close the cycle `gated_before_build`, or `shipped` when part finished (TICKET
+   `partial`), `deviations` in `notes` and the card; 7a grades it.
+   EVERY outcome:
+   save the Builder's JSON verbatim as `$S/builder.json` (`AGT-591`).
 
 **WHATEVER THE OUTCOME, READ THE BUILDER'S `deviations` — IT IS THE DESIGNER'S SIGNAL (`SES-378`).**
 An entry saying the build needed a fact the kickoff did not carry — the Builder read the harvest,
@@ -3257,7 +3257,7 @@ SELECT * FROM public.verdict_ladder_signal('<verdict id>');
 
 ```
 SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/settle-ship.js \
-  --ticket=<ID> --kickoff=<the kickoff path> --cycle-id=<your cycle id> [--remainder="<remainder>"] --apply
+  --ticket=<ID> --kickoff=<the kickoff path> --cycle-id=<your cycle id> --builder=<JSON|none> [--remainder="<remainder>"] --apply
 ```
 
   **A refused `delivered` — no verdict — SETTLES `partial` AND FILES A GATE CARD JOHN CAN ACT ON
@@ -3420,7 +3420,7 @@ SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/check-version-claim.js \
 
 - **Re-assert the lease, then one batched push.** The re-assertion `SELECT` (step 0) is a **hard
   gate on the push**: run it, and only on 1 row proceed with
-  `git fetch origin dev && git rebase origin/dev && git push origin HEAD:dev`. Never
+  `node scripts/settle-ship.js --may-push --builder=<JSON|none> && git fetch origin dev && git rebase origin/dev && git push origin HEAD:dev`. Never
   per-artifact pushes. 0 rows → do not push; follow the stolen-from procedure in step 0. Keep
   the `git fetch` too — it catches a different failure (a successor that shipped without taking
   your lease), and `633fe486` survived on that accident alone.
