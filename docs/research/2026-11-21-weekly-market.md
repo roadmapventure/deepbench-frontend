@@ -287,6 +287,24 @@ this routine.
 
 ---
 
+## One process finding from this run
+
+**`scripts/tail-push.js` cannot produce the commit trailer every routine prompt requires.** The
+Researcher's prompt (and the playbook's own prompt block) say the commit message must end with
+`Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`. `tail-push.js` builds its message from
+`--message` / `--cycle-id` alone and contains no trailer logic — grepped on this tree, there is no
+`Co-Authored-By` string in the file. So commit `b90a667`, this report's own first commit, went onto
+`dev` without it, and so has every routine commit made through this script since `AGT-607` routed
+the routines' own files through it.
+
+It was NOT fixed by rewriting history: `dev` is shared with 5–7 concurrent sessions and a
+force-push to correct one trailer is far worse than the missing trailer. The amendment commit
+carrying this section was made with plain `git commit` and pushed `HEAD:dev`, with the trailer, so
+the two halves of this report sit on `dev` under different commit conventions — which is itself the
+clearest evidence of the gap. Filed for the Development Manager as a separate ledger finding.
+
+---
+
 ## The research body
 
 What follows is the research document returned by The Researcher
