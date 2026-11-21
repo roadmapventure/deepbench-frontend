@@ -281,5 +281,5 @@ Measured 2026-11-21: the strategy consultant's weekly review carries the three r
 | Q | Question | Answer | Date |
 |---|---|---|---|
 | Q1 | Who carries the check | The strategy consultant's weekly review ("Yes, Harry"). It needs the live-wording items readable in full, and one added step in the review's instructions | 2026-11-21 |
-| Q2 | What counts as a mismatch | open | |
+| Q2 | What counts as a mismatch | Substance only ("Yes, substance only"): a number differs; a product, service or practice name differs; a claim contradicts; a wording rule is broken. Phrasing, length, order and synonyms do not count | 2026-11-21 |
 | Q3 | How an already-seen mismatch stops being re-filed | open | |
