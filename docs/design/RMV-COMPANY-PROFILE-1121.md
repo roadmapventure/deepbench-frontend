@@ -302,3 +302,10 @@ Proof after the build: one attended weekly review; report the gaps it actually f
 The Designer replayed the weekly review's Library read on live rows and found that item 2 of 11a does nothing: the read takes search hits first, then the capability's sections in trust order, and stops at 60,000 bytes; with the four items in `value` they sit past that cap and are never read, and the Library search returns none of them. Section 10's line that the four items are found by full-text search is therefore wrong.
 
 Ruled by the principal: the four items stay in section `identity` (no relabel, no manifest edit), and `scripts/personal-agent.js` gains a per-capability read-first rule so the weekly review reads the `identity` items of principal trust ahead of the search hits (six items, 8,729 characters when measured). Items 1, 3 and 4 of 11a and the step text are unchanged. This is one code file more than 11a stated; the cap case goes to the Development Manager.
+
+### 11c. Built and first run (2026-11-21)
+
+- Shipped v7.0.1107, dev commit 4b0a628a; verifier approve (5 standing reds, 0 newly red); ticket done. The guard's live arm reads "4 of 4 seeded live texts whole".
+- First attended weekly review, same day. Gaps filed by the records check: the live Overview calls a product "a managed service"; the company profile's public "nearly 90 published sources" against 91 organizations and 501 publications at release 50; the live Overview lists "practice building", which no record names.
+- Not filed, though predicted in the walkthrough: the product page's "unique" wording against the record's "contributed", and the stated menu's warehouse line against the record's. Both texts were in the prompt; cause not yet established.
+- Two defects found on the way and filed as findings (week 2026-W47): the weekly review's instructions never state the market-check shape its write guard enforces; and the strategy and writing renders are far over their own byte ceilings.
