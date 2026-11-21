@@ -1,3 +1,4 @@
+// DeepBench v7.0.1102 | tests/regression/agt-573-ci-grades-the-change.test.mjs | AGT-611
 // DeepBench v7.0.958 | tests/regression/agt-573-ci-grades-the-change.test.mjs | AGT-573
 //
 // FEATURE: AGT-573 -- the blocking CI job grades THE CHANGE, never the live world (pattern:162).
@@ -22,6 +23,12 @@
 //        reports this guard and SES-180 (d)'s; over a path no test names it reports an empty set at
 //        exit 0 (the branch the step's `if [ -z "$RELATED" ]` takes); and `run-all.js --only=` with
 //        an empty set refuses -- `Nothing was run.`, exit 2, never a silent full suite.
+//   D -- AGT-611: the shipped step pipes the HEAD run to a log, keeps its exit code, builds the
+//        `$BASE_SHA` worktree and hands both to scripts/ci-new-reds.js. Arm B's pre-change control
+//        must carry NONE of those five lines, for arm B's own reason.
+//   E -- newReds() partitions a HEAD red set into standing (red at BASE too) and fresh.
+//   F -- THE DISCRIMINATOR, offline: over a tmpdir base/head pair, a red that is red at BASE exits
+//        0 and a red that was green at BASE exits 1 -- one grader, one log, two outcomes.
 //
 // BASELINE: RED on the unchanged tree -- the step ran `run: node tests/regression/run-all.js` with
 // no BASE_SHA, no diff and no --only, so arm A fails on six clauses at once.
@@ -33,11 +40,13 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { selfRun } from "./_lib/self-run.js";
+import { newReds } from "../../scripts/ci-new-reds.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CI_REL = ".github/workflows/ci.yml";
 const SELF = "agt-573-ci-grades-the-change.test.mjs";
 const SUITE_RUN = "node tests/regression/run-all.js";
+const GRADER = "scripts/ci-new-reds.js";
 
 // The step block, read exactly the way SES-180 (d)'s shipped extractor reads it: never the whole
 // file, because the header commentary above `name: CI` quotes the invocation while explaining the
@@ -112,15 +121,19 @@ function armA() {
 }
 
 // ---- B: the pre-change step must lose the two clauses that carry the ticket ---------------------
+// The retired six lines, hoisted so arm D grades AGT-611's five new clauses against the same
+// control arm B grades AGT-573's two against.
+const PRE_CHANGE = [
+  "      - name: Regression suite (credentialed)",
+  "        if: always()",
+  "        env:",
+  "          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}",
+  "          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}",
+  `        run: ${SUITE_RUN}`,
+].join("\n");
+
 function armB() {
-  const preChange = [
-    "      - name: Regression suite (credentialed)",
-    "        if: always()",
-    "        env:",
-    "          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}",
-    "          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}",
-    `        run: ${SUITE_RUN}`,
-  ].join("\n");
+  const preChange = PRE_CHANGE;
 
   const missing = missingClauses(preChange);
   assert.ok(missing.some(l => l.includes("BASE_SHA:")),
@@ -185,11 +198,136 @@ function armC() {
   console.log("  [arm C] ok");
 }
 
+// ---- D: the shipped step grades a red against the BASE tree before failing (AGT-611) -----------
+//
+// One clause per line of the new shape that carries the ticket. Each is checked in BOTH directions:
+// present in the shipped step, absent from the retired six lines -- without the second half these
+// asserts would pass on any step that merely runs the suite (the LOO-013 lesson again).
+const GRADER_CLAUSES = [
+  'node tests/regression/run-all.js --only="$RELATED" 2>&1 | tee /tmp/head-run.txt',
+  'HEAD_CODE="${PIPESTATUS[0]}"',
+  'git worktree add --detach /tmp/agt611-base "$BASE_SHA"',
+  'ln -s "$PWD/node_modules" /tmp/agt611-base/node_modules',
+  'node scripts/ci-new-reds.js --head-log=/tmp/head-run.txt --head-code="$HEAD_CODE" --base-root=/tmp/agt611-base',
+];
+
+function armD() {
+  const yaml = fs.readFileSync(path.join(ROOT, CI_REL), "utf8").replace(/\r\n/g, "\n");
+  const block = suiteStep(yaml);
+  assert.ok(block, `the regression-suite step was not found in ${CI_REL} -- the anchors moved`);
+  for (const clause of GRADER_CLAUSES) {
+    assert.ok(block.includes(clause),
+      `${CI_REL}'s regression step does not carry \`${clause}\` -- without it a HEAD red is never ` +
+        "measured against the $BASE_SHA tree and every standing red fails the push (AGT-611)");
+    assert.ok(!PRE_CHANGE.includes(clause),
+      `the pre-change step must FAIL the \`${clause}\` clause -- if it does not, arm D would pass ` +
+        "on a step that never builds the BASE tree");
+  }
+  console.log("  [arm D] ok");
+}
+
+// ---- E: the partition itself, pure ------------------------------------------------------------
+function armE() {
+  assert.deepStrictEqual(
+    newReds({ headFails: ["a.js", "b.js", "c.js"], baseFails: ["b.js", "z.js"] }),
+    { standing: ["b.js"], fresh: ["a.js", "c.js"] },
+    "newReds() must call a HEAD red STANDING iff that same name is red at BASE -- a BASE-only red " +
+      "(`z.js`) is neither standing nor fresh, and the order of headFails is kept"
+  );
+  console.log("  [arm E] ok");
+}
+
+// ---- F: THE DISCRIMINATOR -- one grader, one log, two outcomes, offline ------------------------
+//
+// The fixture is a base/head pair under os.tmpdir() removed in `finally` (pattern:76): nothing here
+// touches the repository, the real suite or Supabase. `standing.test.mjs` throws at BASE, so a HEAD
+// red of that name is STANDING and the job passes; `was-green.test.mjs` passes at BASE, so the same
+// run exits 1 the moment that name is red at HEAD. On tree af94e89 the step failed on both.
+function armF() {
+  const RUN_ALL = path.join(ROOT, "tests", "regression", "run-all.js");
+  const GRADER_ABS = path.join(ROOT, GRADER);
+  const fx = fs.mkdtempSync(path.join(os.tmpdir(), "agt611-"));
+  try {
+    const baseDir = path.join(fx, "base", "tests", "regression");
+    const headDir = path.join(fx, "head", "tests", "regression");
+    fs.mkdirSync(baseDir, { recursive: true });
+    fs.mkdirSync(headDir, { recursive: true });
+    fs.writeFileSync(path.join(baseDir, "standing.test.mjs"),
+      'export default async function run() { throw new Error("standing"); }\n');
+    fs.writeFileSync(path.join(baseDir, "was-green.test.mjs"), "export default async function run() {}\n");
+    for (const n of ["standing.test.mjs", "was-green.test.mjs", "brand-new.test.mjs"]) {
+      fs.writeFileSync(path.join(headDir, n), "");
+    }
+
+    const log = path.join(fx, "head-run.txt");
+    const grade = (lines, code, runner = RUN_ALL) => {
+      fs.writeFileSync(log, `${lines.join("\n")}\n`);
+      const args = [GRADER_ABS, `--head-log=${log}`];
+      if (code !== null) args.push(`--head-code=${code}`);
+      args.push(`--head-root=${path.join(fx, "head")}`, `--base-root=${path.join(fx, "base")}`,
+        `--base-runner=${runner}`);
+      return node(args);
+    };
+
+    const STANDING_RED = "  [FAIL] standing.test.mjs -- x";
+    const FRESH_RED = "  [FAIL] was-green.test.mjs -- y";
+
+    // 1. the whole ticket: a red that is red at BASE too passes the job.
+    const one = grade([STANDING_RED], 1);
+    assert.strictEqual(one.code, 0,
+      `a HEAD red that is red at BASE too must pass, got ${one.code}: ${one.out}`);
+    assert.ok(one.stdout.includes("1 standing (red at BASE too), 0 new"),
+      `the grader must say the red is standing: ${one.stdout}`);
+
+    // 2. the same log plus one red that was GREEN at BASE fails -- the discriminating half.
+    const two = grade([STANDING_RED, FRESH_RED], 1);
+    assert.strictEqual(two.code, 1,
+      `a red that was green at BASE must fail the job, got ${two.code}: ${two.out}`);
+    assert.ok(two.stdout.includes("[STANDING] standing.test.mjs"),
+      `the standing red must still be named STANDING: ${two.stdout}`);
+    assert.ok(two.stdout.includes("[NEW RED] was-green.test.mjs"),
+      `the new red must be named NEW RED: ${two.stdout}`);
+
+    // 3. a test file that does not exist at BASE at all is new by construction.
+    const three = grade(["  [FAIL] brand-new.test.mjs -- y"], 1);
+    assert.strictEqual(three.code, 1,
+      `a red in a test file absent from BASE must fail, got ${three.code}: ${three.out}`);
+    assert.ok(three.stdout.includes("[NEW RED] brand-new.test.mjs"),
+      `a test absent from BASE must read NEW RED: ${three.stdout}`);
+
+    // 4. exit 1 naming no failing test file is never excused -- fail closed (D2).
+    const four = grade(["  [PASS] a"], 1);
+    assert.strictEqual(four.code, 1,
+      `exit 1 with no named failure must stay red, got ${four.code}: ${four.out}`);
+    assert.ok(four.stdout.includes("named no failing test file"),
+      `the grader must say why it could not read the red: ${four.stdout}`);
+
+    // 5. exit 2 passes through untouched, and a missing flag is exit 2 -- never a silent 0.
+    const passthrough = grade([STANDING_RED], 2);
+    assert.strictEqual(passthrough.code, 2,
+      `exit 2 must pass through, got ${passthrough.code}: ${passthrough.out}`);
+    const noCode = grade([STANDING_RED], null);
+    assert.strictEqual(noCode.code, 2,
+      `a missing --head-code must exit 2, got ${noCode.code}: ${noCode.out}`);
+
+    // 6. a BASE run that could not run is never read as "nothing was standing".
+    const noRunner = grade([STANDING_RED], 1, path.join(fx, "nope.js"));
+    assert.strictEqual(noRunner.code, 1,
+      `a BASE run that never ran must fail closed, got ${noRunner.code}: ${noRunner.out}`);
+  } finally {
+    fs.rmSync(fx, { recursive: true, force: true });
+  }
+  console.log("  [arm F] ok");
+}
+
 async function run() {
   armA();
   armB();
   armC();
-  return ["A", "B", "C"];
+  armD();
+  armE();
+  armF();
+  return ["A", "B", "C", "D", "E", "F"];
 }
 
 selfRun(import.meta.url, run);

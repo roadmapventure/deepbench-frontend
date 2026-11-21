@@ -1,3 +1,4 @@
+# DeepBench v7.0.1102 | .github/workflows/ci.yml | AGT-611 -- a HEAD red also red on the $BASE_SHA tree is [STANDING], not graded (scripts/ci-new-reds.js).
 # DeepBench v7.0.958 | .github/workflows/ci.yml | AGT-573 — THE BLOCKING SUITE GRADES THE CHANGE (pattern:162), as the
 # scan's `--base` below does: all 900 dev conclusions since 2026-09-16 read the suite job = failure and the anchor sat 49 days.
 # run-all.js --only over related-tests.js of `git diff $BASE_SHA HEAD`; an EMPTY set exits 0. Guard: tests/regression/agt-573-ci-grades-the-change.test.mjs.
@@ -311,7 +312,16 @@ jobs:
             echo "AGT-573: no regression test is related to the $(wc -l < /tmp/changed-files.txt) file(s) changed since ${BASE_SHA} -- nothing to grade; the full suite runs weekly (AGT-391)."
             exit 0
           fi
-          node tests/regression/run-all.js --only="$RELATED"
+          set +e
+          node tests/regression/run-all.js --only="$RELATED" 2>&1 | tee /tmp/head-run.txt
+          HEAD_CODE="${PIPESTATUS[0]}"
+          set -e
+          if [ "$HEAD_CODE" -eq 0 ]; then
+            exit 0
+          fi
+          git worktree add --detach /tmp/agt611-base "$BASE_SHA"
+          ln -s "$PWD/node_modules" /tmp/agt611-base/node_modules
+          node scripts/ci-new-reds.js --head-log=/tmp/head-run.txt --head-code="$HEAD_CODE" --base-root=/tmp/agt611-base
 
   # SES-255, v7.0.339 — CI PUBLISHES ITS OWN GRADE, because nothing else can read it.
   #
