@@ -1,3 +1,4 @@
+// DeepBench v7.0.1097 | middleware.js | AGT-771 -- a known site key may pass the person's address; the address rules run on that person
 // DeepBench v7.0.1096 | middleware.js | AGT-770 -- an unknown MCP key is refused 401; a site key refuses site_cap / site_blocked, no ip
 // DeepBench v7.0.1001 | middleware.js | AGT-297 -- keyed MCP callers
 // DeepBench v7.0.76 | middleware.js | HAR-33 PATCH-1 -- every reason='spend_cap' refusal carries
@@ -113,12 +114,12 @@ function refuseKey(status, reason, stats) {
   });
 }
 
-function failOpen(stage, ip, err) {
+function failOpen(stage, ip, err, pass = passThrough) {
   // One line, no secrets. Grep target for QA item 8: this should never appear during a clean run.
   console.error(
     `[HAR-33 gate] fail-open at ${stage} for ip=${ip || 'unknown'}: ${err && err.message ? err.message : String(err)}`,
   );
-  return passThrough();
+  return pass();
 }
 
 function timeoutSignal(ms) {
@@ -231,6 +232,43 @@ async function fetchCallerGate(url, key, presented) {
   return Array.isArray(rows) && rows[0] && rows[0].caller_name ? rows[0] : null;
 }
 
+const END_USER_IP_HEADER = 'x-deepbench-end-user-ip';
+const END_USER_COUNTRY_HEADER = 'x-deepbench-end-user-country';
+const ALLOWED_COUNTRIES = new Set(['US', 'CA']);
+const V4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+const HEX = /^[0-9A-Fa-f]{1,4}$/;
+function isIpLiteral(s) {
+  if (typeof s !== 'string' || !s || s.length > 45) return false;
+  if (V4.test(s)) return true;
+  if (!s.includes(':')) return false;
+  let body = s;
+  const last = s.lastIndexOf(':');
+  if (s.slice(last + 1).includes('.')) {
+    if (!V4.test(s.slice(last + 1))) return false;
+    body = s.slice(0, last + 1) + '0:0';
+  }
+  const halves = body.split('::');
+  if (halves.length > 2) return false;
+  const all = halves.flatMap(h => (h === '' ? [] : h.split(':')));
+  if (!all.every(g => HEX.test(g))) return false;
+  return halves.length === 2 ? all.length <= 7 : all.length === 8;
+}
+async function endUserProof(secret, ip) {
+  const enc = new TextEncoder();
+  const k = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', k, enc.encode('agt771:' + ip));
+  return Array.from(new Uint8Array(sig), b => b.toString(16).padStart(2, '0')).join('');
+}
+function passWithProof(request, proof) {
+  const fwd = new Headers(request.headers);
+  fwd.set('x-deepbench-end-user-proof', proof);
+  const headers = new Headers({ 'x-middleware-next': '1' });
+  const keys = [];
+  for (const [k, v] of fwd) { headers.set('x-middleware-request-' + k, v); keys.push(k); }
+  headers.set('x-middleware-override-headers', keys.join(','));
+  return new Response(null, { headers });
+}
+
 export default async function middleware(request, context) {
   let ip = null;
   try {
@@ -251,7 +289,9 @@ export default async function middleware(request, context) {
     // 3. Caller identity. No IP at all means local `vercel dev` -- pass through.
     ip = deriveCallerIp(headers);
     if (!ip) return passThrough();
-    const country = headers.get('x-vercel-ip-country') || null;
+    let country = headers.get('x-vercel-ip-country') || null;
+    let pass = passThrough;
+    let endUser = false;
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
@@ -271,15 +311,25 @@ export default async function middleware(request, context) {
         console.error(`[AGT-297 gate] key lookup failed for ip=${ip}: ${err && err.message}`);
       }
       if (caller) {
-        if (caller.permission === 'unlimited') return passThrough();
         if (caller.permission === 'blocked') return refuseKey(403, 'site_blocked', null);
         const cap = Number(caller.spend_limit_usd);
-        if (Number.isFinite(cap) && (Number(caller.cost_usd) || 0) >= cap) {
+        if (caller.permission !== 'unlimited' && Number.isFinite(cap) && (Number(caller.cost_usd) || 0) >= cap) {
           return refuseKey(403, 'site_cap', shapeStats(caller));
         }
-        return passThrough();
-      }
-      if (!lookupFailed) return refuseKey(401, 'unknown_key', null);
+        const rawIp = headers.get(END_USER_IP_HEADER);
+        const rawCountry = headers.get(END_USER_COUNTRY_HEADER);
+        if (rawIp === null && rawCountry === null) return passThrough();
+        const endIp = String(rawIp || '').trim();
+        const endCountry = String(rawCountry || '').trim();
+        if (!isIpLiteral(endIp) || !/^[A-Za-z]{2}$/.test(endCountry)) {
+          return refuseKey(400, 'end_user_invalid', null);
+        }
+        const proof = await endUserProof(supabaseKey, endIp);
+        ip = endIp;
+        country = endCountry.toUpperCase();
+        endUser = true;
+        pass = () => passWithProof(request, proof);
+      } else if (!lookupFailed) return refuseKey(401, 'unknown_key', null);
     }
 
     // 4. The row. blocked_attempts/blocked_at are selected because PostgREST cannot express
@@ -293,15 +343,15 @@ export default async function middleware(request, context) {
           '&select=permission,spend_limit_usd,block_reason,country,blocked_attempts,blocked_at&limit=1',
         { headers: supabaseAuth(supabaseKey), signal: timeoutSignal(SUPABASE_TIMEOUT_MS) },
       );
-      if (!res.ok) return failOpen('row-fetch', ip, new Error(`status ${res.status}`));
+      if (!res.ok) return failOpen('row-fetch', ip, new Error(`status ${res.status}`), pass);
       const rows = await res.json();
-      if (!Array.isArray(rows)) return failOpen('row-fetch', ip, new Error('non-array body'));
+      if (!Array.isArray(rows)) return failOpen('row-fetch', ip, new Error('non-array body'), pass);
       row = rows[0] || null;
     } catch (err) {
-      return failOpen('row-fetch', ip, err);
+      return failOpen('row-fetch', ip, err, pass);
     }
 
-    if (row && row.permission === 'unlimited') return passThrough();
+    if (row && row.permission === 'unlimited' && !endUser) return pass();
 
     if (row && row.permission === 'blocked') {
       background(
@@ -341,7 +391,7 @@ export default async function middleware(request, context) {
     }
 
     // 5. Trial (or first sighting).
-    if (country && country !== 'US') {
+    if (country && !ALLOWED_COUNTRIES.has(country)) {
       background(
         context,
         writeRow(
@@ -367,7 +417,7 @@ export default async function middleware(request, context) {
     } catch (err) {
       // Fails OPEN, unlike the stored-blocked path above: nothing has yet established that this
       // caller is over budget, so refusing on a broken RPC would block good users.
-      return failOpen('spend-rpc', ip, err);
+      return failOpen('spend-rpc', ip, err, pass);
     }
 
     const spent = Number(stats.cost_usd) || 0;
@@ -402,7 +452,7 @@ export default async function middleware(request, context) {
         writeRow(supabaseUrl, supabaseKey, ip, country ? { country } : {}, 'ignore-duplicates'),
       );
     }
-    return passThrough();
+    return pass();
   } catch (err) {
     return failOpen('unhandled', ip, err);
   }
