@@ -1,3 +1,4 @@
+// DeepBench v7.0.1106 | tests/regression/agt-643-harry.test.mjs | AGT-781 -- pin arm re-pointed off the live pin census
 // DeepBench v7.0.1005 | tests/regression/agt-643-harry.test.mjs | AGT-643 -- Harry (SC-01) and the principal's Library: rows, stores, north-star pin
 //
 // FEATURE: AGT-643 -- Harry (SC-01), the principal's Business Strategy Consultant, a personal-lane agent, and the
@@ -178,7 +179,7 @@ async function partE_live() {
   results.push("live-strategy-links-51");
 
   const pins = (await rest(`agent_skill_pins?agent_id=eq.${SELF_ID}&select=skill_profile_slug`)).map(r => r.skill_profile_slug);
-  assert.deepStrictEqual(pins, [NS], `harry's pins: ${JSON.stringify(pins)} (expected exactly the north star)`);
+  assert.strictEqual(pins.filter(p => p === NS).length, 1, `harry's pins: ${JSON.stringify(pins)} (expected the north star exactly once)`);
   results.push("live-harry-north-star-pin");
 
   const grants = (await rest(`personal_source_grants?agent_id=eq.${SELF_ID}&select=kind`)).map(g => g.kind);

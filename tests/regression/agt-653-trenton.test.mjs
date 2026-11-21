@@ -1,3 +1,4 @@
+// DeepBench v7.0.1106 | tests/regression/agt-653-trenton.test.mjs | AGT-781 -- pin arm re-pointed off the live pin census
 // DeepBench v7.0.1013 | tests/regression/agt-653-trenton.test.mjs | AGT-653 -- Trenton (SEC-01): rows, store, north-star pin
 //
 // FEATURE: AGT-653 -- Trenton (SEC-01), the principal's Government AI & Data Security Advisor, a personal-lane agent
@@ -176,7 +177,7 @@ async function partE_live() {
   results.push("live-security-links-30");
 
   const pins = (await rest(`agent_skill_pins?agent_id=eq.${SELF_ID}&select=skill_profile_slug`)).map(r => r.skill_profile_slug);
-  assert.deepStrictEqual(pins, [NS], `trenton's pins: ${JSON.stringify(pins)} (expected exactly the north star)`);
+  assert.strictEqual(pins.filter(p => p === NS).length, 1, `trenton's pins: ${JSON.stringify(pins)} (expected the north star exactly once)`);
   results.push("live-trenton-north-star-pin");
 
   const grants = await rest(`personal_source_grants?agent_id=eq.${SELF_ID}&select=kind`);

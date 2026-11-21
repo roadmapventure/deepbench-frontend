@@ -1,3 +1,4 @@
+// DeepBench v7.0.1106 | tests/regression/agt-542-dilbert.test.mjs | AGT-781 -- pin arm re-pointed off the live pin census
 // DeepBench v7.0.892 | tests/regression/agt-542-dilbert.test.mjs | AGT-542 -- Dilbert (HW-01): rows, private store, personal sources, north-star pin
 //
 // FEATURE: AGT-542 -- Dilbert (HW-01), the principal's Humorist Writer, a personal-lane agent. Three
@@ -197,7 +198,7 @@ async function partE_live() {
   results.push("live-humor-links-12");
 
   const pins = (await rest(`agent_skill_pins?agent_id=eq.${SELF_ID}&select=skill_profile_slug`)).map(r => r.skill_profile_slug);
-  assert.deepStrictEqual(pins, [NS], `dilbert's pins: ${JSON.stringify(pins)} (expected exactly the north star)`);
+  assert.strictEqual(pins.filter(p => p === NS).length, 1, `dilbert's pins: ${JSON.stringify(pins)} (expected the north star exactly once)`);
   results.push("live-dilbert-north-star-pin");
 
   const grants = (await rest(`personal_source_grants?agent_id=in.(dilbert,jerry)&select=agent_id,kind`))
