@@ -1,0 +1,146 @@
+<!-- DeepBench (version claimed at kickoff) | docs/design/RMV-COMPANY-PROFILE-1121.md | design-rmv-profile-1121 — DRAFT design record for one central company profile every relevant agent reads. Sections 1-2 are measured; sections 3-6 are proposals until the principal answers each walkthrough question (section 7). No agent row, Skill row, pin or routine is changed by this document. -->
+
+# One central company profile for the agents (design, DRAFT)
+
+**Status:** inventory measured 2026-11-21; design questions Q1-Q4 open with the principal (section 7).
+
+This document follows the personal-lane convention: the owner is "the principal", no client is named, and no price or personal fact appears. The working files it points to live outside this repository; they are named by file, never copied in.
+
+## 0. The need, in the principal's words
+
+On 2026-11-20 the principal asked for a central place agents read as background, "like we do for the north star". Over 2026-11-17..20 he settled the company's positioning across four working sessions. The result sits in a private working folder and in four agents' own stores. No agent reads it as shared background, and on 11-20 the team contradicted itself on basics (section 2).
+
+## 1. Inventory: what is settled, where it lives, who can read it
+
+"Readable today" means an agent's prompt can carry it through code that exists now (section 3). "Session only" means a Claude session must paste it into the ask.
+
+Sources: **HIST** = the LinkedIn working folder's page history; **NEXT** = its handoff file; **LIVE** = its four live-wording text files (overview, services, the two product descriptions); **CARDS** = its plan-card files; **KBM** = its KPI business-model tracker; **FACT** = its KPI fact sheet (11-20); **NOTES** = the two hand-over notes of the library sessions; **KCD** = the KPI catalog decisions file in the library's own repository; **SR / MR / WR / CR** = the strategy, market, writing and career stores; **LIB** = the principal's Library (`personal_sources`).
+
+### 1a. Positioning and wording rules
+
+| # | Settled fact or ruling | Source | Date | Readable by an agent today |
+|---|---|---|---|---|
+| 1 | The company solves two distinct problems, shown as two practices: AI product management across industries, and GovTech for state and local government | HIST (page restructure), NEXT | 11-19 | No. Session only |
+| 2 | Say "practice", never "division" | NEXT, three session transcripts | 11-19/20 | No. Session only |
+| 3 | Products are products or platforms, never services | HIST (PI opener changed "service" to "platform"), NEXT; WR fact candidate 38688c00 (unticked) | 11-20 | Laura only, as an unconfirmed candidate |
+| 4 | No client name or client data in public copy or media; screens swap the client to "County" and vendors to "Acme Vendor"; real figures may stay | NEXT, HIST (media entries) | 11-20 | No. Session only |
+| 5 | The principal alone decides prices, offers, publishing and agent changes | Standing rule (WORKING-WITH-JOHN, agent runbooks) | standing | Yes, per agent runbook; not stated as company background |
+| 6 | Tagline: "AI product management across industries: agents, data platforms, governance \| GovTech modernization: AI analytics, KPIs" ("for any industry" rejected as wording) | HIST | 11-20 | No |
+| 7 | Overview paragraph 2 opens "Our second practice in GovTech…" and ends "…the same AI and data product" (his change from "work") | HIST, LIVE | 11-20 | No |
+| 8 | Agent licensing wording: "licensing the use of your self-built domain expert agent" | HIST, LIVE | 11-20 | No |
+| 9 | Competitor-list rules for product pages: no eProcurement suites; never the former employer; keep possible acquirers | HIST; WR fact candidate ea75504f (unticked) | 11-20 | Laura only, unconfirmed |
+| 10 | Later, not now: a separate showcase page for the government line when one of three triggers hits | HIST | 11-19 | No |
+
+### 1b. Products, services and the stated menu
+
+| # | Settled fact or ruling | Source | Date | Readable today |
+|---|---|---|---|---|
+| 11 | Three products, each with its own product page: DeepBench (flagship), Procurement Intelligence, Procurement KPI Library | HIST | 11-17, names 11-20 | No. LIB item "Why RMV" (10-23) and the synthesis (11-11) predate the names |
+| 12 | The stated offering menu (services: assessments, implementation, staff augmentation, training; products: dashboards and reporting, data centralization views, libraries and benchmarks, AI at pilot stage, the commodity-code platform) | SR decision d28c9f52 | 11-17 | Harry. Laura through her team read of the strategy store (byte-capped). Not Nathan, not Jerry |
+| 13 | Amendment: the free Public-Data Preview is on the menu as "Getting Started" | SR decision 96e0785f | 11-17 | Same as row 12 |
+| 14 | Live Services description (473 chars, the principal's own outline); ten service names, availability and pricing wording kept as they were | HIST, LIVE | 11-20 | No. MR and WR hold the team's review drafts, not the final text |
+| 15 | Product page wording, final: PI description (996), KPI Library description (997), both in review at LinkedIn; DeepBench page published | HIST, LIVE | 11-20 | No. WR fact candidate fde1c548 holds an earlier KPI text, unticked |
+| 16 | PI plan cards (five names are the principal's) and KPI Library plan cards (five approved); every card "Contact sales", no public price | CARDS, KBM | 11-20 | No. MR and SR hold proposals marked "proposed, not set" |
+| 17 | KPI Library business model: lead with the library inside an assessment; consultant licence yes; agency licence offered now; no certification; benchmarking belongs to Procurement Intelligence; add KPI build guidance; free KPI title search goes on the website, not a card | KBM | 11-20 | No. SR offer 6c06b5fd is Harry's proposal, which differs (agency licence held) |
+| 18 | KPI Library page is aimed at the dashboard-tooling audience (analyst titles) | HIST; WR 029e07cf (unticked) | 11-20 | Laura only, unconfirmed |
+
+### 1c. Library headline numbers
+
+| # | Settled fact or ruling | Source | Date | Readable today |
+|---|---|---|---|---|
+| 19 | Public copy says "500+ KPIs" and "200+ assessment questions" | LIVE; WR 33719aca (unticked) | 11-20 | Laura only, unconfirmed |
+| 20 | Live library after release 50: 560 KPIs, 91 organizations, 501 publications, 3,095 citations | NOTES, KCD | 11-20 | No. LIB holds release 49 (554) and catalog v40 (528), both marked current |
+| 21 | 215 assessment questions, every record still marked Draft | FACT | 11-20 | No |
+| 22 | Source-type rulings for four outside sources; 87 citations accepted; 6 new KPIs in release 50 | KBM, KCD, NOTES | 11-20 | No |
+| 23 | Two pack names on the page do not exist in the library; principal: leave for now | NOTES, HIST | 11-20 | Harry (gap e9983be0, call only) |
+
+### 1d. Where sources disagree
+
+| # | Topic | Source A | Source B | Source C | State |
+|---|---|---|---|---|---|
+| D1 | KPI count | "500+" on the Page, both product pages, a plan card | 554 in the stated menu (d28c9f52), FACT, the media screenshots, LIB "release 49" | 560 live after release 50 (NOTES); 528 in LIB "catalog v40" and the tour script | Open. "500+" is the principal's public figure; no agent is told which number is for which use |
+| D2 | Published sources | "nearly 90 published sources" (KPI page) | 89 organizations / 497 publications (release 49) | 91 / 501 (release 50); "95 professional organizations" on a purpose slide | Consistent with "nearly 90" only by organizations; drifts at the next release |
+| D3 | "80+ measures unique to RMV assessments" (KPI page, the principal's figure) | 26 created + 67 contributed = 93 at build 554 (FACT) | Release 50 put outside citations on 11 of them; only the 26 created are strictly unique | — | Open. Flagged to the principal 11-20, not resolved |
+| D4 | Data warehouse | Overview: "without a data warehouse or an IT project"; PI page: "no ware/lakehouse needed" | Stated menu sells "the plan and build of a procurement data warehouse or lakehouse"; Services: "data platforms" | — | Open. SR gap f82a3e6c |
+| D5 | AI services on the menu | Live Services: "AI: multi-agent build-out, governance; readiness assessments"; tagline leads with the AI practice | Stated menu has no AI-practice service; AI appears only as a government readiness assessment and pilot-stage products | — | Open. SR gap ac3da89b. This is the 11-20 contradiction |
+| D6 | One person or a team | Old Services text said "consultants" (replaced 11-20); menu says "individual contributor to executive" | Page company size 0-1; live Services keeps "Fractional staff augmentation" (his choice) | — | Wording settled on the Page; menu line unchanged. SR gap 22b19e99 |
+| D7 | Product or service | Rule 3 above | Overview "What we do" list (11-17, kept "for now") says "delivered as dashboards or as a managed service" | Menu lists Managed Analytics under products | Open; the list is knowingly old |
+| D8 | Peer benchmark | On the stated menu; PI card "Benchmarks & Peer Reviews" (his choice) | Team 4-0: unsupported, no right to pool agency data (WR f55653f9) | His ruling: benchmarking belongs to PI, not the KPI page | Settled as his call; agents still hold the opposite as a "finding" |
+| D9 | Free preview | On the amended menu (96e0785f) | He removed it from the Services text; no plan card | PI page flags "free trial available" | Settled per surface; no single statement |
+| D10 | KPI Library name | "KPI Library" in the menu and LIB | "Procurement KPI Library" on the product page (his rename) | — | Settled 11-20; older stores not updated |
+| D11 | Licensing sentence | Overview (row 8) | DeepBench page: "license your agent as a service for new revenue" | — | Known, not yet aligned |
+| D12 | Claims kept against the record | KPI page keeps "by current performance", "30 data points" and the two pack names | WR and SR hold each as unsupported (three fact candidates, gap d8c8e5c7) | — | His wording stands; agents will keep flagging it |
+| D13 | Central synthesis is stale | LIB "Integrated story" (john_confirmed, 11-11) and "Why RMV" (10-23), both audience "all agents" | Neither says "across industries", names the three product pages or carries the 11-17..20 rulings | — | Open; these are the nearest thing to a profile today |
+
+**Transcript check.** The linked sessions were listed and three targeted transcript searches run ("division", the north-star ask, the "80+" figure). Every ruling found there is already in HIST, NEXT or KBM; nothing lives only in a transcript.
+
+## 2. What the inventory shows
+
+1. The final wording is the principal's own, and it is the part no agent holds. The agent stores hold their review drafts and proposals of the same day, several of which he overruled.
+2. Twenty-one facts the writer raised in the two 11-20 reviews are stored as candidates waiting for his tick (tick status not re-checked here). Until ticked they are not facts to any other agent.
+3. Three numbers (D1-D3) are counted in the library's own repository and copied by hand everywhere else.
+4. Two Library items already aim at "all agents" (D13). They are long (about 10,000 characters each), private, and ten days behind.
+
+## 3. Where a single copy can live: three existing mechanisms, measured
+
+Checked in code and tables 2026-11-21 (`api/prompt/db-assembly.js`, `scripts/personal-agent.js`, `scripts/market-agent.js`, the four runbooks, `agent_skill_pins`, `personal_source_grants`).
+
+| | A. Pinned Skill row | B. Library item, `john_confirmed` | C. A decision in the strategy store |
+|---|---|---|---|
+| How it reaches a prompt | `assemblePrompt()` reads `agent_skill_pins` for the agent and renders the Skill on every run; an inline knowledge Skill carries its own text | `personal-agent.js` reads the catalog of kinds the agent holds a grant for, only on capabilities that declare a `library` read, ranked against the ask | Read by the strategy capabilities; the writer gets a byte-capped team read |
+| Harry | Yes (already pinned to the north star) | Yes | Yes |
+| Laura | Yes (already pinned) | Yes (grants; 32 deny rows) | Partly |
+| Jerry | Yes (already pinned) | No. Grants cover two kinds, and no career capability declares a `library` read | No |
+| Nathan | Yes (already pinned); `market-agent.js` calls the same `assemblePrompt()` | No. `market-agent.js` never reads `personal_sources` | No |
+| Malcolm, Paul (reached over the MCP server) | Would work: `api/capabilities/execute.js` passes `agent_id` to `assemblePrompt()`. Neither has a pin row today | No | No |
+| Guaranteed on every run | Yes | No. A catalog line plus a ranked search hit | No |
+| Can hold private detail | No. A Skill row can reach an outside AI client with the agent | Yes | Yes |
+| History of edits | Before-image per edit (north-star precedent) | Versioned by sha256; old row marked superseded | Append-only records |
+
+**Runbook check.** `strategy-agent.md` and `career-writer-agent.md` state the Library read. `market-agent.md` and `personal-agent.md` state neither a Library read nor the pins; the pin still renders for those agents because it is in the shared assembly, not in a runbook.
+
+**Proposal (Q2).** A, a second pinned knowledge Skill beside the north star, holding only what is safe to say in public. It is the one mechanism that reaches all four team agents today with no code change, and it renders every run. Private detail (prices, client facts, the review history) stays where it is, behind the Library's grants; the profile points to it and never copies it.
+
+## 4. What the profile holds (proposal, Q1)
+
+A short record, target about 2,500 characters (the north star is 2,606), in six parts:
+
+1. **Purpose.** One sentence on what the company does.
+2. **The two practices**, in the tagline's words.
+3. **Products versus services.** The three product names; the service lines as the live Services text states them; the rule that a product is never called a service.
+4. **The stated menu**: where it lives (decision ids), not its lines.
+5. **Numbers**: the public figure, the measured figure, and where each is counted (section 5).
+6. **Wording rules**: practice not division; no client names or client data in anything public; "500+" style rounding in public copy; the principal decides prices, offers and publishing.
+
+It points to the current public wording by file and by page, and carries none of it verbatim beyond the tagline. **Stays out:** client names, prices and price proposals, personal facts, competitor lists, the vote history, LinkedIn mechanics.
+
+A populated sample is shown to the principal in the walkthrough, tagged as a sample.
+
+## 5. Keeping it current, and catching contradictions (proposal, Q3)
+
+- **One writer.** Only the principal's word changes the profile; a session edits the row on his say, with a before-image, and logs it in the page history the same turn. This extends the working folder's existing rule ("log each change the same turn").
+- **Numbers are read, not typed.** The library's release already prints its counts; the profile's number line is checked against the newest release at each library publish.
+- **A drift check.** A read-only comparison of the profile against the live wording files and the newest release, run when any of them changes; a mismatch is filed as a finding, never fixed silently.
+- **Contradictions.** A reviewing agent that disagrees with the profile says so as a flagged gap naming the profile line, not as a competing statement. The profile wins until the principal changes it.
+
+## 6. Which agents get it (the principal's call, Q4)
+
+Candidates: Harry, Nathan, Laura, Jerry (the review team); Malcolm (writes the government-practice pieces); Paul, Trenton, Dilbert. Proposed default: the four team agents plus Malcolm. Pinning changes agent configuration, so nothing is pinned without his yes.
+
+## 7. Walkthrough record
+
+| Q | Question | Answer | Date |
+|---|---|---|---|
+| Q1 | What the profile holds and leaves out | open | |
+| Q2 | Where the single copy lives | open | |
+| Q3 | How it stays current and how a contradiction is caught | open | |
+| Q4 | Which agents get it | open | |
+
+## 8. Open items the inventory raised (not part of this design)
+
+- D3: the "80+" figure against 26 created / 67 contributed.
+- D4: warehouse wording across the Overview, the PI page and the menu.
+- D5: whether AI-practice services go on the stated menu.
+- D13: the two "all agents" Library items are behind the 11-17..20 positioning.
+- The Library holds two KPI catalog items marked current (528 and 554); the live figure is 560.
+- Twenty-one writer fact candidates from the two 11-20 reviews wait for a tick.
