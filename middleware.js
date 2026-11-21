@@ -1,3 +1,4 @@
+// DeepBench v7.0.1096 | middleware.js | AGT-770 -- an unknown MCP key is refused 401; a site key refuses site_cap / site_blocked, no ip
 // DeepBench v7.0.1001 | middleware.js | AGT-297 -- keyed MCP callers
 // DeepBench v7.0.76 | middleware.js | HAR-33 PATCH-1 -- every reason='spend_cap' refusal carries
 // the stats object, repeat refusals included, because HAR-33b's John-approved superuser popup
@@ -99,6 +100,15 @@ function refuse(reason, ip, stats) {
   if (stats) body.stats = stats;
   return new Response(JSON.stringify(body), {
     status: 403,
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+  });
+}
+
+function refuseKey(status, reason, stats) {
+  const body = { deepbench_gate: true, reason };
+  if (stats) body.stats = stats;
+  return new Response(JSON.stringify(body), {
+    status,
     headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
 }
@@ -248,24 +258,28 @@ export default async function middleware(request, context) {
     if (!supabaseUrl || !supabaseKey) return failOpen('env', ip, new Error('supabase env missing'));
 
     // 3b. AGT-297 -- a known MCP key is the caller; the IP gate below is the fallback.
+    //     AGT-770: unknown key 401, failed lookup -> IP gate.
     const presentedKey = isMcpRequest(url) ? headers.get(MCP_KEY_HEADER) : null;
     if (presentedKey) {
       let caller = null;
+      let lookupFailed = false;
       try {
         caller = await fetchCallerGate(supabaseUrl, supabaseKey, presentedKey);
       } catch (err) {
+        lookupFailed = true;
         // NOT a fail-open: the IP gate still runs. Never log the key.
         console.error(`[AGT-297 gate] key lookup failed for ip=${ip}: ${err && err.message}`);
       }
       if (caller) {
         if (caller.permission === 'unlimited') return passThrough();
-        if (caller.permission === 'blocked') return refuse('manual', ip, null);
+        if (caller.permission === 'blocked') return refuseKey(403, 'site_blocked', null);
         const cap = Number(caller.spend_limit_usd);
         if (Number.isFinite(cap) && (Number(caller.cost_usd) || 0) >= cap) {
-          return refuse('spend_cap', ip, shapeStats(caller));
+          return refuseKey(403, 'site_cap', shapeStats(caller));
         }
         return passThrough();
       }
+      if (!lookupFailed) return refuseKey(401, 'unknown_key', null);
     }
 
     // 4. The row. blocked_attempts/blocked_at are selected because PostgREST cannot express

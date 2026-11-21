@@ -1,10 +1,12 @@
+// DeepBench v7.0.1096 | tests/regression/agt-297-mcp-caller-gate.test.mjs | AGT-770 re-pin
 // DeepBench v7.0.1001 | tests/regression/agt-297-mcp-caller-gate.test.mjs | AGT-297
 //
 // FEATURE: AGT-297 -- on an MCP route, a KNOWN `x-deepbench-mcp-key` is gated on that key's own
 // permission, cap and ledger, never on the caller's IP. MCP connectors share an egress pool, so the
 // IP is not the caller there: one address is thousands of them, and the first to cross the $5 trial
-// cap refuses the rest. No key, an unknown key, or a failed gate lookup fall through to the
-// unchanged per-IP gate -- this narrows nothing.
+// cap refuses the rest. No key or a failed gate lookup fall through to the unchanged per-IP gate.
+// AGT-770: an unknown key is now refused 401 `unknown_key`, not a fall-through; a site key at its
+// cap refuses 403 `site_cap`, a blocked one 403 `site_blocked`, neither carrying `ip`.
 //
 // NO NETWORK. Every arm runs middleware() against a stubbed globalThis.fetch and stub credentials,
 // so nothing here reads or writes the database. The stub records each call's url, headers and body,
@@ -100,7 +102,7 @@ async function call(path, key) {
   const text = await res.text();
   let body = null;
   if (text) { try { body = JSON.parse(text); } catch { body = text; } }
-  return { status: res.status, next: res.headers.get("x-middleware-next"), body };
+  return { status: res.status, next: res.headers.get("x-middleware-next"), cors: res.headers.get("access-control-allow-origin"), body };
 }
 
 const gateCalls = calls => calls.filter(c => c.url.includes("/rpc/mcp_caller_gate")).length;
@@ -120,7 +122,7 @@ async function arm1() {
     const out = await call("/api/mcp/harlan", "key-a");
     assert.strictEqual(out.status, 403, `arm1 key-a: expected 403 on the key's own cap, got ${out.status}`);
     assert.deepStrictEqual(out.body, {
-      deepbench_gate: true, reason: "spend_cap", ip: IP,
+      deepbench_gate: true, reason: "site_cap",
       stats: { llm_calls: 12, total_tokens: 3400, cost_usd: 6.5 },
     }, "arm1 key-a: the refusal body is not the key's own row -- stats 40/1000/1 means the IP gate decided");
     assert.strictEqual(gateCalls(calls), 1, `arm1 key-a: expected exactly 1 gate call, saw ${gateCalls(calls)}`);
@@ -168,17 +170,20 @@ async function arm3() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 4. Unknown key and a DOWN lookup both fall through -- the IP gate still runs, both ways.
+// 4. Unknown key is refused 401 (AGT-770); a DOWN lookup still falls through to the IP gate.
 // ---------------------------------------------------------------------------------------------
 async function arm4() {
   const results = [];
   await withGate({}, async calls => {
     const out = await call("/api/mcp", "key-zzz");
-    assert.strictEqual(out.status, 403, `arm4 unknown: expected the IP gate's 403, got ${out.status}`);
+    assert.strictEqual(out.status, 401, `arm4 unknown: expected 401 unknown_key, got ${out.status}`);
+    assert.deepStrictEqual(out.body, { deepbench_gate: true, reason: "unknown_key" },
+      "arm4 unknown: the refusal body must be exactly { deepbench_gate, reason: unknown_key } -- no ip, no stats");
+    assert.strictEqual(out.cors, "*", `arm4 unknown: the 401 must carry Access-Control-Allow-Origin *, got ${out.cors}`);
     assert.strictEqual(gateCalls(calls), 1, `arm4 unknown: expected 1 gate call, saw ${gateCalls(calls)}`);
-    assert.ok(ipReads(calls) > 0, "arm4 unknown: an unknown key must fall through to the IP gate, which reads the IP");
+    assert.strictEqual(ipReads(calls), 0, `arm4 unknown: an unknown key is refused on the key, so no IP read may happen -- saw ${ipReads(calls)}`);
   });
-  results.push("arm4-unknown-key-falls-through");
+  results.push("arm4-unknown-key-refused-401");
   await withGate({ gateDown: true }, async calls => {
     const out = await call("/api/mcp", "key-b");
     assert.strictEqual(out.status, 403, `arm4 down-blocked: a failed lookup must not fail open past a blocked IP, got ${out.status}`);
@@ -216,7 +221,7 @@ async function arm5() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 6. The key's permission decides alone: unlimited passes, blocked refuses `manual`, no stats.
+// 6. The key's permission decides alone: unlimited passes, blocked refuses `site_blocked`, no stats.
 // ---------------------------------------------------------------------------------------------
 async function arm6() {
   const results = [];
@@ -227,10 +232,10 @@ async function arm6() {
   await withGate({}, async () => {
     const out = await call("/api/mcp", "key-d");
     assert.strictEqual(out.status, 403, `arm6 key-d: expected 403, got ${out.status}`);
-    assert.deepStrictEqual(out.body, { deepbench_gate: true, reason: "manual", ip: IP },
-      "arm6 key-d: a blocked key's refusal must be reason `manual` and carry no stats");
+    assert.deepStrictEqual(out.body, { deepbench_gate: true, reason: "site_blocked" },
+      "arm6 key-d: a blocked key's refusal must be reason `site_blocked` and carry no ip or stats");
   });
-  results.push("arm6-blocked-key-refuses-manual");
+  results.push("arm6-blocked-key-refuses-site-blocked");
   return results;
 }
 
