@@ -1,3 +1,4 @@
+// DeepBench v7.0.1098 | gate-intercept.js | AGT-772 -- forwards period / reopens_at; budgetCopy()
 // DeepBench v7.0.77 | gate-intercept.js | HAR-33
 // FEATURE: HAR-33 (part b) — global fetch interceptor for the edge access gate.
 //
@@ -13,6 +14,24 @@
 // non-JSON 403, an opaque response, or a badly-behaved listener must all leave the fetch
 // chain untouched. A rejected fetch (network error) propagates unchanged — it is never
 // swallowed, and never inspected.
+
+// AGT-772 -- John's approved copy (decision 97dcfccb) for a reason='budget' refusal. Pure, so the
+// regression test reads the exact strings without rendering JSX.
+const BUDGET_SPAN = { day: 'for today', week: 'for this week', month: 'for this month' };
+export function budgetCopy(period, reopensAt) {
+  let p = BUDGET_SPAN[period] ? period : 'day';
+  let when = 'at midnight Central';
+  if (p === 'week') when = 'Monday';
+  if (p === 'month') {
+    const d = new Date(reopensAt);
+    if (Number.isFinite(d.getTime())) when = d.toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric' });
+    else p = 'day';
+  }
+  return {
+    heading: `DeepBench has reached its usage limit ${BUDGET_SPAN[p]}.`,
+    body: `It reopens ${when}. Contact RMV if you need the limit removed.`,
+  };
+}
 
 const listeners = new Set();
 
@@ -65,7 +84,7 @@ function installGateIntercept() {
       if (res && res.status === 403 && urlOf(res, args[0]).includes('/api/')) {
         const payload = await res.clone().json();
         if (payload && payload.deepbench_gate === true) {
-          emit({ reason: payload.reason, ip: payload.ip, stats: payload.stats });
+          emit({ reason: payload.reason, ip: payload.ip, stats: payload.stats, period: payload.period, reopens_at: payload.reopens_at });
         }
       }
     } catch {
