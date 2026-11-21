@@ -1,3 +1,4 @@
+// DeepBench v7.0.1095 | tests/regression/agt-90-fable-temperature.test.mjs | AGT-523 -- the negative control moves to claude-sonnet-4-6: claude-opus-5 now rejects temperature (measured 2026-11-20).
 // DeepBench v7.0.568 | tests/regression/agt-90-fable-temperature.test.mjs | AGT-90 -- the guard on
 // scripts/check-skill-model-params.js: a Skill row must never store a call parameter the model
 // family it names REJECTS.
@@ -63,7 +64,7 @@ export default async function run() {
   );
 
   const RESTRICTED = `${NO_TEMPERATURE_PREFIXES[0]}5-1`;
-  const UNRESTRICTED = "claude-opus-5";
+  const UNRESTRICTED = "claude-sonnet-4-6";
 
   assert.strictEqual(
     supportsTemperature(RESTRICTED), false,
