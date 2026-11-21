@@ -60,8 +60,12 @@ export const MODELS = {
 // FEATURE: AGT-148 (v7.0.592) -- `claude-opus-5-` joins the list: Opus 5.5 returns the same 400 on a
 // forced tool_choice (finding 961caae922b0381a). THE TRAILING DASH IS LOAD-BEARING: `claude-opus-5`
 // (the orchestrator lane's model) has no dash after the 5 and stays forced-capable; only the dotted
-// snapshots (`claude-opus-5-5`, ...) match. NO_TEMPERATURE_PREFIXES below is unchanged -- not measured.
-export const NO_FORCED_TOOL_CHOICE_PREFIXES = ["claude-fable-", "claude-opus-5-"];
+// snapshots (`claude-opus-5-5`, ...) match. NO_TEMPERATURE_PREFIXES: see AGT-523 below.
+//
+// FEATURE: AGT-523 (v7.0.1095) -- measured 2026-11-20, live /v1/messages: forced tool_choice is
+// REJECTED by claude-sonnet-5-5 (req_011ChF5uQHFaWuX1gamtfuhG), claude-opus-5-5, claude-fable-5-1
+// and ACCEPTED by claude-sonnet-5, claude-opus-5, claude-haiku-5-5, claude-sonnet-4-6, haiku-4-5.
+export const NO_FORCED_TOOL_CHOICE_PREFIXES = ["claude-fable-", "claude-opus-5-", "claude-sonnet-5-5"];
 
 export function supportsForcedToolChoice(model) {
   if (typeof model !== "string" || !model) return true; // unknown model: keep today's behaviour
@@ -78,7 +82,14 @@ export function supportsForcedToolChoice(model) {
 // independent API facts that merely happen to share a family today. One flag called
 // `isFableFamily` would be a model NAME masquerading as a capability, and the next model that
 // rejects one restriction but not the other would be un-representable without unpicking it.
-export const NO_TEMPERATURE_PREFIXES = ["claude-fable-"];
+//
+// FEATURE: AGT-523 (v7.0.1095) -- measured 2026-11-20, temperature 0 on tool_choice auto: REJECTED by
+// claude-sonnet-5 (req_011ChF5uQHW968PETpBNG7uQ), claude-opus-5 (req_011ChF5uQHFzZRufaBTXnoaD),
+// claude-haiku-5-5 (req_011ChF5uQHVt1SsJmaPPANhe), claude-sonnet-5-5 (req_011ChF5uQHVu4e1e1vp9tbTp),
+// claude-opus-5-5 (req_011ChF5uQH1AgkXzBo6hiJEH), claude-fable-5-1 (req_011ChF5uQJkKipdqYiFv3Zrt);
+// ACCEPTED by claude-haiku-4-5-20251001 and claude-sonnet-4-6; temperature 1 accepted by all eight.
+// No trailing dash: claude-opus-5 and claude-opus-5-5 (and both sonnets) reject it.
+export const NO_TEMPERATURE_PREFIXES = ["claude-fable-", "claude-opus-5", "claude-sonnet-5", "claude-haiku-5"];
 
 export function supportsTemperature(model) {
   if (typeof model !== "string" || !model) return true; // unknown model: keep today's behaviour

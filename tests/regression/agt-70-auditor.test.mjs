@@ -68,7 +68,7 @@
 //       including the ordering one (`ruled-out` beats `recurring`) and the two-homes-not-one bar.
 //   P   THE SELF-AUDIT -- detectStaleParameters() over the Auditor's OWN seed rows as written is
 //       []; flip one temperature to 0 and it is exactly one finding citing that row and
-//       shared/models.js. Controls: the same 0 on a `claude-opus-5` row is [] (the LIST decides,
+//       shared/models.js. Controls: the same 0 on a `claude-sonnet-4-6` row is [] (the LIST decides,
 //       never the number), and the models.js location's text is built from the IMPORTED constant,
 //       so a copy of the list in audit-corpus.js could not pass here. The seed file itself is
 //       grepped: 6 rows at `6000, NULL`, 0 at `6000, 0`.
@@ -1433,10 +1433,10 @@ function theAuditorPassesItsOwnAudit() {
   // CONTROL: the LIST decides, never the number. The same temperature 0 on a model that accepts it
   // is not a finding, which is what separates this detector from "temperature must be null".
   assert.deepStrictEqual(
-    detectStaleParameters(extractSkillRows([{ slug: "x-opus", objective: "o", llm_model: "claude-opus-5", temperature: 0, max_tokens: 6000 }])),
+    detectStaleParameters(extractSkillRows([{ slug: "x-opus", objective: "o", llm_model: "claude-sonnet-4-6", temperature: 0, max_tokens: 6000 }])),
     [], "a temperature of 0 on a model whose API accepts temperature is correct, not stale");
   assert.strictEqual(supportsTemperature("claude-fable-5-1"), false, "the family the seed targets really does reject it");
-  assert.strictEqual(supportsTemperature("claude-opus-5"), true, "and the control family really does accept it");
+  assert.strictEqual(supportsTemperature("claude-sonnet-4-6"), true, "and the control family really does accept it");
 
   // THE SEED AS WRITTEN, grepped: the self-audit applied to the file John will apply.
   const seed = read("docs/design/agt-70-auditor-seed.sql");
