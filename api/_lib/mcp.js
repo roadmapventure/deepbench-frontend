@@ -1,3 +1,10 @@
+// DeepBench v7.0.1108 | api/_lib/mcp.js | AGT-785 -- a keyed tools/call result carries what the call cost.
+// `_meta["com.roadmapventure.deepbench/usage"]` = { cost_usd, model, models?, model_calls, input_tokens,
+// output_tokens, cache_creation_input_tokens, cache_read_input_tokens, trace_id }. cost_usd is the sum of
+// the figures lib/activity-log.js wrote to ai_activity_log.cost_usd for this call (one pricing site, no
+// second calculation), null when any model row is unpriced. No model row -> no `_meta` at all (never a
+// made-up zero). Keyless callers: result unchanged. content / structuredContent / isError untouched.
+//
 // DeepBench v7.0.792 | api/_lib/mcp.js | AGT-390 -- a second deterministic handler, `agent-teach`, is
 // registered by NAME (the Intent row `agent-teach-intent` declares it), and runDeterministic() hands
 // every handler the matched MCP key's NAME as handler_context.caller_key_name, so a taught row records
@@ -789,7 +796,7 @@ export async function dispatchJsonRpc(message, deps = {}) {
  * `content` at all -- it is rendered as its own JSON rather than flattened into a lie about having
  * answered.
  */
-export function toToolResult(result, row) {
+export function toToolResult(result, row, usage = null) {
   const raw = result ? result.content : undefined;
   const structured = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
   let text;
@@ -799,6 +806,46 @@ export function toToolResult(result, row) {
 
   const out = { content: [{ type: 'text', text }], isError: false };
   if (structured && row && row.output_schema) out.structuredContent = structured;
+  // FEATURE: AGT-785 -- additive and outside every published outputSchema: `_meta` is MCP's own slot
+  // for this, so a client validating structuredContent sees exactly what it saw before.
+  if (usage) out._meta = { [USAGE_META_KEY]: usage };
+  return out;
+}
+
+/** FEATURE: AGT-785 -- the one `_meta` key this server writes; reverse-DNS prefixed per the MCP spec. */
+export const USAGE_META_KEY = 'com.roadmapventure.deepbench/usage';
+
+// ai_activity_log.cost_usd is numeric(10,6): each row is stored rounded to six places, so the sum
+// reported here is rounded the same way per row and equals sum(cost_usd) over the trace.
+function roundUsd6(v) {
+  const viaText = Number(`${v}e6`);
+  return Math.round(Number.isFinite(viaText) ? viaText : v * 1e6) / 1e6;
+}
+
+/**
+ * FEATURE: AGT-785 -- folds the per-call ledger lib/activity-log.js filled into the usage block.
+ * ONLY rows that name a model count: a deterministic capability logs a model-less row and therefore
+ * reports NOTHING (null -> no `_meta`), never a zero. An unpriced model row makes cost_usd null --
+ * shared/models.js's rule, "unknown, never 0" -- while tokens and model are still reported.
+ */
+export function summarizeUsage(ledger, traceId = null) {
+  if (!Array.isArray(ledger)) return null;
+  const rows = ledger.filter(e => e && e.model);
+  if (rows.length === 0) return null;
+  const sum = field => (rows.some(e => e[field] != null) ? rows.reduce((t, e) => t + (Number(e[field]) || 0), 0) : null);
+  const priced = rows.every(e => typeof e.cost_usd === 'number' && Number.isFinite(e.cost_usd));
+  const models = [...new Set(rows.map(e => e.model))];
+  const out = {
+    cost_usd: priced ? roundUsd6(rows.reduce((t, e) => t + roundUsd6(e.cost_usd), 0)) : null,
+    model: models.length === 1 ? models[0] : null,
+    model_calls: rows.length,
+    input_tokens: sum('input_tokens'),
+    output_tokens: sum('output_tokens'),
+    cache_creation_input_tokens: sum('cache_creation_input_tokens'),
+    cache_read_input_tokens: sum('cache_read_input_tokens'),
+    trace_id: traceId || (rows.find(e => e.trace_id) || {}).trace_id || null,
+  };
+  if (models.length > 1) out.models = models;
   return out;
 }
 
@@ -808,7 +855,7 @@ export function toToolResult(result, row) {
  * because both paths end in "no verdict". A spy passed in here can only be called if the guard let
  * the request through. Production never passes `execute`.
  */
-async function runThroughExecutor({ row, intentSlug, taskContext, callerKeyName = null }) {
+async function runThroughExecutor({ row, intentSlug, taskContext, callerKeyName = null, usageLedger = null }) {
   const ctx = getRequestContext();
   return runWithCallSource(
     'mcp',
@@ -823,7 +870,8 @@ async function runThroughExecutor({ row, intentSlug, taskContext, callerKeyName 
     // Spread first: runWithCallSource writes callSource last, so the real caller's ip / device
     // attribution rides through untouched while screen_origin becomes 'mcp' and AGT-163's key name
     // takes the visitor slot.
-    mcpAttribution(ctx, callerKeyName),
+    // AGT-785: the per-call ledger rides the same store logActivity() reads; null leaves it absent.
+    { ...mcpAttribution(ctx, callerKeyName), ...(usageLedger ? { usageLedger } : {}) },
   );
 }
 
@@ -848,7 +896,7 @@ export const DETERMINISTIC_HANDLERS = Object.freeze({ 'agent-bundle': agentBundl
  * the agent it was ASKED about that visibleRows() applies to the tool list, and a second derivation
  * is a second answer waiting to disagree with the first.
  */
-export async function runDeterministic({ row, taskContext, governanceUnlocked, callerKeyName = null }) {
+export async function runDeterministic({ row, taskContext, governanceUnlocked, callerKeyName = null, usageLedger = null }) {
   const ctx = getRequestContext();
   const handle = DETERMINISTIC_HANDLERS[row.handler];
   // Unreachable through assembleCapabilityRows(), which drops a handler-less deterministic row --
@@ -871,9 +919,10 @@ export async function runDeterministic({ row, taskContext, governanceUnlocked, c
           caller_key_name: callerKeyName || null,
         },
       }),
-    mcpAttribution(ctx, callerKeyName),
+    // AGT-785: the per-call ledger rides the same store logActivity() reads; null leaves it absent.
+    { ...mcpAttribution(ctx, callerKeyName), ...(usageLedger ? { usageLedger } : {}) },
   );
-  return toToolResult({ content: result }, row);
+  return toToolResult({ content: result }, row, summarizeUsage(usageLedger));
 }
 
 export async function callToolThroughExecutor({
@@ -919,24 +968,30 @@ export async function callToolThroughExecutor({
   // AA-188: runCapability() does NOT fall back to capabilities.default_intent_slug when intent_slug
   // is null -- it assembles with every Intent Skill skipped. Resolving the default HERE is therefore
   // load-bearing, not a convenience, and it is a generic column read, never a slug conditional.
+  // FEATURE: AGT-785 -- one ledger per tools/call, for a KEYED caller only. A keyless caller hands
+  // both seams null, lib/activity-log.js finds no ledger, and the result is what it always was.
+  const usageLedger = callerKeyName ? [] : null;
   try {
     // FEATURE: AGT-162 -- ONE COLUMN READ, and it is the whole branch. Not a slug, not a handler
     // lookup, not a second registry of names this file knows: the capability's own declared
     // `execution_type`, the column buildSignatureConfig() already stamps into every call_facts and
     // toTool() already prints in the description. Everything `ai` takes the path it always took.
     if (row.execution_type === 'deterministic') {
-      return await executeDeterministic({ row, taskContext, governanceUnlocked, callerKeyName });
+      return await executeDeterministic({ row, taskContext, governanceUnlocked, callerKeyName, usageLedger });
     }
-    const result = await execute({ row, intentSlug, taskContext, callerKeyName });
-    return toToolResult(result, row);
+    const result = await execute({ row, intentSlug, taskContext, callerKeyName, usageLedger });
+    return toToolResult(result, row, summarizeUsage(usageLedger, result && result.trace_id));
   } catch (e) {
     // MCP's own rule: a TOOL failure is a result with isError, not a protocol error, so the calling
     // model can see what went wrong and re-plan. Protocol failures above stay JSON-RPC errors.
     // Message only -- never a stack.
     console.error(`[mcp] ${row.slug} failed:`, e);
+    // AGT-785: a failure that already made model calls still reports what they cost.
+    const failedUsage = summarizeUsage(usageLedger);
     return {
       content: [{ type: 'text', text: e && e.message ? e.message : 'capability execution failed' }],
       isError: true,
+      ...(failedUsage ? { _meta: { [USAGE_META_KEY]: failedUsage } } : {}),
     };
   }
 }
