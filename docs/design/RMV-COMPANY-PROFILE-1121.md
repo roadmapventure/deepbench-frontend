@@ -137,7 +137,7 @@ Ruling 2026-11-21: the entire product team, pinned as the north star is. Measure
 | Q | Question | Answer | Date |
 |---|---|---|---|
 | Q1 | What the profile holds and leaves out | YES to the six parts, and ADD the partnership proposal and the RMV/association offerings (section 4, part 7). RULED the same day: both come in as data points written into the profile itself; the profile does not point to websites or to session files | 2026-11-21 |
-| Q2 | Where the single copy lives | open | |
+| Q2 | Where the single copy lives | RULED: three pinned knowledge Skill rows beside the north star (company profile, offerings, partnership), inline text, each pinned to the same 17 agents (51 pin rows). Each is distilled from one source and corrected on its own | 2026-11-21 |
 | Q3 | How it stays current and how a contradiction is caught | open | |
 | Q4 | Which agents get it | "The entire product team", pinned the way the north star is. RULED: the sixteen north-star agents plus Malcolm (17 pins); Paul stays out | 2026-11-21 |
 
