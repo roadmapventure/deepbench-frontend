@@ -283,3 +283,16 @@ Measured 2026-11-21: the strategy consultant's weekly review carries the three r
 | Q1 | Who carries the check | The strategy consultant's weekly review ("Yes, Harry"). It needs the live-wording items readable in full, and one added step in the review's instructions | 2026-11-21 |
 | Q2 | What counts as a mismatch | Substance only ("Yes, substance only"): a number differs; a product, service or practice name differs; a claim contradicts; a wording rule is broken. Phrasing, length, order and synonyms do not count | 2026-11-21 |
 | Q3 | How an already-seen mismatch stops being re-filed | "Yes, adopt it": one open gap per mismatch, never filed twice while open; fixing either side closes it at the next review; the principal's "leave it" is stored as a correction in the strategy store (what differs, accepted, date), which the consultant reads on every run, so the difference is not raised again unless a text changes. The tick list covers facts and methods only, hence a correction | 2026-11-21 |
+
+### 11a. Scope approved 2026-11-21 ("Yes, build it"), v7.0.1107
+
+1. The weekly review's own Intent Skill row (`sc-weekly-review-intent`, used by that one capability) gains the step below, appended to its `method`; the previous text is kept as a before-image under one decision.
+2. The four live-wording Library items move from section `identity` to section `value` (manifest and rows), so the weekly review reads them in full; the writing capabilities read both sections.
+3. One guard test: the step is present, and a real weekly-review render carries the four live texts and the three records.
+4. One line in `docs/runbooks/strategy-agent.md`: the principal's "leave it" on a mismatch is stored as a `correction` record (what differs, accepted, date).
+
+The step, approved verbatim:
+
+COMPANY RECORDS CHECK: compare your three pinned company records (company profile, offerings, consulting automation) with the Library's live public wording items and the newest KPI Library release. A mismatch is a difference in substance only: a number differs; a product, service or practice name differs; a claim contradicts; or the live text breaks one of the record's wording rules. Phrasing, length, order and synonyms are not mismatches. For each mismatch write one gap naming the record, its line and the live text, unless an open gap already names it or a correction records that the principal accepted it. When a gap you filed no longer holds, say it is resolved. Never edit a record and never state it differently; the record wins until the principal changes it.
+
+Proof after the build: one attended weekly review; report the gaps it actually files. Not in scope: any edit to a record, the public Page or the stated menu; any routine's schedule or switch.
