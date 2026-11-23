@@ -325,6 +325,20 @@ export const WRITING_LIBRARY_SECTIONS = Object.fromEntries(WRITING_SLUGS.map(c =
 // AGT-722. The deny-aware Library's second line, keyed by capability: for a capability named here, a
 // `client_private` item outside these sections never reaches the catalog. Absent capabilities are unchanged.
 export const LIBRARY_PRIVATE_SECTIONS = Object.fromEntries(WRITING_SLUGS.map(c => [c, ['evidence', 'value']]));
+// Career/Library lock step (John, 2026-11-23): the career slugs the principal writes with read what the
+// writing slugs read -- the fixed facts read, the granted Library through the same deny-aware read, the
+// goals -- plus `writing_notes`. Keyed by slug, in their OWN map (agt-722 pins WRITING_LIBRARY_SECTIONS to
+// the five writing slugs). The scheduled career slugs are absent, so their renders are unchanged.
+export const CAREER_LIBRARY_SLUGS = ['career-resume-review', 'career-intro-pitch', 'career-cover-letter',
+  'career-strengths-gaps', 'career-posting-review', 'career-interview-prep'];
+export const CAREER_LIBRARY_SECTIONS = Object.fromEntries(CAREER_LIBRARY_SLUGS.map(c => [c, ['facts', 'identity', 'works', 'value', 'evidence', 'goals', 'approach', 'taste']]));
+for (const c of CAREER_LIBRARY_SLUGS) LIBRARY_PRIVATE_SECTIONS[c] = ['evidence', 'value'];
+// The writing store's kinds a career render reads: the principal's corrections and grades whole, then the
+// practice and method notes inside what is left of WRITING_NOTES_BYTES. NEVER `rule` (the blocked terms).
+export const WRITING_NOTE_KINDS = ['correction', 'grade', 'practice', 'method'];
+export const WRITING_NOTES_BYTES = 30000;
+// The mark a career record carries once the Library holds the current statement of what it says.
+export const SUPERSEDED_KEY = 'superseded_by';
 // A capability that reads the head of every UNSECTIONED item (to label it), and how many characters.
 export const LIBRARY_UNSECTIONED_HEADS = { 'strategy-library-curate': 2000 };
 // The hard cap on the Library's text half; past it the catalog stays and the bodies drop.
@@ -464,6 +478,8 @@ export const EXTRA_READS = {
   'writing-weekly-check': [...WRITING_FIXED_READS, ...WRITING_TEAM_READS],
   'writing-predraft': [...WRITING_FIXED_READS, ...WRITING_TEAM_READS, 'postings_marked'],
   'writing-watch': WRITING_BASE_READS,
+  // Career/Library lock step: the same fixed reads the writing slugs carry, plus the writing notes.
+  ...Object.fromEntries(CAREER_LIBRARY_SLUGS.map(c => [c, [...WRITING_FIXED_READS, 'writing_notes']])),
 };
 // AGT-650: the team reads a strategy render carries are cut to these byte budgets, the rows that share
 // the most stems with the query kept first (newest first on a tie, and with no query), so the memory,
@@ -944,6 +960,8 @@ async function readRecords(db, capability, target) {
       continue;
     }
     const rec = { ...recordHead(r), target_row: r.target_row, has_text: Boolean(r.data?.text) };
+    // Lock step: a record the Library has superseded says so, so the reader prefers the Library's facts.
+    if (r.data?.[SUPERSEDED_KEY]) rec[SUPERSEDED_KEY] = String(r.data[SUPERSEDED_KEY]);
     // AGT-268: a posting carries its PROVENANCE, never its raw `source` -- the stamp is
     // `<capability slug> <date>`, and a capability slug in the prompt would name another agent's
     // work in data (§19d/§19e Rule #1). The two-value label is the whole fact the reader needs.
@@ -1082,7 +1100,7 @@ async function readLibrary(db, args) {
   if (!allowed.length) return null;
   const { catalog, counts } = collapseCatalog(allowed);
 
-  const wanted = new Set(LIBRARY_SECTIONS[args.capability] ?? WRITING_LIBRARY_SECTIONS[args.capability] ?? []);
+  const wanted = new Set(LIBRARY_SECTIONS[args.capability] ?? WRITING_LIBRARY_SECTIONS[args.capability] ?? CAREER_LIBRARY_SECTIONS[args.capability] ?? []);
   const headChars = LIBRARY_UNSECTIONED_HEADS[args.capability] ?? 0;
   // AGT-650: the question decides what is read first, by the Library's own full-text (and, with an
   // embedding key, vector) ranking -- rpc/library_search -- in place of AGT-648's stem overlap. An item
@@ -1624,7 +1642,27 @@ async function readPostingsMarked(db) {
   }));
 }
 
+// Career/Library lock step. Pure. The writing notes a career render carries: only WRITING_NOTE_KINDS rows
+// (any other kind, `rule` first of all, is dropped here as well as in the query); the principal's
+// corrections and grades are WHOLE and never cut (a correction read stays whole, agt-266); the practice
+// and method notes are heads with their data, as the writing slugs read them, inside what is left of `bytes`.
+export function writingNotes(rows, query = null, bytes = WRITING_NOTES_BYTES) {
+  const ok = (rows ?? []).filter(r => r && WRITING_NOTE_KINDS.includes(r.kind));
+  const whole = ({ id, kind, title, body, data, created_at }) => ({ id, kind, title, body: body ?? null, data: data ?? {}, created_at: created_at ?? null });
+  const principal = ok.filter(r => WRITING_PRINCIPAL_KINDS.includes(r.kind)).map(whole);
+  const rest = ok.filter(r => !WRITING_PRINCIPAL_KINDS.includes(r.kind)).map(writingHead);
+  const room = Math.max(2, bytes - Buffer.byteLength(JSON.stringify(principal), 'utf8'));
+  return [...principal, ...rankTrim(rest, query, room)];
+}
+// Names a TABLE and its kinds, never an agent (Rule #1). Newest first then reversed (agt-84's order pin).
+async function readWritingNotes(db, args) {
+  const rows = (await db.get(`writing_records?kind=in.(${WRITING_NOTE_KINDS.join(',')})` +
+    '&select=id,kind,title,body,data,created_at&order=created_at.desc,id.desc')).reverse();
+  return writingNotes(rows, strategyQuery(args));
+}
+
 const EXTRA_READERS = {
+  writing_notes: readWritingNotes,
   // AGT-722
   career_writing: readCareerWriting,
   strategy_facts: readStrategyFacts,

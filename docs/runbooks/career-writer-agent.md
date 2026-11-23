@@ -11,6 +11,17 @@ The method a Claude session follows to run the career writer (agent `laura`, CW-
 
 Writing records are read and written only through these scripts and the Supabase MCP. Never paste a draft, a proposal, a fact, a grade or the blocked terms into a repository file, a Skill row, or anywhere outside the session scratchpad. Never print the `rule` record.
 
+## One place for a fact — the Library (2026-11-23)
+
+The career agent (`jerry`) and the career writer (`laura`) read the principal's background from the same place, so a fact or rule stated once reaches both.
+
+- **Where a fact is edited: the Library, one item.** A new or changed fact about the principal is ONE `public.personal_sources` row (`kind: confirmed_fact`, `section: facts`, `status: current`), written over the Supabase MCP on his word. Both agents read every current facts-section item in full on their next render. Never write the same fact into `career_records` or `writing_records` as well.
+- **Where a writing rule is edited: one `correction` in `writing_records`** (`--write --principal`). Both agents read every writing `correction` and `grade` whole, and the `practice` and `method` notes as heads. The `rule` record (the blocked terms) is read by the writing slugs only and is never printed.
+- **Who reads what.** The six career slugs the principal writes with (`CAREER_LIBRARY_SLUGS` in `scripts/personal-agent.js`: resume review, intro pitch, cover letter, strengths and gaps, posting review, interview prep) read `profile_facts`, the granted `library`, `goals` and `writing_notes`. The scheduled career slugs read as before.
+- **Grants and denies stay matched.** The career agent holds the writer's grant kinds except `document` and `style_sample`, and the same per-item rows in `public.personal_source_denies`. When an item is denied for one, add the row for the other in the same statement. A `client_private` item outside the evidence and value sections never reaches either.
+- **The older copy.** The `resume_fact` and `resume_line` rows in `career_records` (written 2026-09) carry `data.superseded_by: "library"`. They stay readable as detail and render with that mark; where one disagrees with a Library fact, the Library wins. Nothing was deleted.
+- **Test:** `tests/regression/career-library-lockstep.test.mjs` (pure, no database).
+
 ## (a) The ask table
 
 | The ask says | What runs |
