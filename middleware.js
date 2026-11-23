@@ -1,3 +1,4 @@
+// DeepBench v7.0.1112 | middleware.js | AGT-619 -- the header says what get_ip_stats() now does: the stored dollar first, the sheet for a row without one.
 // DeepBench v7.0.1098 | middleware.js | AGT-772 -- a platform budget (day / week / month, US Central) refuses every outside caller once spent
 // DeepBench v7.0.1097 | middleware.js | AGT-771 -- a known site key may pass the person's address; the address rules run on that person
 // DeepBench v7.0.1096 | middleware.js | AGT-770 -- an unknown MCP key is refused 401; a site key refuses site_cap / site_blocked, no ip
@@ -34,9 +35,10 @@
 //   permission='blocked'   -> always refuse, with the row's block_reason
 //   permission='trial'     -> the default: US only, capped by the row's spend_limit_usd
 //
-// SPEND IS COMPUTED, NEVER STORED. get_ip_stats(p_ip) sums ai_activity_log tokens against
-// model_pricing rates at check time. A running total would drift the moment any write path missed
-// an increment, and ai_activity_log.cost_usd is legacy (43 of 33,427 rows) and must never be used.
+// SPEND IS THE STORED DOLLAR FIRST (AGT-619). get_ip_stats(p_ip) sums each ai_activity_log row's
+// own cost_usd -- the price frozen when the call was logged -- and prices a row that carries none
+// from its tokens and the model_pricing sheet at check time, cache reads at the model's own rate.
+// Still no running total: one would drift the moment any write path missed an increment.
 //
 // THIS FILE MUST FAIL OPEN. Cost protection may never become an outage for good users: a Supabase
 // timeout, a non-2xx REST response, a malformed row, a missing env var, or any thrown error logs

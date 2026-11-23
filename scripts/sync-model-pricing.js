@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1112 | scripts/sync-model-pricing.js | AGT-619 -- the mirror carries id, cache_read_per_1k, effective_from and retired_at from SQL.
 // DeepBench v7.0.877 | scripts/sync-model-pricing.js | AGT-304 slice 17 -- the shared/models.js
 // MODEL_PRICING block is GENERATED from public.model_pricing, so the two halves §19t requires to
 // agree cannot drift again by hand.
@@ -14,11 +15,9 @@
 // (pattern:10 -- after two failed instruction-level guards, go structural; pattern:16 -- tracking
 // systems must be self-maintaining; pattern:26 -- build the check that catches the whole class).
 //
-// CACHE-READ RATES ARE NOT IN SQL. public.model_pricing has no cache-read column, so the handful of
-// published per-model cache rates stay JS-side in CACHE_READ_PER_1K (in the target file) and this
-// generator merges them into the rows it renders. The map is imported FROM THE TARGET FILE rather
-// than held here, so there is exactly one home for those rates and `--check` compares the file
-// against a body derived from the file's own map (pattern:14 -- one shared core, not two copies).
+// CACHE-READ RATES ARE IN SQL (AGT-619). public.model_pricing.cache_read_per_1k is their one home;
+// the JS map CACHE_READ_PER_1K is gone. Each rendered row also carries the SQL row's `id` (what
+// ai_activity_log.pricing_row_id names) and `effective_from`, and `retired_at` once a row has one.
 //
 // Usage:
 //   node scripts/sync-model-pricing.js --check [--file=shared/models.js]
@@ -45,22 +44,26 @@ export const MARK_END = "  // END model_pricing mirror";
 // Pure. One rendered row. Numbers go through Number() then String() so the rendered text is a
 // function of the VALUE, not of however PostgREST spelled it ("0.010" and 0.01 render identically)
 // -- otherwise a harmless formatting change in the API response would read as drift.
-function row(r, cache) {
-  const parts = [
-    `input_per_1k: ${String(Number(r.input_per_1k))}`,
-    `output_per_1k: ${String(Number(r.output_per_1k))}`,
-  ];
-  if (cache != null) parts.push(`cache_read_per_1k: ${String(Number(cache))}`);
+function row(r) {
+  const parts = [];
+  if (r.id != null) parts.push(`id: ${String(Number(r.id))}`);
+  parts.push(`input_per_1k: ${String(Number(r.input_per_1k))}`, `output_per_1k: ${String(Number(r.output_per_1k))}`);
+  if (r.cache_read_per_1k != null) parts.push(`cache_read_per_1k: ${String(Number(r.cache_read_per_1k))}`);
+  // Dates go through Date -> ISO for the same reason numbers go through Number(): the rendered text
+  // is a function of the INSTANT, not of how PostgREST spelled it.
+  for (const k of ["effective_from", "retired_at"]) {
+    if (r[k] != null) parts.push(`${k}: ${JSON.stringify(new Date(r[k]).toISOString())}`);
+  }
   return `  ${JSON.stringify(r.model)}: { ${parts.join(", ")} },\n`;
 }
 
 // Pure. Sorted by model id code point so the rendered block is STABLE and diffable: PostgREST row
 // order is not a contract, and an unsorted render would produce a different file on every run
 // (pattern:3 -- reproducible output beats convenient implementation).
-export function renderRows(rows, cacheRates = {}) {
+export function renderRows(rows) {
   return [...rows]
     .sort((a, b) => (a.model === b.model ? 0 : a.model < b.model ? -1 : 1))
-    .map(r => row(r, cacheRates[r.model]))
+    .map(r => row(r))
     .join("");
 }
 
@@ -89,7 +92,7 @@ export function blockOf(src) {
 }
 
 // Pure. `src` with the generated body replaced. Everything outside the fences -- the header
-// comments, CACHE_READ_PER_1K, computeCallCost(), every other export -- is carried through
+// comments, pricingRowId(), computeCallCost(), every other export -- is carried through
 // untouched; this script writes the rows and nothing else.
 export function spliceBlock(src, body) {
   const { i, j } = bounds(src);
@@ -107,7 +110,10 @@ export function diffPricing(rows, table) {
     sqlIds.add(r.model);
     const js = table[r.model];
     if (!js) { missing.push(r.model); continue; }
-    if (!near(r.input_per_1k, js.input_per_1k) || !near(r.output_per_1k, js.output_per_1k)) disagree.push(r.model);
+    const cacheSame = (r.cache_read_per_1k == null) === (js.cache_read_per_1k == null)
+      && (r.cache_read_per_1k == null || near(r.cache_read_per_1k, js.cache_read_per_1k));
+    const idSame = (r.id == null ? null : Number(r.id)) === (js.id ?? null);
+    if (!near(r.input_per_1k, js.input_per_1k) || !near(r.output_per_1k, js.output_per_1k) || !cacheSame || !idSame) disagree.push(r.model);
   }
   const extra = Object.keys(table).filter(id => !sqlIds.has(id));
   return { missing, extra, disagree };
@@ -126,7 +132,7 @@ async function fetchPricing() {
   if (!url || !key) die2("SUPABASE_URL / SUPABASE_SERVICE_KEY not set");
   let r;
   try {
-    r = await fetch(`${url}/rest/v1/model_pricing?select=model,input_per_1k,output_per_1k`, {
+    r = await fetch(`${url}/rest/v1/model_pricing?select=id,model,input_per_1k,output_per_1k,cache_read_per_1k,effective_from,retired_at`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
     });
   } catch (e) {
@@ -149,11 +155,9 @@ async function main(argv) {
 
   const rows = await fetchPricing();
   const src = fs.readFileSync(target, "utf8");
-  // The cache-read map and the current table come from the TARGET file, so --file=<tmp> checks that
-  // copy against its own map rather than against the repo's.
+  // The current table comes from the TARGET file, so --file=<tmp> diffs that copy, not the repo's.
   const mod = await import(`${new URL(`file://${target}`).href}?t=${Date.now()}`);
-  const cacheRates = mod.CACHE_READ_PER_1K || {};
-  const body = renderRows(rows, cacheRates);
+  const body = renderRows(rows);
 
   if (mode === "write") {
     fs.writeFileSync(target, spliceBlock(src, body));

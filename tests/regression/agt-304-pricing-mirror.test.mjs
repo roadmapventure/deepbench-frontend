@@ -1,3 +1,4 @@
+// DeepBench v7.0.1112 | tests/regression/agt-304-pricing-mirror.test.mjs | AGT-619 -- renderRows() takes the cache rate, id and dates from the row itself.
 // DeepBench v7.0.877 | tests/regression/agt-304-pricing-mirror.test.mjs | AGT-304 slice 17
 //
 // FEATURE: AGT-304 slice 17 -- shared/models.js's MODEL_PRICING block is GENERATED from
@@ -35,7 +36,7 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { selfRun, notRun } from "./_lib/self-run.js";
-import { MODEL_PRICING, CACHE_READ_PER_1K, computeCallCost } from "../../shared/models.js";
+import { MODEL_PRICING, computeCallCost } from "../../shared/models.js";
 import { MARK_BEGIN, MARK_END, renderRows, blockOf, spliceBlock, diffPricing } from "../../scripts/sync-model-pricing.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -69,15 +70,29 @@ function partA() {
   // different file on every run.
   const rows = [
     { model: "b-model", input_per_1k: 0.002, output_per_1k: "0.010" },
-    { model: "a-model", input_per_1k: 0.0010, output_per_1k: 0.005 },
+    { model: "a-model", input_per_1k: 0.0010, output_per_1k: 0.005, cache_read_per_1k: "0.0001" },
   ];
-  const text = renderRows(rows, { "a-model": 0.0001 });
+  const text = renderRows(rows);
   assert.strictEqual(
     text,
     '  "a-model": { input_per_1k: 0.001, output_per_1k: 0.005, cache_read_per_1k: 0.0001 },\n' +
     '  "b-model": { input_per_1k: 0.002, output_per_1k: 0.01 },\n',
     "renderRows must sort by id, render the cache rate only where one exists, and normalise the number text",
   );
+
+  // AGT-619: a row that carries the SQL id and dates renders them -- id first, dates as ISO instants
+  // however PostgREST spelled them, retired_at only when the row has one.
+  assert.strictEqual(
+    renderRows([{ id: "7", model: "d-model", input_per_1k: 1, output_per_1k: 2, cache_read_per_1k: null,
+      effective_from: "2026-11-23T12:00:00+00:00", retired_at: null }]),
+    '  "d-model": { id: 7, input_per_1k: 1, output_per_1k: 2, effective_from: "2026-11-23T12:00:00.000Z" },\n',
+    "renderRows must carry id and effective_from and omit a null cache rate and a null retired_at",
+  );
+  assert.deepStrictEqual(
+    diffPricing(
+      [{ id: 7, model: "moved", input_per_1k: 1, output_per_1k: 2 }, { id: 8, model: "cache", input_per_1k: 1, output_per_1k: 2, cache_read_per_1k: 0.5 }],
+      { moved: { id: 9, input_per_1k: 1, output_per_1k: 2 }, cache: { id: 8, input_per_1k: 1, output_per_1k: 2 } }).disagree,
+    ["moved", "cache"], "a different row id or a cache rate one half lacks is `disagree`");
 
   // Each of the three buckets must be named INDEPENDENTLY -- a diff that lumped them together could
   // not tell "SQL gained a row" from "someone typed a wrong rate", which are different fixes.
@@ -128,11 +143,10 @@ function partB() {
   // re-ordered row all fail here, offline, with no credentials needed.
   const fromExports = renderRows(
     Object.entries(MODEL_PRICING).map(([model, p]) => ({ model, ...p })),
-    CACHE_READ_PER_1K,
   );
-  assert.strictEqual(blockOf(src), fromExports, "shared/models.js's generated block must byte-equal renderRows() over its own MODEL_PRICING + CACHE_READ_PER_1K");
+  assert.strictEqual(blockOf(src), fromExports, "shared/models.js's generated block must byte-equal renderRows() over its own MODEL_PRICING");
 
-  // The rates moved out of the rows and into CACHE_READ_PER_1K, so prove they still ARRIVE: 1000
+  // AGT-619: the cache rates now arrive from public.model_pricing.cache_read_per_1k, so prove they still ARRIVE: 1000
   // cache-read tokens on Fable 5.1 bill at its own published $0.25/MTok, not the 0.10x fallback
   // (which would read 0.001). A generator that dropped the merge would pass the byte check above
   // and fail here.
