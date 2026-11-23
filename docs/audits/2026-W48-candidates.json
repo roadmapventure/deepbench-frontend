@@ -1,0 +1,2163 @@
+{
+  "week": "2026-W48",
+  "found_by": "auditor:judgment:claude-fable-5-1 + auditor:board-checks + auditor:private-scan + auditor:routine:board-health + auditor:routine:work-quality + auditor:routine:advisor + check-routine-prompt:auditor + check-routine-prompt:runner + check-routine-prompt:runner + auditor:routine:suite",
+  "findings": [
+    {
+      "check_slug": "board-repeat-worked",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-237",
+          "text": "7 cycles (streak cap 4); status partial"
+        }
+      ],
+      "governing_fact": "A ticket the runner has cycled at least chain_max_noship_streak times without reaching done or removed is being re-worked without shipping.",
+      "confidence": "high",
+      "proposed_resolution": "Read the ticket's cycles and decide: re-scope it, split it, or remove it -- do not queue it again unchanged.",
+      "found_by": "auditor:board-checks",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "board-repeat-worked",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-251",
+          "text": "8 cycles (streak cap 4); status open"
+        }
+      ],
+      "governing_fact": "A ticket the runner has cycled at least chain_max_noship_streak times without reaching done or removed is being re-worked without shipping.",
+      "confidence": "high",
+      "proposed_resolution": "Read the ticket's cycles and decide: re-scope it, split it, or remove it -- do not queue it again unchanged.",
+      "found_by": "auditor:board-checks",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "board-repeat-worked",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-471",
+          "text": "4 cycles (streak cap 4); status open"
+        }
+      ],
+      "governing_fact": "A ticket the runner has cycled at least chain_max_noship_streak times without reaching done or removed is being re-worked without shipping.",
+      "confidence": "high",
+      "proposed_resolution": "Read the ticket's cycles and decide: re-scope it, split it, or remove it -- do not queue it again unchanged.",
+      "found_by": "auditor:board-checks",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "board-repeat-worked",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-570",
+          "text": "4 cycles (streak cap 4); status partial"
+        }
+      ],
+      "governing_fact": "A ticket the runner has cycled at least chain_max_noship_streak times without reaching done or removed is being re-worked without shipping.",
+      "confidence": "high",
+      "proposed_resolution": "Read the ticket's cycles and decide: re-scope it, split it, or remove it -- do not queue it again unchanged.",
+      "found_by": "auditor:board-checks",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "docs/harvests/AGT-319.md:362",
+          "text": "secret_assignment: const withDb = { ...process.env, SUPABASE_URL: base, SUPABASE_SERVICE_KEY: \"agt3****\", NO_PROXY: \"127.0.0.1,localhost\", no_proxy: \"127.0.0.1,localhost\" };"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from docs/harvests/AGT-319.md (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "config-private-in-public",
+      "kind": "other",
+      "locations": [
+        {
+          "location": "tests/regression/agt-112-card-write-repins.test.mjs:118",
+          "text": "secret_assignment: const withDb = { ...process.env, SUPABASE_URL: base, SUPABASE_SERVICE_KEY: \"agt3****\", NO_PROXY: \"127.0.0.1,localhost\", no_proxy: \"127.0.0.1,localhost\" };"
+        }
+      ],
+      "governing_fact": "secret_assignment must not appear in a public repo",
+      "confidence": "high",
+      "proposed_resolution": "remove the secret_assignment value from tests/regression/agt-112-card-write-repins.test.mjs (rotate it if it is a credential) and keep it only in server-held config",
+      "found_by": "auditor:private-scan",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:SK-13",
+          "text": "JD → Capability Auto-Generation — upload a job description, extract competencies mapped to Skill types, match to existing Skill Profiles via RAG, propose new Skill Profiles for unmatched competencies, assemble into a Capability, HITL approv"
+        },
+        {
+          "location": "backlog_items:AGT-019",
+          "text": "Load a Job Description: build an agent's full Skillset from a real job description"
+        }
+      ],
+      "governing_fact": "Which row owns building an agent's Skills and Capability from an uploaded job description: SK-13 and AGT-019 both ask for it.",
+      "confidence": "high",
+      "proposed_resolution": "SK-13 survives (AGT-371's decided survivor, finding 42872015276431ef; it carries the pipeline and the human approval gate); AGT-019 closes with SK-13 as the superseding id and any clause only it names appended. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-010",
+          "text": "Agent role_prompt re-fetches once per same-type Skill with no dedup — Michelle's renders twice"
+        },
+        {
+          "location": "api/prompt/db-assembly.js:3",
+          "text": "// DeepBench v7.0.944 | api/prompt/db-assembly.js | AGT-552 -- a role prompt renders ONCE per bundle"
+        },
+        {
+          "location": "git:e016cee (2026-11-03)",
+          "text": "v7.0.944 AGT-552 - a role prompt renders once per bundle"
+        }
+      ],
+      "governing_fact": "Whether an agent's role_prompt still renders once per same-type Skill: AGT-010 (open) says Michelle's renders twice; the AGT-552 ship at v7.0.944 gives a role prompt one home per bundle.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-010 closes as fixed by AGT-552 (commit e016cee, v7.0.944), with that commit written into its description; AGT-552 is the row of record. Recurring from W46, unexecuted.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:PE-06",
+          "text": "Projects tab — live wiring to `deliverables` table; shows agent's completed deliverables: count, type, task name, date; stub until DL-04 ships"
+        },
+        {
+          "location": "backlog_items:DL-07",
+          "text": "Agent work history on Projects tab (PE-06) — wired to `deliverables` table; shows deliverable count, types, task names, dates per agent; categorizes what kind of work each agent is capable of"
+        }
+      ],
+      "governing_fact": "Which row owns the Personnel Projects tab's live wiring to the deliverables table: PE-06 and DL-07 ask for the same tab, the same table and the same four displayed facts.",
+      "confidence": "high",
+      "proposed_resolution": "PE-06 survives (AGT-371's decided survivor, finding 93f5904c74120041; already partial); DL-07 closes with PE-06 as the superseding id and its one extra clause (categorizes what kind of work each agent is capable of) appended. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:ADM-4",
+          "text": "The briefing moves into the app: standard server capture, rendered live from the DB"
+        },
+        {
+          "location": "backlog_items:ADM-5",
+          "text": "The briefing becomes a DeepBench Super Admin page — live render of runner_ tables, passcode-gated taps, artifact retires at cutover"
+        }
+      ],
+      "governing_fact": "Which row owns moving the briefing into the app as a page rendered live from the database: ADM-4 and ADM-5 both ask for it, and ADM-5 adds the passcode gate and the artifact's retirement.",
+      "confidence": "high",
+      "proposed_resolution": "ADM-5 survives (AGT-371's decided survivor, finding 13655847babb6c68); ADM-4 closes with ADM-5 as the superseding id. W46 recorded an explicit hold of John's on ADM-4: it travels onto ADM-5 verbatim, because closing a duplicate must not lift a hold that is his alone. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-623",
+          "text": "A re-grade's approve mints its ship decision on the re-grading cycle, so a Reverse reverts another ticket's push"
+        },
+        {
+          "location": "backlog_items:AGT-632",
+          "text": "A re-grade's ship handle names the re-grading cycle, so a Reverse on it would revert another ticket's push"
+        },
+        {
+          "location": "backlog_items:AGT-623 (description)",
+          "text": "AGT-609's 7a-ter re-grade lane records an approve as a `ship` decision attributed to the cycle doing the re-grading, not to the cycle that shipped the ticket."
+        },
+        {
+          "location": "backlog_items:AGT-632 (description)",
+          "text": "scripts/regrade-current.js:401-405 records a re-grade's approve through record_ship_decision({p_cycle_id: cycleId}) -- the RE-GRADING cycle."
+        }
+      ],
+      "governing_fact": "Which cycle a re-grade's ship decision is recorded on: AGT-623 and AGT-632, filed 88 minutes apart on 2026-11-09, both say it is the re-grading cycle, so a Reverse would revert another ticket's push.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-623 survives (filed first, and it names the lane and the rule in record_ship_decision()'s own comment); AGT-632 closes with AGT-623 as the superseding id and its file:line (scripts/regrade-current.js:401-405) appended. New this week; it joins AGT-371's sets.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:DAT-23",
+          "text": "A newly created table still gets anon SELECT by default; the rules doc overstates the lockdown"
+        },
+        {
+          "location": "backlog_items:SES-384",
+          "text": "Every new public table is born readable by anon: the default ACL grants SELECT that no migration asked for, and the rule file says otherwise"
+        },
+        {
+          "location": ".claude/rules/supabase-column-grants.md:64",
+          "text": "**Corrected 2026-08-19 (`SES-78a`, found live): SELECT is NOT closed** — the six `runner_`"
+        }
+      ],
+      "governing_fact": "Which row owns closing the anon SELECT default on new public tables: DAT-23 and SES-384 both ask for it, and the rule-file half both titles carry is already satisfied at supabase-column-grants.md:64.",
+      "confidence": "high",
+      "proposed_resolution": "DAT-23 survives (AGT-371's decided survivor, finding e5c7bf89e960570f); SES-384 closes with DAT-23 as the superseding id and its remaining clauses appended; both rows drop the rule-file clause, corrected under SES-78a. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-003",
+          "text": "Michelle's planning-behavior Skill has rich objective/method content the behavior harness never reads"
+        },
+        {
+          "location": "api/prompt/db-assembly.js:1",
+          "text": "// DeepBench v7.0.1002 | api/prompt/db-assembly.js | AGT-636 -- a behavior Skill renders its own objective and method"
+        },
+        {
+          "location": "api/prompt/db-assembly.js:347",
+          "text": "// FEATURE: AGT-636 -- objective and method render, as in identity and intent"
+        },
+        {
+          "location": "git:e12a976 (2026-11-11)",
+          "text": "v7.0.1002 AGT-636 - a behavior Skill renders its own objective and method"
+        }
+      ],
+      "governing_fact": "Whether the behavior branch still drops a Behavior Skill's objective and method: AGT-003 (open) says the harness never reads them; AGT-636 shipped at v7.0.1002 and db-assembly.js now pushes both.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-003 closes as fixed by AGT-636 (commit e12a976, v7.0.1002), with that commit written into its description; AGT-636 is the row of record. New this week: W46 filed AGT-003 as a duplicate of AGT-400 while the code still rendered neither.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AI-25",
+          "text": "`ai_services` table — Supabase catalog of all 14 named Services: slug, name, service_type (ai/deterministic/mixed), description, patterns jsonb (array of pattern slugs), properties jsonb (llm_provider, llm_model, token_budget, execution_mod"
+        },
+        {
+          "location": "docs/ARCHITECTURE.md:2014",
+          "text": "| `platform_services` (new, 31 rows) | what things ARE: slug, branded name (≤4 words), layer, functions, `utilizes_model`, `tracking_status`, `match_keys`, `code_anchor` | counts, cost, latency |"
+        },
+        {
+          "location": "docs/ARCHITECTURE.md:2048",
+          "text": "a separate `ai_services` name (services are services; model use is a flag)."
+        }
+      ],
+      "governing_fact": "Whether a Supabase catalog of the platform's services exists: AI-25 (open) asks for an ai_services table; ARCHITECTURE.md records platform_services as that catalog and rules the ai_services name out.",
+      "confidence": "high",
+      "proposed_resolution": "AI-25 closes as satisfied by platform_services (ARCHITECTURE.md:2007) under the ruling at :2041; any field it wanted that the table lacks is filed as a column proposal against platform_services. AGT-372 names it. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-508",
+          "text": "Step 5's serve-class layer names no runnable per-ticket driver, so every pick carries supports_class NULL"
+        },
+        {
+          "location": "backlog_items:AGT-630",
+          "text": "Step 5 orders a classify pass on the queue top that no cycle can run: capability classify-ticket has no driver"
+        },
+        {
+          "location": "backlog_items:AGT-508 (description)",
+          "text": "No script in the clone drives that capability for a single ticket"
+        },
+        {
+          "location": "backlog_items:AGT-630 (description)",
+          "text": "when supports_class IS NULL, but nothing in the repo can drive it."
+        }
+      ],
+      "governing_fact": "Whether any script can run capability classify-ticket for one picked ticket, as runner-cycle.md step 5 orders: AGT-508 (2026-10-18) and AGT-630 (2026-11-09) both say none can.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-508 survives (filed first, and it names the consequence, every pick carrying supports_class NULL); AGT-630 closes with AGT-508 as the superseding id and its account of agent-prompt.js and the one sanctioned writer appended. New this week; it joins AGT-371's sets.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-400",
+          "text": "Prompt assembler: role prompts rendered once, Behavior Skills render their own objective and method, and tone and output description reach the prompt"
+        },
+        {
+          "location": "backlog_items:AGT-400 (description)",
+          "text": "(1) role prompts are added by both the Identity branch (AA-66) and the Behavior branch, so every prompt carries them twice and the scaffold three times; keep one copy, in Identity."
+        },
+        {
+          "location": "git:e016cee (2026-11-03)",
+          "text": "v7.0.944 AGT-552 - a role prompt renders once per bundle"
+        },
+        {
+          "location": "git:e12a976 (2026-11-11)",
+          "text": "v7.0.1002 AGT-636 - a behavior Skill renders its own objective and method"
+        },
+        {
+          "location": "git:3d26da8 (2026-11-06)",
+          "text": "v7.0.965 AA-169 - Format Skill objective/method/output_desc/guardrails reach the model"
+        },
+        {
+          "location": "api/prompt/db-assembly.js:198",
+          "text": "if (sp?.output_desc) parts.push(`Output: ${sp.output_desc}`);"
+        }
+      ],
+      "governing_fact": "How much of AGT-400 is still unbuilt: its title asks three things, and three later ships (AGT-552, AGT-636, AA-169) deliver role prompts once, Behavior objective and method, and output description; only tone has no reader in db-assembly.js.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-400 survives narrowed to its one unbuilt clause, tone into the Behavior section; the three shipped clauses are struck with commits e016cee, e12a976 and 3d26da8 named, so the row stops reading as four pieces of open work. AGT-372 is the open row for this class.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-98",
+          "text": "The Vercel deployment-protection bypass secret is written in plain text in about 46 files of the public deepbench-frontend repo; rotate it and stop writing it into docs"
+        },
+        {
+          "location": "backlog_items:AGT-130",
+          "text": "The live Vercel protection-bypass secret and local Windows paths are committed in the public repo; replace every literal with a reference to the stored secret"
+        },
+        {
+          "location": "backlog_items:AGT-168",
+          "text": "A public repo carries a live Vercel bypass value on 48 lines, four hardcoded keys, and eleven files quoting local paths or a personal email"
+        },
+        {
+          "location": "backlog_items:AGT-168 (description)",
+          "text": "Nothing gated a commit for private values when this was filed; a change-scoped gate now exists and every count has moved."
+        },
+        {
+          "location": "git:5f093ea (2026-11-14)",
+          "text": "v7.0.1024 AGT-168 -- 45 copies of the bypass value redacted; rotation outstanding"
+        }
+      ],
+      "governing_fact": "Which row owns rotating the Vercel bypass secret and scrubbing its committed copies: three open rows carry that one ask, and AGT-168's ship at v7.0.1024 has redacted 45 copies with rotation outstanding.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-168 survives (AGT-371's decided survivor, finding 19593a494bf31899; it shipped the redaction at v7.0.1024); AGT-98 and AGT-130 close with AGT-168 as the superseding id and any clause only they name appended. The rotation stays John's. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:SES-328",
+          "text": "The six deny-hooks travel with the repo and bind in every environment: hooks versioned and tested in-repo, PowerShell matched, dev branch protected with CI as a required check, and the eleven orphaned check scripts wired into CI"
+        },
+        {
+          "location": "backlog_items:SES-349",
+          "text": "The seven enforcement hooks travel with the repo, so a cloud cycle and a fresh clone run the same guards as John's machine"
+        },
+        {
+          "location": "backlog_items:SES-350",
+          "text": "CI runs every check script instead of two, and the repo gains npm test, a lint baseline and an engines pin"
+        },
+        {
+          "location": "backlog_items:SES-351",
+          "text": "Decide how dev is protected: the branch Vercel serves and the runner pushes to has zero protection while main is protected and abandoned"
+        }
+      ],
+      "governing_fact": "Which rows own making the enforcement hooks, the CI check scripts and dev-branch protection bind off John's machine: SES-328 bundles the three asks that SES-349, SES-350 and SES-351 each carry singly.",
+      "confidence": "high",
+      "proposed_resolution": "SES-349, SES-350 and SES-351 survive (AGT-371's decided survivors, finding fd34872ca3baa078, one mechanism each); SES-328 closes as the umbrella with the three ids written in and any clause only it names (PowerShell matched) appended to SES-349. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AZ-18",
+          "text": "Desktop auto-load removed by `SPA-1` (v7.0.51, 2026-08-02)"
+        },
+        {
+          "location": "backlog_items:AZ-18 (status)",
+          "text": "partial"
+        },
+        {
+          "location": "backlog_items:MOB-10",
+          "text": "Mobile Spend Analysis parity for `SPA-1`: mobile's landing (`MobileAnalyzerHome`) has no Load Demo card, so its copy of the Austin auto-load was deliberately kept when `SPA-1` removed desktop's."
+        }
+      ],
+      "governing_fact": "Whether AZ-18 still holds unbuilt work: its own title records the desktop auto-load removed by SPA-1 at v7.0.51, and the one remainder, mobile's copy of that auto-load, is MOB-10's whole ask.",
+      "confidence": "medium",
+      "proposed_resolution": "AZ-18 closes on SPA-1 (v7.0.51), the ship its own title names; MOB-10 survives as the only row for the mobile remainder. If AZ-18's partial means something else, the row should say what, because its title names no open work.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "redundant",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-676",
+          "text": "A backup nobody has ever restored, a 74-day-old offsite mirror, and two stores outside the backups altogether"
+        },
+        {
+          "location": "backlog_items:DAT-25",
+          "text": "Offsite backup mirror is behind: DAT-21 tooling fix and two post-grants snapshots are local-only"
+        },
+        {
+          "location": "backlog_items:DAT-27",
+          "text": "A scheduled weekly Supabase dump with a recorded restore score, so the recovery point stops being whenever John last ran the script"
+        },
+        {
+          "location": "backlog_items:AGT-676 (description)",
+          "text": "No restore has ever been run, timed or row-counted; the offsite mirror is 74 days old"
+        }
+      ],
+      "governing_fact": "Which rows own the stale offsite backup mirror and the never-run restore: AGT-676 (2026-11-13) restates DAT-25's mirror, 74 days behind and filed 2026-08-31, and DAT-27's recorded restore.",
+      "confidence": "medium",
+      "proposed_resolution": "DAT-25 and DAT-27 survive, one mechanism each and both older; AGT-676 narrows to what only it names, the two stores outside the backups, with both ids written in. DAT-25 is deferred, so the narrowing must not undo that deferral.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AG-05",
+          "text": "api/plan.js reads Michelle prompt from Supabase"
+        },
+        {
+          "location": "backlog_items:SK-20",
+          "text": "Refactor `api/plan.js` — replace hardcoded system prompt and hardcoded tool schema with Prompt Container + Builder; tool schema moves to SP-PM-03 traits.schema (SK-18)."
+        },
+        {
+          "location": "backlog_items:SK-19",
+          "text": "Refactor `api/brief.js` legacy path — remove hardcoded McKinsey memo system prompt from the no-agent_id path; route through Prompt Container + Builder instead."
+        },
+        {
+          "location": "backlog_items:HAR-29",
+          "text": "api/plan.js and api/brief.js bypass the shared prompt pipeline and its caching"
+        },
+        {
+          "location": "api/plan.js:63",
+          "text": "const systemPrompt = `You are Michelle Manning (PP-01), a Project Manager. Generate a concise, specific work order"
+        }
+      ],
+      "governing_fact": "Which rows own moving api/plan.js and api/brief.js off their hardcoded system prompts onto the shared prompt pipeline: four open rows ask for it, and api/plan.js:63 still hardcodes Michelle's prompt.",
+      "confidence": "medium",
+      "proposed_resolution": "SK-19 and SK-20 survive (AGT-371's decided survivors, finding 408603c56c0a15c9, one file each); AG-05 closes into SK-20 and HAR-29 closes into SK-19/SK-20 with the superseding ids written in and HAR-29's caching clause appended to both. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:SES-270",
+          "text": "build-briefing.mjs multi-line anchors fail on CRLF checkouts, so every desktop bridge republish exits 2"
+        },
+        {
+          "location": "backlog_items:SES-314",
+          "text": "The attended verifier is a false block on a CRLF checkout: SES-135 and SES-177 fail only under CRLF line endings"
+        },
+        {
+          "location": "backlog_items:SES-314 (description)",
+          "text": "regression red on exactly SES-135-briefing-render.js"
+        }
+      ],
+      "governing_fact": "Whether the briefing builder's anchors match on a CRLF checkout: SES-270 says build-briefing.mjs's multi-line anchors fail there, and SES-314's false block is the briefing-render test going red only under CRLF.",
+      "confidence": "medium",
+      "proposed_resolution": "SES-270 survives as the cause (filed first, on the builder itself); SES-314 closes into it with SES-270 as the superseding id and its two test names (SES-135, SES-177) appended as the acceptance check. Medium: SES-177's failure is not quoted in what I was handed.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "redundant",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-358",
+          "text": "RLS is off on agents, so the anon key can read and rewrite who owns an agent and who can see it"
+        },
+        {
+          "location": "backlog_items:DAT-29",
+          "text": "Database security floor per the Supabase advisor: RLS on with explicit policies that keep today's reads, search_path pinned on 60 functions, two anon-callable definer functions closed, CORS from the env var"
+        },
+        {
+          "location": "backlog_items:DAT-29 (description)",
+          "text": "**33** public tables with RLS disabled"
+        }
+      ],
+      "governing_fact": "Which row owns turning row-level security on for public.agents: it is the whole of AGT-358's fix and one table inside DAT-29's first clause, RLS on with explicit policies across the 33 tables it counts.",
+      "confidence": "medium",
+      "proposed_resolution": "DAT-29 survives as the platform-wide row; AGT-358 closes into it with DAT-29 as the superseding id and its owner_id/sharing/shared_with evidence appended, so the agents table is not designed twice. AGT-371 holds this pair (W43 ruling). Recurring since W43.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:DL-09",
+          "text": "Deliverable marketplace — publish, price, sell; 30/60/10 split (platform/IP owner/infrastructure)"
+        },
+        {
+          "location": "backlog_items:AA-25",
+          "text": "Deliverables marketplace UI — discovery, preview, purchase flow for other tenants' published capabilities and deliverables"
+        },
+        {
+          "location": "backlog_items:AA-19",
+          "text": "Margin sharing engine — 30% platform / 60% IP owner / 10% infrastructure; $0.10 minimum L4 price"
+        }
+      ],
+      "governing_fact": "Which rows own the deliverables marketplace and its 30/60/10 revenue split: DL-09's one line restates AA-25 (the marketplace UI) and AA-19 (the margin engine).",
+      "confidence": "medium",
+      "proposed_resolution": "AA-25 and AA-19 survive (AGT-371's decided survivors, buy-side and split respectively); DL-09 closes with both ids written in and its publish/price/sell clause appended to AA-25. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-605",
+          "text": "Fifteen routine prompts and scripts tell an unattended run to read the service key's value and type it into a command, and one run wrote it into seven logged commands"
+        },
+        {
+          "location": "backlog_items:AGT-682",
+          "text": "Nothing can hand a runner_secrets value to a child process without printing it, so step 4a-bis's serving probe can never reach a verdict in an unattended cycle"
+        },
+        {
+          "location": "backlog_items:AGT-605 (description)",
+          "text": "A value read over the MCP and typed into a Bash command is in the sessi"
+        },
+        {
+          "location": "backlog_items:AGT-682 (description)",
+          "text": "the only route a cycle has to runner_secrets is a conne"
+        }
+      ],
+      "governing_fact": "How an unattended run gets a runner_secrets value into a command: AGT-605 says the written route types the value into the logged command, and AGT-682 says no route exists that does not print it.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-682 survives (it asks for the missing mechanism, a hand-off that never prints the value); AGT-605 closes into it with AGT-682 as the superseding id and its fifteen prompts and scripts appended as the places to re-point once the mechanism exists.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "redundant",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:SES-356",
+          "text": "Repo hygiene: root-level test debris, a 2026-08-07 snapshot, desktop.ini and a stale package.json version leave the tree, and a check keeps them out"
+        },
+        {
+          "location": "backlog_items:AGT-575",
+          "text": "Cleanup 2026-W44: a scratch test-*.mjs tracked at the repo root since 2026-10-07"
+        }
+      ],
+      "governing_fact": "Which row owns removing scratch test files from the repo root: SES-356 asks for the debris out and a check to keep it out, AGT-575 asks for one such file out, and two test-* files still sit at the root.",
+      "confidence": "medium",
+      "proposed_resolution": "SES-356 survives (older, and it carries the check that stops the next one); AGT-575 closes into it with SES-356 as the superseding id and its file named. Titles only, both rows came without a description, so this is medium.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AA-05",
+          "text": "Character Layer L1 settings panel — Personnel File new tab: philosophy dropdown, skeptic level slider, autonomy dial, lock/adaptive/supervised toggle per setting"
+        },
+        {
+          "location": "backlog_items:AA-17",
+          "text": "Lock/Adaptive/Supervised controls — UI toggle per dimension and character setting"
+        }
+      ],
+      "governing_fact": "Which row owns the lock/adaptive/supervised toggle per character setting: AA-05's panel already lists it and AA-17 asks for the same control on its own.",
+      "confidence": "medium",
+      "proposed_resolution": "AA-05 survives (the panel that houses the control, per the W44 ruling that ticketed this pair, ledger fc77157a4de0e651); AA-17 closes with AA-05 as the superseding id and its per-dimension clause appended. Recurring since W44.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-006",
+          "text": "AGENTS array and the agents table are duplicate stores; decide which is authoritative"
+        },
+        {
+          "location": "backlog_items:AGT-57",
+          "text": "Move the frontend roster read from src/data/agents.js to the agents table"
+        }
+      ],
+      "governing_fact": "Which store is the roster's authority: AGT-006 (partial) asks to decide between the AGENTS array and the agents table, and AGT-57 already carries the move of the roster read onto the agents table.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-57 survives (it is the build the decision leads to; W40 finding 2b41e12a87b52463 cites ARCHITECTURE.md 19u ruling the agents table the record of authority); AGT-006's remaining decision clause closes into it with AGT-57 named. Carried from W43, not re-read in 19u this week.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-247",
+          "text": "A regression arm that needs an absent credential has no agreed shape, so the browser-key denial on the project-lifecycle writers is never exercised"
+        },
+        {
+          "location": "backlog_items:AGT-612",
+          "text": "A test part the runner cannot run is folded into a green gate, so the anon-denial arm is unproven on every unattended ship"
+        },
+        {
+          "location": "backlog_items:AGT-247 (description)",
+          "text": "it cannot run because VITE_SUPABASE_ANON_KEY is no"
+        },
+        {
+          "location": "backlog_items:AGT-612 (description)",
+          "text": "a runner container exports the service key but never the anon key"
+        }
+      ],
+      "governing_fact": "Whether a regression arm that needs the browser key can run in a runner: AGT-247 and AGT-612 both say it cannot because the anon key is absent, each naming a different arm D the gate then counts as green.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-247 survives (filed first, and it asks for the agreed shape every such arm needs); AGT-612 closes into it with AGT-247 as the superseding id and its arm (agt-239 arm D) and its green-gate consequence appended. Two arms, one missing credential, so one fix.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-85",
+          "text": "Private chat inside DeepBench for a personal-lane agent — real sign-in plus row-level security so a conversation is readable only by its owner"
+        },
+        {
+          "location": "backlog_items:AGT-603",
+          "text": "No sign-in exists and the run stores carry anon SELECT with RLS off, so a client's material is readable by anyone holding the browser's own key"
+        },
+        {
+          "location": "backlog_items:AGT-85 (description)",
+          "text": "tasks, deliverables and durable_hops are readable with the public key"
+        },
+        {
+          "location": "backlog_items:AGT-603 (description)",
+          "text": "auth.users holds 0 rows, so no account exists to own anything."
+        }
+      ],
+      "governing_fact": "Whether a user's tasks and deliverables can be read only by their owner: AGT-85 (2026-09-19) and AGT-603 (2026-11-04) both say no, the public key reads them and no sign-in exists to key a policy on.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-603 survives (it measures all four stores and the empty auth.users); AGT-85 keeps only its chat-surface clause and names AGT-603 for sign-in and row-level security. AGT-85 is deferred 'maybe': the narrowing must leave that deferral as it stands.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "redundant",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:DAT-29",
+          "text": "Database security floor per the Supabase advisor: RLS on with explicit policies that keep today's reads, search_path pinned on 60 functions, two anon-callable definer functions closed, CORS from the env var"
+        },
+        {
+          "location": "backlog_items:HAR-35",
+          "text": "vercel.json sets a wildcard CORS origin on all api routes; tighten to the site's own origins"
+        },
+        {
+          "location": "backlog_items:HAR-35 (description)",
+          "text": "**`vercel.json` sets `Access-Control-Allow-Origin: *` on `/api/*`"
+        },
+        {
+          "location": "vercel.json:12",
+          "text": "{ \"key\": \"Access-Control-Allow-Origin\",  \"value\": \"*\" },"
+        }
+      ],
+      "governing_fact": "Which row owns tightening the wildcard CORS origin on the api routes: it is the whole of HAR-35 and the last clause of DAT-29's title, and vercel.json:12 still serves the wildcard.",
+      "confidence": "medium",
+      "proposed_resolution": "HAR-35 survives as the one row for the CORS change (it carries the measurement and its Post-beta placement); DAT-29 drops its CORS clause and names HAR-35, keeping its database clauses. AGT-371 holds this pair (W43 ruling). Recurring since W42.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:SES-366",
+          "text": "The Librarian's answers, refusals and supersessions are logged as hops naming the requesting agent, the reason and the citation, and rendered in the Audit Pipeline Log"
+        },
+        {
+          "location": "backlog_items:AGT-503",
+          "text": "The Librarian's lookups record no caller and no trace, so \"why did the librarian run\" cannot be answered from the log"
+        }
+      ],
+      "governing_fact": "Whether a Librarian lookup's log row names who asked and why: SES-366 (2026-09-11) asks for hops naming the requesting agent, the reason and the citation, and AGT-503 (2026-10-16) reports the rows carry no caller and no trace.",
+      "confidence": "medium",
+      "proposed_resolution": "SES-366 survives (older, and it carries the rendered Audit Pipeline Log outcome); AGT-503 closes into it with SES-366 as the superseding id and its five measured rows of 2026-10-16 appended as the acceptance case.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "competing-purpose",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AA-94",
+          "text": "Retire the dead `capability-registry-knowledge` Skill Profile (Knowledge type, attached to Michelle's `project-manager` capability) — `traits.fetch_instruction` is `null`, so it has never actually fetched anything (same bug class as the his"
+        },
+        {
+          "location": "backlog_items:AGT-012",
+          "text": "Retag capability-registry-knowledge and pm-roster-knowledge from knowledge to intent"
+        }
+      ],
+      "governing_fact": "What becomes of the capability-registry-knowledge Skill row: AA-94 asks to retire it as dead, AGT-012 asks to retag it from knowledge to intent; both cannot ship.",
+      "confidence": "medium",
+      "proposed_resolution": "AA-94 survives (AGT-371's decided survivor, finding 240853d26348d6e6: a Skill whose fetch_instruction is null is retired, not retagged); AGT-012 narrows to pm-roster-knowledge alone with AA-94 named. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "redundant",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-675",
+          "text": "Every actor is a shared, long-lived key: no personal sign-in, no rotation record, and assistant connectors with standing rights"
+        },
+        {
+          "location": "backlog_items:DAT-30",
+          "text": "Secrets rotate and their age is visible: seven runner_secrets values and two CI secrets are unrotated since 2026-08-20, and any MCP-connected session can read them"
+        },
+        {
+          "location": "backlog_items:AGT-675 (description)",
+          "text": "The credentials themselves are shared and permanent"
+        }
+      ],
+      "governing_fact": "Which row owns rotating the runner_secrets values and recording their age: it is DAT-30's whole ask and the no-rotation-record clause of AGT-675's title.",
+      "confidence": "medium",
+      "proposed_resolution": "DAT-30 survives for rotation (older, and it lists the values by name); AGT-675 narrows to its other two clauses, personal sign-in and the connectors' standing rights, with DAT-30 named for rotation.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-534",
+          "text": "Nothing runs the customer's own path on a schedule, so the served path is proven only when someone opens it"
+        },
+        {
+          "location": "backlog_items:AGT-579",
+          "text": "Every claim the platform makes about itself is prose: no named check runs the buyer's own path and renders its last result"
+        },
+        {
+          "location": "backlog_items:AGT-534 (description)",
+          "text": "Nothing exercises the path a buyer walks"
+        }
+      ],
+      "governing_fact": "Whether anything runs the buyer's own path as a named, scheduled check: AGT-534 (2026-10-21) and AGT-579 (2026-10-31) both say nothing does.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-534 survives (filed first, and it carries the measured list of what the existing sensors do watch); AGT-579 closes with AGT-534 as the superseding id and its one extra clause, rendering the check's last result, appended. AGT-579 came with no description, so this is medium.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:SES-259",
+          "text": "docs/SESSIONS.md crossed its 1.5 MB rotation threshold"
+        },
+        {
+          "location": "backlog_items:SES-268",
+          "text": "Rotate docs/SESSIONS.md — it has crossed its own SES-172 rotation ceiling (1560.8 KB > ~1.5 MB)"
+        },
+        {
+          "location": "backlog_items:SES-262",
+          "text": "[Tripwire] session-hygiene check 8: 1 flagged finding with no owning ticket"
+        },
+        {
+          "location": "backlog_items:SES-259 (description)",
+          "text": "check-session-docs.js check 8 fires at 1539 KB"
+        },
+        {
+          "location": "backlog_items:SES-268 (description)",
+          "text": "Tripwire check 8 FLAGs SESSIONS.md at 1560.8 KB"
+        },
+        {
+          "location": "docs/SESSIONS.md (wc -c)",
+          "text": "2117930"
+        }
+      ],
+      "governing_fact": "Which row owns rotating docs/SESSIONS.md past its 1.5 MB ceiling: three open rows hang on the same check-8 flag, and the file is still over the ceiling with no rotation done.",
+      "confidence": "high",
+      "proposed_resolution": "SES-259 survives (AGT-371's decided survivor, finding e7eb6e3f2a76debd); SES-268 and SES-262 close with SES-259 as the superseding id, and the tripwire signature is recorded on SES-259 so check 8 stops re-filing. Recurring since W41; the file grew 7,197 bytes since last week's read.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AI-21",
+          "text": "AI Audit output token tracking — extend `logAICall()` to accept `outputTokens` param; include output cost in formula; write to existing `output_tokens` column in ai_activity_log; all `logAICall()` call sites updated"
+        },
+        {
+          "location": "lib/activity-log.js:281",
+          "text": "output_tokens: outputTokens,"
+        },
+        {
+          "location": "lib/activity-log.js:275",
+          "text": ": computeCallCost(model, inputTokens, outputTokens, cacheCreationInputTokens, cacheReadInputTokens);"
+        },
+        {
+          "location": "backlog_items:LOG-122",
+          "text": "Dead logAICall() still writes ai_activity_log from the browser, bypassing the server writer"
+        }
+      ],
+      "governing_fact": "Whether output tokens are written to ai_activity_log and priced: AI-21 (open) asks for it through logAICall(); the server writer lib/activity-log.js already writes the column and prices it through computeCallCost().",
+      "confidence": "high",
+      "proposed_resolution": "AI-21 closes as fixed on lib/activity-log.js:275/:281; its one unmet clause, the dead browser logAICall(), already belongs to LOG-122 and stays there. AGT-372 names it. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AI-26",
+          "text": "`ai_patterns` table — Supabase catalog of 20 industry-standard AI Patterns: slug, name, description, in_deepbench boolean (true = active, false = roadmap)."
+        },
+        {
+          "location": "backlog_items:LOG-134",
+          "text": "15+ pattern_vocabulary gold rows have criteria IS NULL and can never match anything"
+        },
+        {
+          "location": "docs/ARCHITECTURE.md:1743",
+          "text": "is live in the gold data, verified 2026-08-25 (`LOG-73`): of the 33 `pattern_vocabulary` rows, the"
+        }
+      ],
+      "governing_fact": "Whether a Supabase catalog of AI patterns exists: AI-26 (open) asks for an ai_patterns table; pattern_vocabulary is that catalog, 33 rows by ARCHITECTURE.md, and LOG-134 is already repairing its rows.",
+      "confidence": "medium",
+      "proposed_resolution": "AI-26 closes as satisfied by pattern_vocabulary; its in_deepbench active/roadmap flag, if still wanted, is filed as a column proposal against that table. First filed W40 beside AI-25; medium because I did not re-read the table live.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:TC-02",
+          "text": "Trainer Agent — dedicated agent role that trains/configures other agents; visible as participant in multi-agent workflows; shows who taught an agent in the personnel file training log"
+        },
+        {
+          "location": "backlog_items:AGT-250",
+          "text": "Susan Smith gains the agent-authoring capability: read an agent's uploaded training documents and decide what to build"
+        },
+        {
+          "location": "src/data/agents.js:101",
+          "text": "id: \"susan\", name: \"Susan Smith\", role: \"Trainer Agent\","
+        }
+      ],
+      "governing_fact": "Which row owns the agent that trains other agents: TC-02 asks for a dedicated Trainer role, and AGT-250 gives that existing role, Susan Smith in src/data/agents.js, the agent-authoring capability.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-250 survives (AGT-371's decided survivor; Susan Smith already exists as the Trainer, so TC-02's first clause is done); TC-02 closes with AGT-250 as the superseding id and its two residual clauses (visible in workflows, who-taught-whom in the training log) appended. Recurring since W41.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:SES-82",
+          "text": "Replace the briefing's manual usage-meter reading with a programmatic read the day one exists"
+        },
+        {
+          "location": "scripts/read-usage-meter.js:3",
+          "text": "// DeepBench v7.0.1067 | scripts/read-usage-meter.js | AGT-617 -- the 5h headers are optional; a reading without them is written with session NULL."
+        },
+        {
+          "location": ".github/workflows/meter-reader.yml:67",
+          "text": "run: node scripts/read-usage-meter.js --via-headers"
+        },
+        {
+          "location": "scripts/build-briefing.mjs:358",
+          "text": "const [reading] = await sel('runner_usage_readings?select=all_models_pct,fable_pct&order=taken_at.desc&limit=1');"
+        },
+        {
+          "location": "git:18b56d7 (2026-11-20)",
+          "text": "v7.0.1067 AGT-617 - the meter reader no longer needs the 5h header"
+        }
+      ],
+      "governing_fact": "Whether a programmatic usage-meter read exists for the briefing: SES-82 (open, deferred) waits for one; scripts/read-usage-meter.js writes the readings on a schedule and build-briefing.mjs reads them, and AGT-617's repair of it shipped at v7.0.1067.",
+      "confidence": "medium",
+      "proposed_resolution": "SES-82 closes as satisfied by SES-374/SES-388 (scripts/read-usage-meter.js, build-briefing.mjs:358), as AGT-372 already names; the outage that held this at medium last week was repaired by AGT-617 (commit 18b56d7). The row is deferred by you, so the close is recorded against that deferral, not around it. Medium: I did not read a live reading.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-694",
+          "text": "redesign-pickup.js prints the Designer's mandatory log command with an --ai-type agent-log refuses, so a pasted turn logs nothing"
+        },
+        {
+          "location": "backlog_items:AGT-694 (description)",
+          "text": "scripts/redesign-pickup.js:267 prints a paste-ready log line reading --ai-type=design-kickoff."
+        },
+        {
+          "location": "backlog_items:AGT-709",
+          "text": "The two capabilities every build cycle runs have no catalog entry, so their mandatory log row is refused"
+        },
+        {
+          "location": "backlog_items:AGT-709 (description)",
+          "text": "shared/ai-patterns.js SERVICE_CATALOG holds 86 slugs and neither design-kickoff nor build-ticket is among them."
+        },
+        {
+          "location": "scripts/redesign-pickup.js:285",
+          "text": "\"--ai-type=design-kickoff --feature=design-kickoff:ds-kickoff-intent:depth1 --cycle=<runner_cycles.id> --patterns-applied=<csv>\");"
+        }
+      ],
+      "governing_fact": "Whether agent-log.js accepts --ai-type=design-kickoff: AGT-694 (2026-11-15) and AGT-709 (2026-11-16) both say it refuses it because the slug is not in SERVICE_CATALOG, and redesign-pickup.js still prints that command.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-709 survives (it names both missing slugs, design-kickoff and build-ticket, and the catalog as the one fix); AGT-694 closes with AGT-709 as the superseding id and its redesign-pickup.js print line appended as the acceptance case. New this week; it joins AGT-371's set.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "duplicate",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-570",
+          "text": "The driver's second pass gates on walls that count the cycle's own claim and its own lane, so a rule-compliant cycle can never assign"
+        },
+        {
+          "location": "backlog_items:AGT-570 (description)",
+          "text": "pass two re-reads runner_should_boot(), whose live_lanes count includes the calling cycle's"
+        },
+        {
+          "location": "backlog_items:AGT-740",
+          "text": "runner_should_boot() counts the asking cycle as a live lane, so a chained continuation refuses itself"
+        },
+        {
+          "location": "backlog_items:AGT-740 (description)",
+          "text": "Its `lanes` CTE counts every open runner-stamped cycle whose heartbeat is inside 20 minutes with no exclusion, and the function takes no arguments at all"
+        },
+        {
+          "location": "backlog_items:AGT-774",
+          "text": "A staged migration's md5 pin is never re-checked when another ticket replaces the same body, so AGT-570's exemption can no longer apply while its header says it did"
+        },
+        {
+          "location": "git:77c7bbc (2026-11-16)",
+          "text": "v7.0.1039 AGT-570 - the boot gate stops counting the cycle that asks"
+        }
+      ],
+      "governing_fact": "Whether runner_should_boot() leaves the asking cycle's own row out of its lane count: AGT-570 (partial) and AGT-740 (2026-11-20) both say it does not, and AGT-570's fix for it was committed staged and never applied.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-740 survives for the lane count (it carries the caller-argument design and the overload drop, and AGT-774 already names it as the replacement); AGT-570 narrows to its record_leverage() claim limb with AGT-740 written in. AGT-570 is at the no-ship cap in this week's code findings, so it should not be queued again unchanged.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "redundant",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-254",
+          "text": "runner-cycle.md:4704 still says the reversible-table allowlist is fifteen and lists fifteen names; it is seventeen"
+        },
+        {
+          "location": "backlog_items:AGT-703 (description)",
+          "text": "(1) runner-cycle.md:4722 -- the reversible allowlist is 17 tables, not 15 (add model_assignments and projects), or point at public.reversible_tables()."
+        },
+        {
+          "location": "docs/runbooks/runner-cycle.md:4722",
+          "text": "**The allowlist, widened 7 → 14 by `SES-364`** and to 15 by `AGT-86` slice 1b (`v7.0.543`) (read live): `backlog_items`,"
+        }
+      ],
+      "governing_fact": "Which row owns correcting runner-cycle.md's reversible-table count from fifteen to seventeen: it is the whole of AGT-254 and item (1) of AGT-703, and the line still reads 15.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-254 survives (it is the older row and the one written for this line alone); AGT-703 drops item (1) and names AGT-254, so the line is not edited twice. This is not last week's AGT-157/AGT-254 pair, which was ruled not a defect: AGT-157 has left the board and AGT-703 is the row now carrying the second copy.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "redundant",
+      "check_slug": "board-duplicate",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-681",
+          "text": "One regression test is invisible to run-all for want of an export default, so AGT-642's blocked-first guard has never run and it reds the suite when a push pulls it in"
+        },
+        {
+          "location": "backlog_items:AGT-681 (description)",
+          "text": "tests/regression/agt-642-blocked-first.test.mjs ends with selfRun(import.meta.url, run) and no 'export default run;' line"
+        },
+        {
+          "location": "backlog_items:AGT-703",
+          "text": "Audit cleanup 2026-W47: 15 one-line fixes"
+        },
+        {
+          "location": "docs/backlog/BACKLOG-SNAPSHOT.md:1953",
+          "text": "(11) agt-642-blocked-first.test.mjs exports no default async function."
+        },
+        {
+          "location": "tests/regression/agt-642-blocked-first.test.mjs:124",
+          "text": "selfRun(import.meta.url, run);"
+        }
+      ],
+      "governing_fact": "Which row owns adding the missing default export to agt-642-blocked-first.test.mjs: it is the whole of AGT-681 and item (11) of AGT-703, and the file still ends on selfRun() with no export.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-681 survives (it carries the run-all.js:251 cause and the guard that has never run); AGT-703 drops item (11) and names AGT-681. Item (11) sits past the 300 characters of AGT-703's description I was handed, so I quote it from the repo's backlog snapshot.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-517",
+          "text": "The STEP 0 weekly meter stop reached two live routines but neither of their repo blocks"
+        },
+        {
+          "location": "backlog_items:AGT-517 (status)",
+          "text": "partial"
+        },
+        {
+          "location": "docs/runbooks/auditor-routine.md:22",
+          "text": "STEP 0 — WEEKLY METER STOP (John, 2026-10-17). Before anything else, using the Supabase MCP tools, run: select ok, reason, all_models_pct,"
+        },
+        {
+          "location": "docs/runbooks/victoria-reorg.md:84",
+          "text": "STEP 0 — WEEKLY METER STOP (John, 2026-10-14). This runs before everything below, including the npm ci line."
+        },
+        {
+          "location": "git:90c59d2 (2026-11-14)",
+          "text": "v7.0.1031 AGT-567 - the weekly meter stop is in the repo blocks of the three routines that run it"
+        },
+        {
+          "location": "git:b0605f4 (2026-11-16)",
+          "text": "AGT-517 v7.0.1045 — the weekly victoria-reorg runbook block carries its live STEP 0 meter stop"
+        },
+        {
+          "location": "backlog_items:AGT-705",
+          "text": "The live Auditor routine prompt and its canonical repo block disagree on the STEP 0 weekly meter stop"
+        }
+      ],
+      "governing_fact": "Whether the two repo blocks AGT-517 names still lack the STEP 0 weekly meter stop: the row reads partial, while auditor-routine.md and victoria-reorg.md both carry it since v7.0.1031 and v7.0.1045.",
+      "confidence": "high",
+      "proposed_resolution": "AGT-517 settles delivered on commits 90c59d2 and b0605f4, which put the stop in both blocks its title names; AGT-705 survives as the one row for what is left, the Auditor routine's live prompt still differing from its block. I read the two repo blocks, not the live routine.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-633",
+          "text": "CI's blocking job and the rollback engine grade the absolute suite while the verdict grades the delta, so a verified ship is carded red"
+        },
+        {
+          "location": "git:640a1d0 (2026-11-21)",
+          "text": "v7.0.1102 AGT-611 - CI fails only on a red this push introduced"
+        },
+        {
+          "location": ".github/workflows/ci.yml:2",
+          "text": "# DeepBench v7.0.1102 | .github/workflows/ci.yml | AGT-611 -- a HEAD red also red on the $BASE_SHA tree is [STANDING], not graded (scripts/ci-new-reds.js)."
+        },
+        {
+          "location": "scripts/ci-new-reds.js:2",
+          "text": "// DeepBench v7.0.1102 | scripts/ci-new-reds.js | AGT-611 -- CI fails only on a red this push introduced."
+        }
+      ],
+      "governing_fact": "Whether CI's blocking job still grades the absolute suite: AGT-633 (open) says it does; AGT-611 shipped at v7.0.1102 and the job now fails only on a red that was green on the base tree.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-633 narrows to its rollback-engine clause, with commit 640a1d0 written in for the CI clause; AGT-611 is the row of record for the CI gate. Last week these two were filed as a duplicate pair and AGT-611 has since shipped. Medium: I did not trace whether rollback-on-red takes its red from the CI conclusion alone, in which case the row closes outright.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "check_slug": "board-already-fixed",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-671",
+          "text": "A ticket waiting on a credential only John can create is flagged needs-desktop, so the redesign door keeps re-offering it"
+        },
+        {
+          "location": "backlog_items:AGT-690",
+          "text": "A gate card you have already accepted has no parked state, so the ticket is handed back to the runner forever"
+        },
+        {
+          "location": "backlog_items:AGT-690 (description)",
+          "text": "public.refusal_parked_tickets() parks any open or partial ticket whose design_status is 'needs-desktop' under the"
+        },
+        {
+          "location": "git:369060e (2026-11-19)",
+          "text": "v7.0.1061 AGT-683 - an attended-only redesign parks the ticket instead of re-offering it daily"
+        },
+        {
+          "location": "docs/runbooks/redesign-after-refusal.md:1",
+          "text": "<!-- DeepBench v7.0.1061 | runbooks/redesign-after-refusal.md | AGT-683 — an attended-only redesign parks the ticket (--park); --diagnose needs a refusal. -->"
+        }
+      ],
+      "governing_fact": "Whether the redesign door still re-offers a ticket that was never refused: AGT-671 and AGT-690 (both open) say it does at every cooldown; AGT-683 shipped an attended-only park at v7.0.1061 that takes such a ticket off the list.",
+      "confidence": "medium",
+      "proposed_resolution": "AGT-671 and AGT-690 each narrow to what the park does not give: AGT-671's return-when-the-secret-lands state, AGT-690's refusal of a second card on an accepted one; the re-offer clause is struck in both with commit 369060e named, AGT-683 being the row of record. Medium: I read the commit and the runbook, not the live parked list.",
+      "found_by": "auditor:routine:board-health",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "quality-description-wrong",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-782 (description)",
+          "text": "Retire the two superseded KPI catalog items and mark the two older all-agents summaries as behind the 2026-11-17..20 positioning, on the principal's word per item."
+        },
+        {
+          "location": "docs/design/RMV-COMPANY-PROFILE-1121.md:272",
+          "text": "The Library never held two KPI catalog items marked current: the 528 catalog was already superseded, and the inventory query that reported it lacked the status filter. One catalog item was current, and its content had already been refreshed to release 50 (560 KPIs) by the library session; only its title still read \"release 49: 554\"."
+        }
+      ],
+      "governing_fact": "How many KPI catalog items in the Library were superseded and awaiting retirement: the ticket says two, the delivery's own record says none needed retiring (one already superseded, one current and already refreshed).",
+      "confidence": "high",
+      "proposed_resolution": "docs/design/RMV-COMPANY-PROFILE-1121.md section 10 wins: it is the dated correction recorded at delivery (commit 58ff632). Correct backlog_items:AGT-782's description to one stale title corrected and no catalog item retired.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "quality-description-wrong",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-764 (title)",
+          "text": "No unattended cycle can apply a database change: the one authorised apply route raises a human confirmation, and nine designed tickets have parked on it since 2026-10-05"
+        },
+        {
+          "location": "backlog_items:AGT-764 (description)",
+          "text": "So apply_migration over the Supabase connector is the whole surface, and on 2026-11-20 it raised a confirmation inside an authorised unattended cycle (a0f78aa0, AGT-553), timed out at 60s and applied nothing"
+        },
+        {
+          "location": "docs/kickoffs/v7.0.1093-AGT-764-asked-statements-named-at-design.md:11",
+          "text": "The ticket's cause is measured false; its symptom is real. Read-only, 2026-11-20: 91 migrations applied since 2026-10-05, 47 with a down an unattended cycle captured"
+        },
+        {
+          "location": "docs/runbooks/environment-facts.md:38",
+          "text": "Unattended cycles DO apply migrations: 47 of the 91 applied since 2026-10-05 carry a down an unattended cycle captured"
+        }
+      ],
+      "governing_fact": "Whether an unattended cycle can apply a database change: the ticket says none can because the route itself asks a human; the measured record says 47 did, and only statements leading with DROP, DELETE or TRUNCATE are asked about.",
+      "confidence": "high",
+      "proposed_resolution": "docs/runbooks/environment-facts.md:38 wins: it is the measured fact shipped under AGT-764 (v7.0.1093, kickoff call D1). Correct backlog_items:AGT-764's title and description to name the destructive statement, not the route, as the wall.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "quality-description-wrong",
+      "locations": [
+        {
+          "location": "backlog_items:AGT-620 (title)",
+          "text": "The audit rpc spends 98% of its time in one call and is already past the anon key's 3-second statement timeout"
+        },
+        {
+          "location": "backlog_items:AGT-620 (description)",
+          "text": "pg_roles shows anon with statement_timeout 3s and authenticated with 8s, so for every reader holding the anon key that ships in the bundle this rpc is already 2.3x over its limit and returns HTTP 500 / SQLSTATE 57014 instead of a verdict."
+        },
+        {
+          "location": "docs/kickoffs/v7.0.1068-AGT-620-queue-indexes.md:17",
+          "text": "The limit is 8 s, not 3 s: `anon` holds no EXECUTE on `audit_flow_checks()`; its caller uses the service key, under `authenticator` (`statement_timeout=8s`)."
+        }
+      ],
+      "governing_fact": "Which statement timeout binds audit_flow_checks(): the ticket says the anon key's 3 seconds and a failing browser reader; the measured record says anon cannot execute it and its one caller runs under an 8-second limit.",
+      "confidence": "high",
+      "proposed_resolution": "docs/kickoffs/v7.0.1068-AGT-620-queue-indexes.md wins: it is the 2026-11-20 measurement the ship was built on (call D2). Correct backlog_items:AGT-620's title and description to the 8-second service-key limit; no anon reader was failing.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "other",
+      "check_slug": "other",
+      "locations": [
+        {
+          "location": "runner_verdicts:78a27dbd-f9ca-4282-ad5a-8a4e44434e0e (reasoning, AGT-781, verdict block)",
+          "text": "pin left behind (AGT-328): the kickoff declares 3 regression tests repin and 3 are not in this delivery's changed files (the changed-file list could not be read -- fail closed): tests/regression/agt-721-laura.test.mjs, tests/regression/agt-542-dilbert.test.mjs, tests/regression/agt-643-harry.test.mjs."
+        },
+        {
+          "location": "runner_verdicts:78a27dbd-f9ca-4282-ad5a-8a4e44434e0e (auto_done_reason)",
+          "text": "(changed-file source: git diff vs origin/dev, 0 paths)"
+        },
+        {
+          "location": "commit 9db0cb7 (graded_sha 9db0cb710dbdcce69af745217f387a9b0901fb98), changed files",
+          "text": "tests/regression/agt-542-dilbert.test.mjs\ntests/regression/agt-643-harry.test.mjs\ntests/regression/agt-653-trenton.test.mjs\ntests/regression/agt-721-laura.test.mjs"
+        },
+        {
+          "location": "runner_verdicts (AGT-770, v7.0.1096, graded_sha a4c064bcad74524aca7c48d2a815aebf60113829, verdict block, reasoning)",
+          "text": "pin left behind (AGT-328): the kickoff declares 1 regression test repin and 1 is not in this delivery's changed files (the changed-file list could not be read -- fail closed): tests/regression/agt-297-mcp-caller-gate.test.mjs."
+        },
+        {
+          "location": "commit a4c064b, changed files",
+          "text": "docs/ARCHITECTURE.md\nmiddleware.js\ntests/regression/agt-297-mcp-caller-gate.test.mjs"
+        },
+        {
+          "location": "backlog_items:AGT-224 (status removed, description)",
+          "text": "When step 7 omits it the verifier falls back to git, records '(changed-file source: git diff vs origin/dev, 0 paths)' and still returns a verdict"
+        }
+      ],
+      "governing_fact": "Whether the re-pinned tests were in the graded delivery's changed files: two block verdicts say no because the list read as 0 paths after the push, while each graded commit's own file list holds every named test.",
+      "confidence": "medium",
+      "proposed_resolution": "The commit record wins: 9db0cb7 and a4c064b list the tests. Home is scripts/verifier.js's changed-file read (the graded-against-zero-paths defect of AGT-224, removed unbuilt; AGT-688 holds the dropped list): re-file it there and re-grade both verdicts with the real paths.",
+      "found_by": "auditor:routine:work-quality",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "other",
+      "check_slug": "advisor-model-change",
+      "confidence": "high",
+      "governing_fact": "Whether the orchestrator lane was re-trialed against claude-opus-5-5 ($4/$20 vs Opus 5's $5/$25) once the trial harness was repaired on 2026-11-19: it was not. The lane still names claude-opus-5 and no model-* decision row exists after 2026-11-06, 17 days on.",
+      "locations": [
+        {
+          "location": "task_context.platform_facts.lanes[0] — public.runner_model_lanes row lane='orchestrator', field model_id; public.model_assignments job_kind='lane' job_key='orchestrator' re-read 2026-11-23, same model_id, updated_at 2026-09-02T23:17:49.529179+00:00",
+          "text": "{\"lane\":\"orchestrator\",\"model_id\":\"claude-opus-5\",\"purpose\":\"Parent cycle: orchestrates, codes, QAs, ships (register B21).\",\"updated_at\":\"2026-09-02T23:17:49.529179+00:00\",\"updated_by\":\"ses-313-coding\"}"
+        },
+        {
+          "location": "https://platform.claude.com/docs/en/about-claude/models/overview — 'Latest models', retrieved 2026-11-23",
+          "text": "If you’re unsure which model to use, start with [Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview) for most workloads."
+        },
+        {
+          "location": "https://platform.claude.com/docs/en/about-claude/pricing — 'Model pricing' table rows, retrieved 2026-11-23",
+          "text": "| Claude Opus 5.5 | $4 / MTok | $5 / MTok | $8 / MTok | $0.20 / MTok<sup>2</sup> | $20 / MTok |\n| Claude Opus 5 | $5 / MTok | $6.25 / MTok | $10 / MTok | $0.50 / MTok | $25 / MTok |"
+        },
+        {
+          "location": "https://platform.claude.com/docs/en/about-claude/model-deprecations — 'Model status' table rows, retrieved 2026-11-23",
+          "text": "| claude-opus-5-5 | Active | N/A | Not sooner than September 22, 2027 |\n| claude-opus-5 | Active | N/A | Not sooner than July 24, 2027 |"
+        },
+        {
+          "location": "git log -- scripts/model-trial.js (clone at /home/user/deepbench-frontend, HEAD 53479ce, 2026-11-23) — the two commits that repaired the line the 2026-W46 and 2026-W47 findings named",
+          "text": "1dc9583 2026-11-19 v7.0.1060 AGT-522 - a trial replay no longer fails on its own node_modules link\n0dddd90 2026-11-20 v7.0.1066 AGT-522 - a lane trial picks build jobs it can replay"
+        },
+        {
+          "location": "public.runner_decisions where (kind like 'model-%' or summary ilike '%model-watch%') and decided_at >= '2026-11-06', read 2026-11-23 — the newest row; 0 rows after it",
+          "text": "kind model-report, decided_at 2026-11-06T10:21:14.583779+00:00, summary \"model-watch 2026-11-06: releases 0, retirements 12, watch reviewed 0, trials 6, switched 0, kept 5, reverted 0 · models: capability/bench-report-card=claude-sonnet-4-6, capability/data-room-custody=claude-haiku-4-5-20251001, lane/judgment=claude-fable-5-1, lane/mechanical=claude-sonnet-5, lane/orchestrator=claude-opus-5 · changes this week: 0\""
+        },
+        {
+          "location": "public.runner_decisions id 0fa3a85f-9d9d-4a19-a565-823f5d69c779 (kind model-keep, decided_at 2026-11-06T10:19:16.326332+00:00) — still the newest model-keep for this lane, read 2026-11-23",
+          "text": "lane/orchestrator keeps claude-opus-5"
+        },
+        {
+          "location": "public.backlog_items, backlog_id in (AGT-704, AGT-710, AGT-522), fields status / title / updated_at, read 2026-11-23",
+          "text": "AGT-704 open \"No lane can move to a cheaper current model, because the trial harness cannot grade the replay the move needs\" (updated_at 2026-11-16T12:05:35.443281+00:00); AGT-710 open \"A routine that stops firing leaves no record, so the model watch has been silent for ten days unnoticed\" (updated_at 2026-11-16T12:05:35.443281+00:00); AGT-522 partial (updated_at 2026-11-20T02:21:18.303874+00:00)"
+        },
+        {
+          "location": "public.audit_findings fingerprints 347ceceae09708e1 (2026-W46) and 5ed921b394b49f92 (2026-W47), check_slug advisor-model-change, fields status / filed_backlog_id, read 2026-11-23",
+          "text": "ticketed, AGT-704; ticketed, AGT-704 — neither ruled not-a-defect"
+        },
+        {
+          "location": "SPEND — public.ai_activity_log, created_at >= now() - 7 days, model='claude-opus-5', read 2026-11-23T11:35Z",
+          "text": "207 rows; input_tokens 422900; output_tokens 16000; cache_read_input_tokens NULL; cost_usd NULL on 207 of 207"
+        },
+        {
+          "location": "SPEND — public.model_pricing rows, fields input_per_1k / output_per_1k, read 2026-11-23",
+          "text": "claude-opus-5 0.005 / 0.025; claude-opus-5-5 0.004 / 0.02"
+        }
+      ],
+      "proposed_resolution": "public.model_assignments wins and moves only on a passing trial (decision 0fa3a85f, 2026-11-06). The harness repair AGT-704 asked for shipped under AGT-522; what is missing is the re-run, because the model watch that runs trials has left no row since 2026-11-06 (AGT-710). Re-run the orchestrator trial under AGT-704. Costs no money: Opus 5.5 is cheaper on every line.",
+      "found_by": "auditor:routine:advisor",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "other",
+      "check_slug": "advisor-model-change",
+      "confidence": "high",
+      "governing_fact": "Whether the judgment lane can be paired with Anthropic's current Fable: the lane names claude-fable-5-1 ($10/$50) while Claude Fable 5.2 ($8/$40) is published as current, and a second week on model_catalog and model_pricing still hold no claude-fable-5-2 row for a trial to pair.",
+      "locations": [
+        {
+          "location": "task_context.platform_facts.lanes[1] — public.runner_model_lanes row lane='judgment', field model_id",
+          "text": "{\"lane\":\"judgment\",\"model_id\":\"claude-fable-5-1\",\"purpose\":\"Judgment-dense delegated steps: kickoff design for P1-P5, root-cause diagnosis, invention scoring, P1-P4 classification (register B21).\",\"updated_at\":\"2026-09-09T19:20:19.34746+00:00\",\"updated_by\":\"design-runner-24h-0908 (decision 91d43ca7-8e71-455a-b885-30a336367a27)\"}"
+        },
+        {
+          "location": "https://platform.claude.com/docs/en/about-claude/models/overview — 'Latest models', retrieved 2026-11-23",
+          "text": "Use [Claude Fable 5.2](https://platform.claude.com/docs/en/models/fable-5-2/overview) for demanding reasoning and long-horizon agentic work, or when your evals on Claude Opus 5.5 at higher effort still fall short."
+        },
+        {
+          "location": "https://platform.claude.com/docs/en/about-claude/pricing — 'Model pricing' table rows, retrieved 2026-11-23",
+          "text": "| Claude Fable 5.2 | $8 / MTok | $10 / MTok | $16 / MTok | $0.20 / MTok<sup>1</sup> | $40 / MTok |\n| Claude Fable 5.1 | $10 / MTok | $12.50 / MTok | $20 / MTok | $0.25 / MTok<sup>1</sup> | $50 / MTok |"
+        },
+        {
+          "location": "https://platform.claude.com/docs/en/about-claude/model-deprecations — 'Model status' table rows, retrieved 2026-11-23",
+          "text": "| claude-fable-5-2 | Active | N/A | Not sooner than November 9, 2027 |\n| claude-fable-5-1 | Active | N/A | Not sooner than September 1, 2027 |"
+        },
+        {
+          "location": "public.model_catalog, model_id like 'claude-fable%', fields retire_not_before / last_checked, read 2026-11-23 — the only rows",
+          "text": "claude-fable-5 (retire_not_before 2027-06-09, last_checked 2026-11-06T09:45:10.101025+00:00); claude-fable-5-1 (retire_not_before 2027-09-01, last_checked 2026-11-06T10:19:16.326332+00:00) — no claude-fable-5-2 row; no Claude row in the table has a last_checked after 2026-11-06T10:19:16.326332+00:00"
+        },
+        {
+          "location": "public.model_pricing, model like 'claude-fable%', fields input_per_1k / output_per_1k / updated_at, read 2026-11-23 — the only rows",
+          "text": "claude-fable-5 0.01 / 0.05 (2026-11-06T09:45:10.101025+00:00); claude-fable-5-1 0.01 / 0.05 (2026-11-06T10:19:16.326332+00:00) — no claude-fable-5-2 row"
+        },
+        {
+          "location": "public.skill_profiles, count grouped by llm_model, read 2026-11-23",
+          "text": "claude-fable-5-1: 109 rows (0 with a stored temperature) — the largest group of 236 rows; no row names claude-fable-5-2"
+        },
+        {
+          "location": "this advisor run's own assembled prompt, /tmp/claude-0/-home-user/d94907fd-f428-5d4d-ac7d-c689574b5b7b/scratchpad/auditor-2026-W48/advisor.prompt.md:1, against the session's stated model, read 2026-11-23",
+          "text": "prompt: \"# The Auditor — Governance — Auditor · capability audit-advisor · model claude-fable-5-1\" — session: \"The exact model ID is claude-fable-5-2\""
+        },
+        {
+          "location": "public.audit_findings fingerprint a159a00c3e9fdf65 (2026-W47), check_slug advisor-model-change, fields status / filed_backlog_id, read 2026-11-23",
+          "text": "ticketed, AGT-704 — not ruled not-a-defect"
+        },
+        {
+          "location": "SPEND — public.ai_activity_log, created_at >= now() - 7 days, model='claude-fable-5-1', read 2026-11-23T11:35Z",
+          "text": "163 rows; input_tokens 1328973; output_tokens 447359; cache_read_input_tokens 533846; cost_usd NULL on 163 of 163"
+        },
+        {
+          "location": "SPEND — public.runner_cycles id ce7e9361-2393-4a14-85a8-706db6f524cc (started_at 2026-11-20T05:44:05.118043+00:00), field last_step; and public.runner_usage_readings (source routine-self-read) 2026-11-19T21:51:07.963288+00:00",
+          "text": "\"step 6 — wall stop (weekly subscription limit, hard 429 on the judgment lane)\"; all_models_pct 99 fable_pct 99"
+        }
+      ],
+      "proposed_resolution": "public.model_assignments (mirrored by runner_model_lanes) wins and changes only by the model-watch trial rule (decision 0fa3a85f). Add claude-fable-5-2 to model_catalog and model_pricing under AGT-704 so the trial can pair it. No new spend: it is cheaper per token; how your subscription meter weights it is unverified.",
+      "found_by": "auditor:routine:advisor",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "other",
+      "check_slug": "advisor-limit-hit",
+      "confidence": "medium",
+      "governing_fact": "How often the subscription's weekly pool stopped the runner this window: 162 of 223 did-not-run cycles (144 weekly_pace, 17 weekly_wall, 1 hard 429), a third week running (127, then 164), with the meter at 99% on 2026-11-19 and 0 of 32 cycles shipping on 2026-11-22.",
+      "locations": [
+        {
+          "location": "task_context.limits_hit.by_outcome_and_step[0], [4] and [17]",
+          "text": "{\"outcome\":\"did_not_run\",\"last_step\":\"step 0 — pre-boot refusal (weekly_pace)\",\"count\":138} [...] {\"outcome\":\"did_not_run\",\"last_step\":\"step 0 — pre-boot refusal (weekly pace)\",\"count\":5} [...] {\"outcome\":\"did_not_run\",\"last_step\":\"step 0 - pre-boot refusal (weekly_pace)\",\"count\":1}"
+        },
+        {
+          "location": "task_context.limits_hit.by_outcome_and_step[2] and [20]",
+          "text": "{\"outcome\":\"did_not_run\",\"last_step\":\"step 0 — pre-boot refusal (weekly_wall)\",\"count\":16} [...] {\"outcome\":\"did_not_run\",\"last_step\":\"step 0 - pre-boot refusal (weekly_wall)\",\"count\":1}"
+        },
+        {
+          "location": "task_context.limits_hit.by_outcome_and_step[15] — public.runner_cycles id ce7e9361-2393-4a14-85a8-706db6f524cc, started_at 2026-11-20T05:44:05.118043+00:00",
+          "text": "{\"outcome\":\"did_not_run\",\"last_step\":\"step 6 — wall stop (weekly subscription limit, hard 429 on the judgment lane)\",\"count\":1}"
+        },
+        {
+          "location": "public.runner_cycles, started_at >= now() - 7 days, counted per America/Chicago day (pace = last_step ilike '%weekly_pace%' or '%weekly pace%', wall = ilike '%weekly_wall%'), read 2026-11-23T11:35Z",
+          "text": "2026-11-16 pace 17 wall 0 shipped 2 total 34; 2026-11-17 pace 20 wall 0 shipped 7 total 46; 2026-11-18 pace 27 wall 0 shipped 7 total 41; 2026-11-19 pace 2 wall 17 shipped 27 total 79; 2026-11-20 pace 18 wall 0 shipped 13 total 42; 2026-11-21 pace 26 wall 0 shipped 8 total 44; 2026-11-22 pace 32 wall 0 shipped 0 total 32; 2026-11-23 pace 2 wall 0 shipped 6 total 13 — window outcomes: did_not_run 223, shipped 70, gated_before_build 29, failed 5"
+        },
+        {
+          "location": "public.runner_usage_readings (source routine-self-read), highest all_models_pct per America/Chicago day, read 2026-11-23",
+          "text": "2026-11-16 61; 2026-11-17 79; 2026-11-18 87; 2026-11-19 99 (2026-11-19T21:51:07.963288+00:00 all_models_pct 99 fable_pct 99); 2026-11-20 48; 2026-11-21 44; 2026-11-22 45; 2026-11-23 50"
+        },
+        {
+          "location": "public.runner_budget month 2026-11, read 2026-11-23 (task_context.platform_facts.budget carried a 42703 read error, so this row was read directly)",
+          "text": "{\"month\":\"2026-11\",\"month_cap_usd\":100,\"day_default_usd\":5,\"updated_at\":\"2026-11-02T20:56:29.918805+00:00\",\"runner_day_token_allowance\":10000000,\"stale_fallback_tokens\":3000000,\"weekly_rest_pct\":90,\"runner_share_pct\":50,\"final_day_rest_pct\":90}"
+        },
+        {
+          "location": "public.audit_findings fingerprints 26344c22e7cf3a9b (2026-W46) and 3b4ee308d6d392d3 (2026-W47), check_slug advisor-limit-hit, fields status / john_call / filed_backlog_id, read 2026-11-23",
+          "text": "escalated, money, null; escalated, money, null — neither ruled not-a-defect, neither answered"
+        },
+        {
+          "location": "https://claude.com/pricing — individual plan cards, retrieved 2026-11-23 (read through a page summariser; quoted fragments as it returned them)",
+          "text": "Max: \"$100\" per month — \"5x Pro usage\" every 5 hours and every week*. Ultra: \"$200\" per month — \"No 5-hour limit\"‡ and \"10x Pro usage\" every week*. *\"Usage limits apply.\" \"How fast you reach a limit depends on the model you use\""
+        }
+      ],
+      "proposed_resolution": "Money call, yours, and I assume nothing: both stops are your rulings M5-16 and M5-06 working, and docs/runbooks/runner-cycle.md stays their home. Only a bigger weekly pool removes them: Ultra ($200/mo) lists twice Max's weekly usage; which plan you hold was not read this run. No-money levers first: the Opus 5.5 and Fable 5.2 lane moves above.",
+      "found_by": "auditor:routine:advisor",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "check_slug": "routine-prompt-drift",
+      "locations": [
+        {
+          "location": "routine/trig_017TZ3JZcLBK6AYH6DKURqMH/prompt",
+          "text": "cycle 13afc717-429e-423b-ae70-b8f1a14dbe15: tokens_at_open: unmeasured (get_session returned no external_metadata.usage block; only context_usage). Stamp check passed: get_trigger trig_017TZ3JZcLBK6AYH6DKURqMH stored prompt matches the fired prompt verbatim. Meter self-read OK: reading aa8f943e-2436-45a4-a784-8a3272962942, all_models 48%, fab"
+        },
+        {
+          "location": "docs/runbooks/routine-prompt.md:42",
+          "text": "<!-- ROUTINE-PROMPT-BEGIN -->"
+        }
+      ],
+      "governing_fact": "the live routine prompt must equal its repo block (the repo is the source)",
+      "confidence": "medium",
+      "proposed_resolution": "update the live routine from the repo block on John's word (routine-prompt.md update rule), or fix the block",
+      "found_by": "check-routine-prompt:runner",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-143-assignments-readers.test.mjs",
+          "text": "Skill rows are stranded by a switch: no model_assignments row carries [\"<NULL>\",\"claude-haiku-5-5\",\"claude-sonnet-5-5\"], so nothing can move the Skills on it. AGT-143's whole premise is that the assig"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-166-board-burn-down.test.mjs",
+          "text": "live: the drain must have something to drain — the §2.2 predicate counts 0. A zero here is either a finished drain (write the ticket done) or a broken predicate"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-184-ledger-orphan.test.mjs",
+          "text": "the ledger must carry NO orphan (it carried exactly one, 'agt138_researcher_route', before Task 1). Orphans now: [\"agt423_sweep_fault_isolation\",\"agt577_napkin_text_updated_at\",\"dat30_secret_rotation\""
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-240-project-finish-line.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-245-regrade-delivered.test.mjs",
+          "text": "AGT-101's newest verdict does not open with \"AGT-245 delta re-grade of AGT-101: prior 2a48b34f-400f-410a-b009-a7df95fcaab6 (v7.0.563); base 7bddd2260f082743c2aab0d497b31bd4b0988878\" -- so it was not w"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-253-design-only-lane.test.mjs",
+          "text": "1 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-486-charter-fit.test.mjs",
+          "text": "2 arm(s) failed:"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-542-dilbert.test.mjs",
+          "text": "personal_source_grants: [\"dilbert/linkedin_post\",\"dilbert/style_sample\",\"jerry/goals\",\"jerry/linkedin_post\"]"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-550-render-budget.test.mjs",
+          "text": "1 arm(s) failed -- B live: humor-weekly-draft: the newest live record 1ac04d85-43c1-4645-b2ba-e7a2e47f9a1d is still in the prompt -- heads, not a short read"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-600-gap-attribution.test.mjs",
+          "text": "exactly ONE migration must be applied after 20261109084459, got 36: [\"agt600_gap_attribution_declines_census\",\"agt618_skill_rules\",\"agt618_holding_aged_slug\",\"agt297_mcp_caller_gate\",\"agt635_zero_verd"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-642-blocked-first.test.mjs",
+          "text": "agt-642-blocked-first.test.mjs does not export a default async function"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-643-harry.test.mjs",
+          "text": "agents row 'harry' is not exactly [{code:'SC-01', lane:'personal', is_active:false}] -- is_active is the principal's hire, not this build's"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-644-strategy-agent.test.mjs",
+          "text": "D live: prompt_bytes 290094 is under 150000 (AGT-647)"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-650-harry-mentor-path.test.mjs",
+          "text": "D live renders: advise prompt_bytes 292006 < 150000"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-666-victoria-new-waiting.test.mjs",
+          "text": "GET runner_decisions?kind=eq.requirement-check&reversed_at=is.null&backlog_id=not.is.null&select=backlog_id&limit=100000 returned 1000 of 5343 rows -- raise the limit."
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-683-attended-park.test.mjs",
+          "text": "AGT-160 must stay on the redesign list (D3); list: "
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-722-career-writer.test.mjs",
+          "text": "F live renders: writing-draft prompt_bytes 232994 under 200000"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/agt-725-laura-fixed-reads.test.mjs",
+          "text": "D live renders: writing-draft prompt_bytes 236490 under 200000"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-340-projects-govern.test.mjs",
+          "text": "project_blockers has no scope='project' row for the executing project 'dev-manager-capabilities'. The view's whole job is to answer John's question at the PROJECT level; a table of per-ticket rows wit"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    },
+    {
+      "check_slug": "suite-red",
+      "kind": "other",
+      "family": "service",
+      "locations": [
+        {
+          "location": "tests/regression/ses-424b-authority-matrix.test.mjs",
+          "text": "2 of the 105 re-pin decisions have been reversed (797d83e9-a661-440c-89e1-4ddceebda9bc, efb7a979-6768-4d58-8c47-27eba3a3b3cd) -- row 1 is written on an UNREVERSED pattern; a reversal is John overrulin"
+        }
+      ],
+      "governing_fact": "the full regression run (AGT-391) read this test red",
+      "confidence": "high",
+      "proposed_resolution": "repair ticket for the Development Manager",
+      "found_by": "auditor:routine:suite",
+      "finding_type": "defect"
+    }
+  ],
+  "carried": [
+    {
+      "kind": "other",
+      "locations": [
+        {
+          "text": "SCHEDULED-AGENT: rank-backlog — 60 ticket(s) given an automation_rank on Platform Reliability (Site Reliability Engineering); decision ccfa5fb8-ddf0-475f-9078-fa27b822b385; tokens unreported by the sub-agent",
+          "location": "runner_cycles:9cae9a77 notes"
+        },
+        {
+          "text": "`node scripts/rank-backlog.js --cycle=<id> --answer=<file> --input-tokens=<the Agent tool's reported\ninput> --output-tokens=<its output>`.",
+          "location": "docs/runbooks/runner-cycle.md:1902-1903"
+        },
+        {
+          "text": "**The two token flags are the ONLY measurement of what this run cost (`SES-386`, `v7.0.487`).**",
+          "location": "docs/runbooks/runner-cycle.md:1908"
+        },
+        {
+          "text": "+ `; ${tokens.total === null ? 'tokens unreported by the sub-agent' : `${tokens.total} tokens`}`,",
+          "location": "scripts/rank-backlog.js:557"
+        }
+      ],
+      "governing_fact": "Step 4c's second pass must carry the Agent tool's token pair; this run's row says the pair was not passed, so a 60-ticket re-rank on subscription tokens has no recorded cost.",
+      "confidence": "high",
+      "proposed_resolution": "runner-cycle.md step 4c wins (SES-386, v7.0.487). Spend seen: runner_cycles, 1 row (9cae9a77), 60 tickets ranked, token count unmeasured. Have pass two of scripts/rank-backlog.js refuse or loudly flag an --answer run with no --input-tokens/--output-tokens, so the step cannot be skipped silently.",
+      "status": "open",
+      "ruling": null,
+      "ruled_by": null,
+      "ruled_at": null,
+      "found_by": "carry:2026-W47",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "locations": [
+        {
+          "text": "`--input-tokens=${tokens.input ?? 0}`, `--output-tokens=${tokens.output ?? 0}`,",
+          "location": "scripts/rank-backlog.js:540"
+        },
+        {
+          "text": "// the CLI wins over the answer file. An unreported pair still stores NULL, never 0.",
+          "location": "scripts/rank-backlog.js:23"
+        },
+        {
+          "text": "//   --input-tokens / --output-tokens   optional, BUT ALL-OR-NOTHING. Give both as non-negative\n//                              integers, or give neither and the row records NULL = \"unmeasured\".",
+          "location": "scripts/agent-log.js:124-125"
+        },
+        {
+          "text": "tokens unreported by the sub-agent",
+          "location": "runner_cycles:9cae9a77 notes"
+        }
+      ],
+      "governing_fact": "An unreported token pair must be stored as NULL (unmeasured), never 0; rank-backlog.js hands agent-log.js 0 and 0 when the pair is absent, so this run's ai_activity_log row reads as free.",
+      "confidence": "medium",
+      "proposed_resolution": "scripts/agent-log.js's rule wins (omit both flags = NULL, the SES-386 'never 0' rule). In scripts/rank-backlog.js:540 omit both token flags when tokens.total is null. Read from code, not the row: confirm this cycle's ai_activity_log row holds 0/0 before ticketing.",
+      "status": "open",
+      "ruling": null,
+      "ruled_by": null,
+      "ruled_at": null,
+      "found_by": "carry:2026-W47",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "stale-or-irrelevant",
+      "locations": [
+        {
+          "text": "**It renders the last three cycles whose `outcome` is already `shipped`, and your own row does not\n  close until the step-9 tail — so the file you commit still does not carry YOUR OWN ship, and the\n  next cycle's render is what adds it.** That much is inherent and unchanged.",
+          "location": "docs/runbooks/runner-cycle.md:3279-3281"
+        },
+        {
+          "text": "// DeepBench v7.0.451 | scripts/render-claude-state.js | SES-354 — A SHIP IS A CYCLE ROW THAT RECORDS A\n// PUSH (`push_sha IS NOT NULL`), not one whose `outcome` reached `shipped`. The retired predicate read a",
+          "location": "scripts/render-claude-state.js:23-24"
+        },
+        {
+          "text": "**Version in dev:** v7.0.1102 (runner cycle `9da52bfb`, 2026-11-21, **scheduled**, model claude-opus-5, push `640a1d0afb9399735cd8e7b88387e1e4081f3781` — `AGT-611`)",
+          "location": "CLAUDE-STATE.md:4 (at commit 574aaa1bcb061301cdf4103a558033e506b82c68)"
+        },
+        {
+          "text": "card-pin: 9da52bfb-8a4d-4438-af44-ec2e00bfc3fc=none",
+          "location": "CLAUDE-STATE.md:16 (at commit 574aaa1bcb061301cdf4103a558033e506b82c68)"
+        },
+        {
+          "text": "CLAUDE-STATE.md renders FROM this row's push_sha, so it cannot exist before the push it describes.",
+          "location": "runner_cycles:9da52bfb-8a4d-4438-af44-ec2e00bfc3fc"
+        }
+      ],
+      "governing_fact": "Which cycles the state file renders: the runbook says those whose outcome is already shipped, so a cycle's own ship is absent until the next cycle; the renderer has keyed on push_sha since SES-354, and this cycle's pre-tail commit carried its own ship with no card.",
+      "confidence": "high",
+      "proposed_resolution": "scripts/render-claude-state.js:23-24 (SES-354, v7.0.451) wins; the predicate at runner-cycle.md:3279-3281 is the retired one. Rewrite that sentence to say the file carries your own ship once push_sha is written and gains its card only at the tail render, so it is committed once, in the tail push.",
+      "status": "open",
+      "ruling": null,
+      "ruled_by": null,
+      "ruled_at": null,
+      "found_by": "carry:2026-W47",
+      "finding_type": "defect"
+    },
+    {
+      "kind": "contradiction",
+      "locations": [
+        {
+          "text": "3. **Re-enter at step 1** with the new cycle id and run every step exactly as a fresh cycle would — step 1b (`chained (drain continuation)` is exempt from pacing, by spec), **step 3's walls re-checked in full** (this is what bounds the loop — a wall-stop closes the continuation cycle `did_not_run` and, per Gate A, ends the chain), selection at step 5 (the drain pick, the atomic claim, all of it), build, QA, ship, and this tail again. One ticket per cycle row, full ceremony per cycle — the second iteration earns no shortcut.",
+          "location": "docs/runbooks/runner-cycle.md:4573-4578"
+        },
+        {
+          "text": "overwrite\" — his words, the operative spec):** inside the tail, AFTER taking the publish lease, re-fetch the live page and re-parse `briefing-state` — never republish from a harvest taken before the lease, because another cycle may have republished while you were building. Decisions",
+          "location": "docs/runbooks/runner-cycle.md:310-312"
+        },
+        {
+          "text": "so a second judgment turn on byte-identical input would re-derive a determined decline at roughly 140k tokens; attempts-per-tier is 1 and the runbook forbids grinding, so no second devmanager sub-agent was run. NO manager answer was produced, therefore NO runner_skips row was written for it and none was invented.",
+          "location": "runner_cycles:eecaa1d6-e789-466a-8495-60fe6f6f5983 notes (step 5)"
+        },
+        {
+          "text": "The page was NOT re-fetched for this cycle (a 443 KB read for state that cannot have changed without a human); stated rather than implied.",
+          "location": "runner_cycles:eecaa1d6-e789-466a-8495-60fe6f6f5983 notes (step 2)"
+        },
+        {
+          "text": "TAIL: publish lease taken clean at 08:10Z, no steal. Harvest NOT re-fetched for this cycle and the reason is stated rather than implied: the page was read under the lease at 07:08Z in this same turn",
+          "location": "runner_cycles:eecaa1d6-e789-466a-8495-60fe6f6f5983 notes (tail)"
+        },
+        {
+          "text": "cost decision c6b8f2ad, cost_usd 0, cost_basis subscription-lane (2 ai_activity_log rows, 0 billable) ... est_tokens_dev and est_tokens_qa NULL -- unmeasured, never free",
+          "location": "runner_cycles:eecaa1d6-e789-466a-8495-60fe6f6f5983 notes (spend seen)"
+        }
+      ],
+      "governing_fact": "Whether a chained continuation runs every step a fresh cycle runs: the runbook says every step and no shortcut; this cycle's record says it ran no step-5 manager call, no step-2 page read and no post-lease re-fetch, each because it predicted the result.",
+      "confidence": "high",
+      "proposed_resolution": "docs/runbooks/runner-cycle.md:4573-4578 wins as written (SES-140, SES-141): a continuation runs the step-2 read, the step-5 manager call and the tail's post-lease re-fetch. If skipping a call on unchanged input is wanted, the runbook should say so once rather than each cycle naming a deviation; AGT-570's own-row exemption removes the manager's cause.",
+      "status": "open",
+      "ruling": null,
+      "ruled_by": null,
+      "ruled_at": null,
+      "found_by": "carry:2026-W47",
+      "finding_type": "defect"
+    }
+  ],
+  "gone": [
+    {
+      "fingerprint": "8745a2158c8d3ffa",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 4,
+      "governing_fact": "What gateStatus() returns for a regression-suite exit 2 that names no failing test: run-all.js's header still says red and that an outage blocks a ship; since v7.0.1103 verifier.js returns not-run and records no verdict. The cycle named this and no backlog row carries it."
+    },
+    {
+      "fingerprint": "caab449e0730a562",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 4,
+      "governing_fact": "This cycle's closing last_step was overwritten after ended_at by the test-slot heartbeat, whose write has no closed-row guard; 5 closed cycles since 2026-11-12 read this way, 3 on 2026-11-19 — a cause AGT-375 does not name."
+    },
+    {
+      "fingerprint": "c088d60e038b9eb4",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 5,
+      "governing_fact": "The door (d) marker-order defect this run filed as new is already ticketed: AGT-680 and AGT-708 are both open and ask for the same repair, and this is at least the twelfth finding row for it."
+    },
+    {
+      "fingerprint": "8213ab9a8905b9db",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 4,
+      "governing_fact": "The mid-cycle token reading the runbook requires was not taken, so 32,755,615 measured tokens sit in notes and both ledger columns read NULL; 48 of 52 shipped cycles since 2026-11-13 read NULL the same way."
+    },
+    {
+      "fingerprint": "b771d81c1dfe5f97",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "build needed a fact the kickoff did not carry"
+    },
+    {
+      "fingerprint": "475f6060b24ea9bf",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 5,
+      "governing_fact": "Whether the driver's lanes_full refusal of the manager's assignment stops an unattended cycle from building: the card says it stops every one, while the cycle's notes and step 5(d) say the cycle carries on and only the deploy-headroom yield stopped this one."
+    },
+    {
+      "fingerprint": "7c91f56e4b72a22a",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "build needed a fact the kickoff did not carry"
+    },
+    {
+      "fingerprint": "1486c8c2ce6fdd84",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "build needed a fact the kickoff did not carry"
+    },
+    {
+      "fingerprint": "5912ce4d433138bc",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 4,
+      "governing_fact": "What rendered as \"[object Object]\" on the AGT-571 skip: the cycle note says the stored reason text; the row's reason holds the manager's full sentence, and the object is the printed row id that AGT-293 already tickets."
+    },
+    {
+      "fingerprint": "c5960fcd53de4067",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 6,
+      "governing_fact": "One delivery moves the ladder once; here an approve on commit cd02451, which never reached dev, already added a bug_fix streak credit, and the cycle that ships that same commit will be graded by a second verdict."
+    },
+    {
+      "fingerprint": "620649bcaa8be540",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 4,
+      "governing_fact": "Whether card 9b9d7797 recorded a rollback you can accept or reverse: its plain_worth offers both and names a rollback to undo; its before_after says nothing was reverted and its decision_reason says it asks you nothing."
+    },
+    {
+      "fingerprint": "476254298524539a",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "kickoff carried a baseline narrower than the graded set on first assembly"
+    },
+    {
+      "fingerprint": "7fbbc8422ad01916",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 1,
+      "governing_fact": "docs/design/agt-570-own-row-exemption.sql claims it was applied by a cycle, and the database holds no agt570 migration; after the AGT-637 ship its md5 guard also names a gate body that no longer exists, so it would refuse as written."
+    },
+    {
+      "fingerprint": "9ffbc0ada195ff9a",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "Closing AGT-770 on 2026-11-20: the attended verifier command in session-setup.md 3e is run AFTER the push with --base=origin/dev. HEAD then equals origin/dev, the changed-file source reads 'git diff vs origin/dev, 0 paths', and the AGT-328 pin check fails closed although the declared re-pin (tests/regression/agt-297-mcp-caller-gate.test.mjs) is in the pushed commit a4c064bc. Build, regression suite and hygiene gates were green; the verdict was BLOCK, AGT-770 settled delivered instead of done, and verdict_ladder_signal reset the bug_fix streak from 9 to 0."
+    },
+    {
+      "fingerprint": "295f70353af18811",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 4,
+      "governing_fact": "The close-out commit 439ec59 changed only the backlog snapshot; CLAUDE-STATE.md was last changed by the previous cycle and names neither this cycle nor v7.0.1054, though the note lists it in that push."
+    },
+    {
+      "fingerprint": "a582228705a357be",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "build needed a fact the kickoff did not carry"
+    },
+    {
+      "fingerprint": "d00aeaff74b11e20",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 5,
+      "governing_fact": "What the regression gate of verdict 2a132296 graded: it reads green for AGT-547, but the CI job it rests on ran 9 of 518 tests chosen from a close-out commit's diff, and agt-547-cycle-note.test.mjs was not among them."
+    },
+    {
+      "fingerprint": "744169394364f30d",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 5,
+      "governing_fact": "Where cycle 863e41d8 stopped: last_step says it is built and waiting for a test slot; outcome says shipped and the notes record the verdict, the settle and the tail, and both earlier cycles of this chain closed at step 9."
+    },
+    {
+      "fingerprint": "3e090ad09ad9af18",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 5,
+      "governing_fact": "Whether the not-run notice reaches the verdict and the ship card: STANDARDS makes it mandatory reading, yet with any [FAIL] present the verifier keeps only the pass count, so both rows omit 6 unverified parts in the three files this ship edited."
+    },
+    {
+      "fingerprint": "0787a6ccf78b1c7f",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 4,
+      "governing_fact": "What part M of agt-70 grades after slice 7: the code asserts the sweep script's two write calls read from its source, while the comments above it still say a ledger snapshot is taken and the claim is invariance; the record names the gap and files nothing."
+    },
+    {
+      "fingerprint": "95ecc2de15ee2bbf",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 6,
+      "governing_fact": "Which files count as the verification itself: the verifier's list holds three, and this delivery rewrote the blocking CI step and that step's own guard test, was graded green by both, and was still reported auto-done eligible."
+    },
+    {
+      "fingerprint": "44ea0c4807ccaa87",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 4,
+      "governing_fact": "What the closed cycle row records: its last_step says it built and is waiting for a test slot and its version and push_sha are empty, while its own notes say nothing was built, v7.0.1086 was claimed and ea658ba was pushed to dev."
+    },
+    {
+      "fingerprint": "9002b88dcf278f3d",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 3,
+      "governing_fact": "Which model serves a step-5 call: the runbook says the model the assembly prints; this cycle's record says the printed model was claude-opus-5 and the call ran on claude-fable-5-1, and nothing refused the mismatch."
+    },
+    {
+      "fingerprint": "d90bbbacefbea9d9",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 4,
+      "governing_fact": "The AGT-570 migration file says it was applied, and the database holds no such migration; since this ship its guard also names a gate body that no longer exists, so it will refuse as written. R2 was ordered ingested and reached no row."
+    },
+    {
+      "fingerprint": "b504a1d79c5f13e5",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 5,
+      "governing_fact": "Which version and commit AGT-547 shipped at: the ship decision says v7.0.1086 at b646192, while the delivery is v7.0.929 at 71918ec; v7.0.1086 is this cycle's harvest-note commit and b646192 another cycle's close-out commit."
+    },
+    {
+      "fingerprint": "147a90b8209a0105",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 3,
+      "governing_fact": "The live briefing page's build date is stated two ways in one record: PAGE_BUILT reads 2026-08-31T22:56Z, while the note's summary and the finding it filed both say a build from 2026-09-01."
+    },
+    {
+      "fingerprint": "cac919c15ef5a53e",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 4,
+      "governing_fact": "How many tests the approving gate ran: the ship card you read quotes \"5/5 passed\" as the regression summary under the verifier's approve; the verdict row's own gate line reads \"4/4 passed\", and the fifth file ran only in the build step's set."
+    },
+    {
+      "fingerprint": "d3e5bdb553ebfe5d",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "baseline block header named a script path before the instrument line, so the pre-spawn gate read the wrong instrument and refused the build"
+    },
+    {
+      "fingerprint": "fee45a54250e14ee",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 3,
+      "governing_fact": "A claim from 2026-09-27 still sits on a removed ticket and is returned by every cycle's silence probe; this run saw it, left it by rule, and filed nothing, so no row asks anyone to release it."
+    },
+    {
+      "fingerprint": "c1cc45c1b684f68c",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 4,
+      "governing_fact": "The row closed shipped with last_step still naming the step-7 wait for a test slot, though its own notes record the verdict, the push, step 8a and the tail after it; I see only the final value, not the heartbeat trail."
+    },
+    {
+      "fingerprint": "de9603e2f17d6fcd",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 4,
+      "governing_fact": "Where the ticket claim is released: the runbook puts it in the close-out tail through settle-ship --release; the attested kickoff put it in the Builder's task as raw SQL, and the kickoff check passed it."
+    },
+    {
+      "fingerprint": "229ec740f430b242",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 5,
+      "governing_fact": "Which ticket this cycle shipped: its ship card says AGT-522, its own row names none, so the published state page reads 'no ticket' and the trial pick this cycle shipped excludes this cycle's own build job."
+    },
+    {
+      "fingerprint": "dfb9038c6d12f05e",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "driver refused pass two: assignment agt-552 vs pick path agt-328. proven an artifact of this cycle own claim, not a re-ordering: releasing the claim put agt-552 back at pos 1 with agt-328 at pos 2, and re-claiming dropped it again. agt-183 own-claim branch did not fire because pass one ran --dry-run and stored no pick for pass two to re-read"
+    },
+    {
+      "fingerprint": "943caad70d2b7999",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 5,
+      "governing_fact": "The cycle row ends shipped with its tail complete while last_step still reads the test-slot wait, because the closing write sets outcome and ended_at but not last_step."
+    },
+    {
+      "fingerprint": "5a7f97dc5a194e8c",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "build needed a fact the kickoff did not carry"
+    },
+    {
+      "fingerprint": "b111251c6cc5d19a",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 5,
+      "governing_fact": "This cycle claimed v7.0.1054 and labelled its commit with it, yet the version field of its own row is empty, and its note lists two burned ids without naming the version as a third number spent on nothing shipped."
+    },
+    {
+      "fingerprint": "65b287f32c536630",
+      "from_week": "2026-W47",
+      "located": 1,
+      "total": 6,
+      "governing_fact": "Whether the auto-done line was a new finding on this run: it is the third filing of one fact. Two rulings (2026-10-18, 2026-10-20) already call delivered the correct write and give AGT-512 the one-line runbook fix; AGT-512 is still open at queue 817."
+    },
+    {
+      "fingerprint": "b305203e0f396503",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 2,
+      "governing_fact": "build needed a fact the kickoff did not carry"
+    },
+    {
+      "fingerprint": "1a55609d13a356cf",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 4,
+      "governing_fact": "How many of AGT-571's 23 homes remain after slice 4 shipped: the ship card you read says 14, which is the kickoff's count before the slice; the kickoff's own close-out line says 11."
+    },
+    {
+      "fingerprint": "24e236284e3367da",
+      "from_week": "2026-W47",
+      "located": 0,
+      "total": 4,
+      "governing_fact": "How many suites are keyed after slice 5 shipped: the ship card you read says twelve, which is the harvest's count before the slice; the tree at 27c12f8 holds fifteen (twelve plus this slice's three, and 15 + 8 = 23)."
+    }
+  ]
+}
