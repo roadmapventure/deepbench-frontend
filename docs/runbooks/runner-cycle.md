@@ -2226,7 +2226,7 @@ spent its whole drain call on bookkeeping and fell through to the board, and Joh
 drain was not read until the following cycle. Found live 2026-08-23 with M0/M1/M2 queued in
 sequence and M0 already complete: one retirement per cycle, one stale directive each, M2's first
 pick two grid slots out. The scan is now a bounded loop that keeps advancing while directives
-retire and acts on the first `pick` / `blocked` / `unscoped` / `none`.
+retire or pass as `blocked` and acts on the first `pick` / `unscoped`.
 
 Three things about that change, so a later editor does not undo it:
 
@@ -4622,7 +4622,7 @@ drain closes the drain and fires nothing, in the place the emptiness is first ob
 dry-run form to dodge the write.
 
 **Pass YOUR CYCLE ID: the parameter is a stamp, not a selector.** The function ignores its argument
-when choosing the drain (it reads the single oldest queued `drain-epic` row regardless) and uses it
+when choosing the drain (it reads the queued `drain-epic` rows oldest first regardless) and uses it
 **only** to stamp that retirement before-image — so a wrong uuid succeeds silently and is correct on
 every path *except* retirement, where it attributes the before-image to a cycle that never existed.
 Recorded because this cycle did it: step 5's call was made with the **epic** id, returned a correct

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1110 | scripts/render-standing-brief.js | AGT-695 -- the standing drain names the drain the pick has passed to; the claim that it reads drain_epic_next()'s row is gone.
 // DeepBench v7.0.1063 | scripts/render-standing-brief.js | DAT-30 -- Secret age: an eleventh group,
 // every row of `runner_secrets` by NAME and the day that row was last written. Measured before this
 // ship (2026-11-19): 12 rows, oldest `updated_at` 91 days old, 5 rows at or past 90 -- and the brief
@@ -1895,6 +1896,9 @@ export function renderBlock(facts, nowIso) {
       L.push(`- Still open: ${drain.openIds.map(t => `\`${t}\``).join(", ")}.`);
     }
   }
+  if (drain && drain.pickEpic) {
+    L.push(`- **Blocked — the pick has passed to ${drain.pickEpic}** (\`public.drain_standing()\`, \`AGT-695\`). This drain keeps its slot and is read first again on the next call.`);
+  }
   L.push("");
 
   // ---- Proposed projects (FEATURE: AGT-240 (d)) — after the drain: what runs next, and what waits
@@ -2135,8 +2139,9 @@ export async function fetchFacts(url, key) {
   const settingsRows = await rest(url, key, "runner_settings?select=*&id=eq.1");
   const settings = Array.isArray(settingsRows) && settingsRows[0] ? settingsRows[0] : null;
 
-  // The standing drain: the single oldest QUEUED drain-epic directive, the same row drain_epic_next()
-  // reads. `cancelled` and `done` are excluded — a withdrawn or finished order is not standing.
+  // The standing drain: the single oldest QUEUED drain-epic directive. The picker can pass it
+  // (AGT-495); public.drain_standing(), read below, names the drain the pick is on (AGT-695).
+  // `cancelled` and `done` are excluded — a withdrawn or finished order is not standing.
   const dirs = await rest(url, key,
     "runner_directives?select=id,epic_id,created_at&type=eq.drain-epic&status=eq.queued&order=created_at&limit=1");
   let drain = null;
@@ -2172,7 +2177,14 @@ export async function fetchFacts(url, key) {
       requiredOpenIds: ids(requiredOpenRows),
       nonRequiredOpenIds: ids(nonReqOpenRows),
       deferredIds: ids(deferredRows),
+      pickEpic: null,   // AGT-695: set below when the pick has passed this drain
     };
+  }
+  // AGT-695: one home for which queued drain the pick is on. rest() dies on a non-2xx, so a
+  // database predating agt695_drain_standing refuses rather than rendering a silent omission.
+  if (drain) {
+    const st = await rest(url, key, "rpc/drain_standing", { method: "POST", body: "{}" });
+    if (Array.isArray(st) && st[0] && st[0].passed > 0) drain.pickEpic = st[0].epic_name || "(unnamed epic)";
   }
   // FEATURE: SES-286 (c) — the decision ledger. runner_decisions is service_role only (SES-286a's
   // explicit REVOKE), which is the same key everything else in this script already needs; there is

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1110 | scripts/build-briefing.mjs | AGT-695 -- §15's drain row says when the pick has passed the standing drain, read from public.drain_standing().
 // DeepBench v7.0.368 | scripts/build-briefing.mjs | SES-300 — A WITHDRAWN CARD STOPS READING AS AN
 // OPEN ASK. The orphan guard below (SES-163) fails a build when an item- ask target is neither
 // rendered nor claimed by a briefing_dom_ids row. SES-285 closed 44 gated_before_build cards with
@@ -692,6 +693,10 @@ if (bdDrain) {
   bdBucketTotal = bdBucket.length;
   bdBucketOpen = bdBucket.filter(i => !['done', 'removed'].includes(i.status)).length;
 }
+// AGT-695: the standing drain is still the oldest queued one. When the pick has passed it,
+// public.drain_standing() -- the one home for that fact -- names the drain the pick is on.
+const bdStanding = bdDrain ? ((await rpc('drain_standing')) || [])[0] || null : null;
+if (bdStanding && bdStanding.passed > 0) bdEpicName += ' - blocked, the pick has passed to ' + bdStanding.epic_name;
 // NO STANDING DRAIN IS A REAL STATE, NOT AN EMPTY ROW. John unticks the drain box and there is
 // genuinely nothing to count — so the two rows say so in words rather than rendering 0 of 0, which
 // would read as "your drain is stuck at zero progress" (the same rule as §14's cost showing "—").

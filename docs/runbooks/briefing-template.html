@@ -614,6 +614,7 @@
     drain_epic: 'Automation',    // epics.name it resolves to
     drain_left: 17,              // named members still open  (runner_drain_scope join)
     drain_named: 18,             // rows in runner_drain_scope for that directive
+    drain_pick_epic: '',         // AGT-695: the drain the pick has passed to; '' while the standing drain holds it
     drain_history: [],           // ['Automation completed — 18 tickets at 4:10 AM CST'] per finished drain
     // SES-147 — runner_settings.daily_max_tokens_millions, John's STANDING day cap in millions.
     // `null` is the blank box and is NOT zero: blank means "no standing number, budget exactly as
@@ -1170,6 +1171,7 @@
     var drainStat = s.drain_on
       ? '<b>'+esc(AUTOMATION.drain_left)+'</b> of <b>'+esc(AUTOMATION.drain_named)
         +'</b> tickets left in '+esc(AUTOMATION.drain_epic)
+        +(AUTOMATION.drain_pick_epic ? ' &mdash; blocked; the pick has passed to '+esc(AUTOMATION.drain_pick_epic) : '')
       : 'No drain running.';
     // Both off is the one combination that means nothing happens, so it is said in words rather
     // than left for John to infer from two unchecked boxes (spec, verbatim).

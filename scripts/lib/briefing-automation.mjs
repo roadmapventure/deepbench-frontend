@@ -1,3 +1,4 @@
+// DeepBench v7.0.1110 | scripts/lib/briefing-automation.mjs | AGT-695 -- drain_pick_epic: the drain the pick has passed to, read from public.drain_standing().
 // DeepBench v7.0.267 | scripts/lib/briefing-automation.mjs | SES-211 — a CANCELLED drain is never reported as completed (see the block at the closed-drains query)
 // DeepBench v7.0.204 | scripts/lib/briefing-automation.mjs | SES-162
 // FEATURE: §2b's cycle-written half, derived. The briefing builder (scripts/build-briefing.mjs,
@@ -104,6 +105,10 @@ export async function deriveAutomation(sel, rpc, now = new Date()) {
   const drains = await sel(
     'runner_directives?type=eq.drain-epic&status=eq.queued&select=id,epic_id&order=created_at.asc&limit=1');
   const drain = drains[0] || null;
+  // AGT-695: the standing drain is still the oldest queued one. public.drain_standing() -- the
+  // one home for that fact -- says whether the pick has passed it, and to which drain.
+  const standing = drain ? ((await rpc('drain_standing')) || [])[0] || null : null;
+  const drainPickEpic = standing && standing.passed > 0 ? (standing.epic_name || '') : '';
 
   let drainEpic = 'Automation', drainNamed = 0, drainLeft = 0;
   if (drain) {
@@ -191,6 +196,7 @@ export async function deriveAutomation(sel, rpc, now = new Date()) {
     drain_epic: drainEpic,
     drain_left: drainLeft,
     drain_named: drainNamed,
+    drain_pick_epic: drainPickEpic,
     drain_history: drainHistory,
     daily_max_millions: settings.daily_max_tokens_millions ?? null,
     daily_max_effective: dailyMaxEffective,
@@ -209,6 +215,7 @@ export function automationLiteral(a) {
     drain_epic: ${J(a.drain_epic)},
     drain_left: ${a.drain_left},
     drain_named: ${a.drain_named},
+    drain_pick_epic: ${J(a.drain_pick_epic)},
     drain_history: ${JSON.stringify(a.drain_history)},
     daily_max_millions: ${a.daily_max_millions === null ? 'null' : Number(a.daily_max_millions)},
     daily_max_effective: ${J(a.daily_max_effective)},
