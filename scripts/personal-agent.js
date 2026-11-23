@@ -443,9 +443,14 @@ const WRITING_TEAM_READS = ['career_writing', 'strategy_facts', 'market_messagin
 // AGT-725: the fixed read of the confirmed facts, the current LinkedIn text and the master resume, listed
 // FIRST so it reaches the task context before the ranked Library (facts first is the guardrail's order).
 const WRITING_FIXED_READS = ['profile_facts', ...WRITING_BASE_READS];
+// Central facts: the slugs outside the writing and career stores that answer or draft for the principal
+// read the facts section whole (`central_facts`, the facts half of `profile_facts`, outside LIBRARY_BYTES)
+// and the writing notes, listed FIRST so both reach the task context before the ranked Library.
+export const CENTRAL_FACTS_SLUGS = ['strategy-readiness-check', 'strategy-advise', 'humor-weekly-draft'];
+const CENTRAL_READS = ['central_facts', 'writing_notes'];
 export const EXTRA_READS = {
   'career-linkedin-alerts': 'competitors',
-  'humor-weekly-draft': HUMOR_EXTRA_READS,
+  'humor-weekly-draft': [...CENTRAL_READS, ...HUMOR_EXTRA_READS],
   'humor-topic-scout': HUMOR_EXTRA_READS,
   // AGT-644: every strategy slug reads the Library, the team's stores and the week; the readiness
   // check and the weekly review also read the vision corpus.
@@ -456,10 +461,10 @@ export const EXTRA_READS = {
   'strategy-weekly-review': [...STRATEGY_EXTRA_READS, ...MENTOR_READS],
   // AGT-655: the readiness check and the advise also read `security` -- the security store's newest
   // scorecard and its open blockers (shared data; the reader names a table, never an agent).
-  'strategy-readiness-check': ['library', 'market', ...MENTOR_READS, 'security'],
+  'strategy-readiness-check': [...CENTRAL_READS, 'library', 'market', ...MENTOR_READS, 'security'],
   'strategy-library-curate': ['library'],
   // A question or a draft review: the Library, the market and the idea board; no postings, no week.
-  'strategy-advise': ['library', 'market', 'napkin', ...MENTOR_READS, 'goals', 'security'],
+  'strategy-advise': [...CENTRAL_READS, 'library', 'market', 'napkin', ...MENTOR_READS, 'goals', 'security'],
   'strategy-weekly-study': ['library', ...MENTOR_READS, 'sources'],
   'strategy-mentor-review': ['library', ...MENTOR_READS, 'sources', 'goals'],
   // AGT-655: every security slug reads the newest collector inventory; the exposure scan also reads the
@@ -1661,7 +1666,14 @@ async function readWritingNotes(db, args) {
   return writingNotes(rows, strategyQuery(args));
 }
 
+// The facts half of the fixed read, alone: every current facts-section item in full, trust order.
+async function readCentralFacts(db) {
+  const block = await readProfileFacts(db);
+  return block?.facts?.length ? block.facts : null;
+}
+
 const EXTRA_READERS = {
+  central_facts: readCentralFacts,
   writing_notes: readWritingNotes,
   // AGT-722
   career_writing: readCareerWriting,

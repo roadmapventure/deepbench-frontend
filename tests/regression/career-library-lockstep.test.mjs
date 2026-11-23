@@ -12,6 +12,10 @@
 //                  survive a byte cut that drops practice and method notes; the reader's query names
 //                  exactly the four kinds.
 //   D  MARK     -- a career record whose data carries the superseded mark renders with it (source check).
+//   E  CENTRAL  -- every CENTRAL_FACTS_SLUGS slug reads `central_facts` then `writing_notes` ahead of every
+//                  other read and keeps the reads it had; the facts reader returns the fixed read's facts
+//                  alone (source check); CONTROL: the topic scout, the daily brief and a writing slug do not
+//                  read `central_facts`.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -19,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { selfRun } from "./_lib/self-run.js";
 import {
   EXTRA_READS, READ_MAP, CAREER_LIBRARY_SLUGS, CAREER_LIBRARY_SECTIONS, WRITING_LIBRARY_SECTIONS,
-  LIBRARY_PRIVATE_SECTIONS, WRITING_NOTE_KINDS, SUPERSEDED_KEY, libraryAllowed, libraryTextSkips, writingNotes,
+  LIBRARY_PRIVATE_SECTIONS, WRITING_NOTE_KINDS, SUPERSEDED_KEY, CENTRAL_FACTS_SLUGS, libraryAllowed, libraryTextSkips, writingNotes,
 } from "../../scripts/personal-agent.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -94,6 +98,23 @@ async function run() {
   arm("D mark", () => {
     assert.equal(SUPERSEDED_KEY, "superseded_by");
     assert.ok(SRC.includes("if (r.data?.[SUPERSEDED_KEY]) rec[SUPERSEDED_KEY] = String(r.data[SUPERSEDED_KEY]);"), "a superseded career record renders its mark");
+  });
+
+  arm("E central", () => {
+    assert.deepEqual([...CENTRAL_FACTS_SLUGS].sort(), ["humor-weekly-draft", "strategy-advise", "strategy-readiness-check"]);
+    const had = { "humor-weekly-draft": reads("humor-topic-scout"), "strategy-advise": ["library", "market", "napkin", "memory", "product", "goals", "security"],
+      "strategy-readiness-check": ["library", "market", "memory", "product", "security"] };
+    for (const s of CENTRAL_FACTS_SLUGS) {
+      assert.deepEqual(reads(s).slice(0, 2), ["central_facts", "writing_notes"], `${s} reads the facts and the notes first`);
+      assert.deepEqual(reads(s).slice(2), had[s], `${s} keeps the reads it had`);
+      assert.ok(!reads(s).includes("profile_facts"), `${s} carries the facts alone, not the profile or the resume`);
+    }
+    for (const s of ["humor-topic-scout", "strategy-daily-brief", "strategy-weekly-review", "writing-draft", ...CAREER_LIBRARY_SLUGS]) {
+      assert.ok(!reads(s).includes("central_facts"), `control: ${s} does not read central_facts`);
+    }
+    const f = SRC.match(/async function readCentralFacts[\s\S]*?\n}/)?.[0] ?? "";
+    assert.ok(f.includes("await readProfileFacts(db)") && f.includes("block.facts"), "the facts reader returns the fixed read's facts");
+    assert.ok(SRC.includes("central_facts: readCentralFacts,"), "the reader is registered");
   });
 
   if (failures.length) throw new Error(failures.join(" | "));
