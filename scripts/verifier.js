@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1113 | scripts/verifier.js | AGT-541 -- 7a refuses a baseline measured on the tree it grades.
 // DeepBench v7.0.1103 | scripts/verifier.js | AGT-698 -- a suite that did not run is not-run, never red.
 // DeepBench v7.0.1101 | scripts/verifier.js | AGT-598 -- a cycle-measured BASELINE block is graded against the cycle's measurement.
 // DeepBench v7.0.1073 | scripts/verifier.js | AGT-319 -- the coupled-files note records who pays for a runbook edit's dragged files: the kickoff that makes the edit (comment only, no clause changed).
@@ -1053,7 +1054,7 @@ export function baselineCoverageFinding({ measured, graded, instrument, absent }
     uncovered,
     measured_count: have.length,
     graded_count: graded.length,
-    remedy: "measure the baseline over the SAME set this run grades -- node scripts/pre-build-baseline.js --kickoff=<the kickoff path> --out=<file> -- and hand that one file to both ends",
+    remedy: "measure the baseline over the SAME set this run grades, on the UNCHANGED tree (never the one being graded: AGT-541) -- node scripts/pre-build-baseline.js --kickoff=<the kickoff path> --out=<file> -- and hand that one file to both ends",
     reason: `baseline NARROWER than the set being graded: ${uncovered.length} of the ${graded.length} ` +
       `graded ${graded.length === 1 ? "test" : "tests"} ${uncovered.length === 1 ? "is" : "are"} ` +
       `absent from the ${have.length} ${have.length === 1 ? "test" : "tests"} the baseline measured, so a red in ` +
@@ -1086,6 +1087,24 @@ export function baselineProvenanceFinding({ block: b, measurement: m }) {
   return { kind: "kickoff-baseline-not-the-measurement", differs, block: b, measurement: m,
     remedy: "paste the handed file's BASELINE header and Red set lines over the kickoff's block, verbatim; never edit a number into shape",
     reason: `kickoff-baseline-not-the-measurement: the block says cycle-measured and is not this cycle's measurement -- ${differs.join("; ")} (AGT-598).` };
+}
+
+// ---- FEATURE: AGT-541 -- fence 1 in code: a baseline measured on the graded tree is refused.
+export function baselineTreeFinding({ tree, gradedSha }) {
+  const [t, g] = [tree, gradedSha].map(v => String(v ?? "").toLowerCase());
+  if (![t, g].every(s => /^[0-9a-f]{7,40}$/.test(s)) || !(g.startsWith(t) || t.startsWith(g))) return null;
+  return { error: "baseline-measured-on-graded-tree", tree: t, graded_sha: g,
+    remedy: "use the file step 7 measured before the build's first edit, or measure a checkout of the commit the build started from (pre-build-baseline.js --root=<it>); never the graded tree",
+    reason: `baseline MEASURED ON THE GRADED TREE: header tree ${t}, graded ${g} -- the tree vouching for itself (AGT-541).` };
+}
+
+// Graded names with no file at the baseline's tree: tests this build ADDED. Git silent = none.
+export function addedSinceBaseline({ repoRoot, tree, graded }) {
+  if (!Array.isArray(graded) || !/^[0-9a-f]{7,40}$/.test(String(tree ?? ""))) return [];
+  const r = spawnSync("git", ["ls-tree", "--name-only", `${tree}:tests/regression`], { cwd: repoRoot, encoding: "utf8" });
+  if (r.error || r.status !== 0) return [];
+  const at = String(r.stdout).split("\n").map(s => s.trim());
+  return [...new Set(graded.map(n => path.basename(String(n))))].filter(n => !at.includes(n));
 }
 
 // Pure. The regression gate's status once the delta is taken into account.
@@ -1376,6 +1395,7 @@ export function readRegressionBaseline(baselinePath, readFile = (f) => fs.readFi
     // AGT-629: the FOURTH list off the SAME read of the SAME file, for the reason the third one's
     // comment above gives -- four facts read from four reads can describe four baselines.
     absent: absentPreBuildFrom(text),
+    tree: baselineStampFrom(text)?.tree ?? null,
     source: `${baselinePath} (${names.length} red on the unchanged tree, ${unverified.length} never run)` };
 }
 
@@ -4515,6 +4535,15 @@ async function main() {
         + `reason is recorded in the row; a bare --no-baseline is not a reason and refuses.` });
   }
 
+  // AGT-541: fence 1 -- exit 2 before any gate, no row.
+  const selfMeasured = baselineTreeFinding({ tree: baselineRead.tree, gradedSha: gradedShaFor(repoRoot) });
+  if (selfMeasured) {
+    return emit({ code: 2, payload: { ok: false, exitCode: 2, ...selfMeasured, kind: "cannot-run" },
+      prose: `verifier: ${selfMeasured.reason}\n  Exiting 2 and recording NOTHING.\n  ${selfMeasured.remedy}` });
+  }
+  // AGT-541: a test git proves ADDED is exempt as an ABSENT line is (AGT-629); red, it still blocks.
+  const added = addedSinceBaseline({ repoRoot, tree: baselineRead.tree, graded: relatedRead?.names ?? null });
+  if (added.length) baselineRead.absent = [...(baselineRead.absent ?? []), ...added];
   // ---- AGT-457: THE BASELINE MUST COVER THE SET THIS RUN IS ABOUT TO GRADE. ------------------
   //
   // AFTER THE GATE ABOVE, NEVER BEFORE IT: that gate answers "is there a baseline at all", and a run

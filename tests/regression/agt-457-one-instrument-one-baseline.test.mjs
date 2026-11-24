@@ -1,3 +1,4 @@
+// DeepBench v7.0.1113 | tests/regression/agt-457-one-instrument-one-baseline.test.mjs | AGT-541 -- arm C: a tree no clone holds.
 // DeepBench v7.0.874 | tests/regression/agt-457-one-instrument-one-baseline.test.mjs | AGT-457
 //
 // FEATURE: AGT-457 -- one instrument, one baseline, one refusal. The per-test lines `renderBlock()`
@@ -209,7 +210,7 @@ async function armC() {
     const measuredFile = path.join(fx, "pre-build-baseline.txt");
     fs.writeFileSync(measuredFile, pre.renderOut({
       block: red.renderBlock(FOUR.map(n => ({ path: `tests/regression/${n}`, code: 0 }))),
-      sha7: "e66fee81", iso: "2026-10-20T00:00:00.000Z", cycleId: "084b72e9", declaredCount: 12,
+      sha7: "0000000", iso: "2026-10-20T00:00:00.000Z", cycleId: "084b72e9", declaredCount: 12,
     }));
 
     // A block naming ONE of the four: it cannot answer for the other three.
