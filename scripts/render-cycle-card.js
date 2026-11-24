@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1115 | scripts/render-cycle-card.js | AGT-321 -- step 3 carries blocks [1, 2, 3]: the day clause, the cap resolver and the day token wall command.
 // DeepBench v7.0.1100 | scripts/render-cycle-card.js | AGT-596 -- premise delivered.
 // DeepBench v7.0.1073 | scripts/render-cycle-card.js | AGT-319 -- a render writes the card and nothing else: `--write` no longer re-pins the live dm-knowledge-cycle-card row, refuses the flags only the re-pin reads, and prints RE-PIN OWED when the card changed. The re-pin is its own command, run once on the final card (`--sync-knowledge --repin`), and the ship gate holds it: ses-378d is in the related set of any card change.
 // DeepBench v7.0.977 | scripts/render-cycle-card.js | AGT-610 -- the pre-boot gate note names the redesign pickup: a find-work-only boot runs `node scripts/redesign-pickup.js --next` FIRST, so a refused ticket is picked up by the team rather than waiting for John (John's standing decision 6e94edcb). DEVIATION, recorded: the kickoff's literal outcome was 180 chars and render() throws over OUTCOME_MAX 90, so it is cut to 90 carrying both branches and the pickup command -- the runbook pointer (docs/runbooks/redesign-after-refusal.md) travels in record_skip()'s own refusal instead, exactly as v7.0.505 (AGT-79 slice 5) cut a 169-char outcome to 90.
@@ -137,7 +138,7 @@ export const NOTES = {
   "1b":       { outcome: "verdict 'run' → step 2; anything else → close did_not_run, run the tail, end", block: 1 },
   "2":        { outcome: "read-only here; the harvest writes happen in the step-9 serial tail", block: 2 },
   "2b":       { outcome: "every Requirement becomes exactly ONE artifact, and the card says which", block: 1 },
-  "3":        { outcome: "a wall fails → close did_not_run with the reason, run the tail, end", block: 1 },
+  "3":        { outcome: "a wall fails → close did_not_run with the reason, run the tail, end", block: [1, 2, 3] },
   "4":        { outcome: "dev must serve; a user-blocking failure preempts everything, root-cause first", block: 0 },
   "4a":       { outcome: "read CI's conclusion for that sha and hand it to the actuator", block: 1 },
   "4a-bis":   { outcome: "exit 0 serving-green → carry on; exit 1 → 4a with its engine object; 2 = cannot tell", block: 1 },

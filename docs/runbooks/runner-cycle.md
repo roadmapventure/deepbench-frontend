@@ -1383,8 +1383,8 @@ Four things about this boundary, each of which has already bitten or would have:
   reading row); remaining weekly pool = `(100 − all_models_pct) × tokens_per_pct`; today's
   availability = pool ÷ days left in the meter week; runner allowance = availability ×
   `runner_share_pct` (50%), capped at `runner_day_token_allowance` (10M) until two readings
-  exist to calibrate from. Sum today's `est_tokens_dev + est_tokens_qa`; at or over the
-  allowance → `did_not_run`, reason "runner token share for the day spent (~N est)", END —
+  exist to calibrate from. One script (below) grades today's spend; at or over the allowance →
+  `did_not_run`, reason "runner token share for the day spent", END —
   **unless an unexpired `budget_override` directive covers today's token track, exactly as the
   dollar track above works** (register B32, John live 2026-08-20 21:0xZ: "allow overance for the
   day and keep sessions going"). Covering means: `type='budget_override'`, `status='queued'`,
@@ -1395,8 +1395,8 @@ Four things about this boundary, each of which has already bitten or would have:
   **The override never widens the API-dollar wall** — that is real money and needs its own
   `max_usd` override. Both new columns are nullable and fail closed: NULL `max_tokens` or a NULL
   / past `expires_at` means no override, and the wall stands.
-  Meter-derived token figures are estimates, labeled so; a cycle row's `est_tokens_*` is
-  measured (step 9).
+  A NULL `est_tokens_*` on a cycle that ran is not-known, never 0: the wall stands on
+  it, fail closed (§19v).
 
 **THE CALIBRATION IS DERIVED BY ONE CALL, NOT BY EACH CYCLE'S ARITHMETIC (`SES-128`,
 `v7.0.163`, migration `ses128_reading_slots`).** Step (c) above describes calibrating
@@ -1420,13 +1420,12 @@ SELECT * FROM public.resolve_day_token_cap('<your cycle id>');
 traces to a rung rather than to a cycle's reading of this paragraph.** The function calls
 `derive_token_allowance('<your cycle id>')` for you and returns its result as `calibrated_allowance`
 / `calibration_guard`, so the calibration is still stored on the morning row exactly as `SES-128`
-requires — **do not also call `derive_token_allowance` yourself.** It is harmless if you do (it
-writes only when `tokens_per_pct` actually differs, read from `pg_get_functiondef` rather than
-assumed), but it is a second statement to remember, which is the failure this entire family of
-corrections exists to remove. The retired direct call, for reading the paragraphs below:
+requires — **do not also call `derive_token_allowance` yourself.** Hand `day_cap` and `cap_source`
+to the day's wall, one script, no hand sum (`AGT-321`):
 
-```sql
-SELECT * FROM public.derive_token_allowance('<your cycle id>');   -- now called FOR you
+```
+SUPABASE_URL=… SUPABASE_SERVICE_KEY=… node scripts/day-token-wall.js --day-cap=<day_cap> --cap-source=<cap_source>
+# exit 0 clear; 1 or 2 → did_not_run, printed reason, END (2: could not read)
 ```
 
 - **`guard = 'ok'`** → `day_allowance` is your allowance for the day, and the call has already
@@ -4085,8 +4084,9 @@ reading 1 when the Builder returns (before 7a), reading 2 here. One reading = `i
 output_tokens + cache_read_tokens + cache_write_tokens` of `external_metadata.usage`;
 `est_tokens_dev` = reading 1 − reading 0, `est_tokens_qa` = reading 2 − reading 1 —
 DELTAS, never a session total, because the counter is SESSION-cumulative and a chain runs many
-cycles in one session (`v7.0.532`). Write `tokens_basis: get_session` in `notes`. A missing
-reading NULLs each column it feeds; tool unavailable → both NULL,
+cycles in one session (`v7.0.532`). Write `tokens_basis: get_session` in `notes`. Take each reading
+afresh (`AGT-321`): a missed reading 1 takes reading 2's value; `notes` says
+`tokens_split: unmeasured`. A missing reading NULLs each column it feeds; tool unavailable → both NULL,
 never a number. Why measured and not estimated: `SES-409` read **15.27M** tokens on the session that
 had been estimating **≤900,000** — the estimate was off by better than an order of magnitude, and
 every budget card downstream inherited it), plus outcome and push SHA. The briefing's budget cards
