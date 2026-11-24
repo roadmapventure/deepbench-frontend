@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1114 | scripts/tripwire-to-backlog.js | AGT-371 -- a check class is owned by any row carrying its signature line, not only by a row this script filed.
 // DeepBench v7.0.467 | scripts/tripwire-to-backlog.js | SES-205 + AGT-70 slice 3 (--from-ledger)
 // FEATURE: SES-205 -- the truth tripwire's findings become `public.backlog_items` rows instead of
 // console output nobody re-reads. Third and last piece of the SES-176 remainder (pieces 1 and 2
@@ -412,10 +413,16 @@ function restHeaders(key, extra = {}) {
   return { apikey: key, Authorization: `Bearer ${key}`, ...extra };
 }
 
+// AGT-371: the owner of a check class is ANY row whose description carries the signature line,
+// whatever filed it -- so a ticket that already owned the finding, once it is given the line, keeps
+// the class filed, and closing the tripwire's own duplicate row can never re-open it.
+export const OWNER_LINE = "Tripwire signature:";
+export function ownerQuery(base) {
+  return `${base}/rest/v1/backlog_items?description=like.*${encodeURIComponent(OWNER_LINE)}*&select=description`;
+}
+
 async function fetchTripwireDescriptions(base, key) {
-  const url =
-    `${base}/rest/v1/backlog_items?source_file=eq.${encodeURIComponent(TRIPWIRE_SOURCE_FILE)}` +
-    `&select=description`;
+  const url = ownerQuery(base);
   let res;
   try {
     res = await fetch(url, { headers: restHeaders(key) });

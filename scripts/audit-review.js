@@ -1,3 +1,4 @@
+// DeepBench v7.0.1114 | scripts/audit-review.js | AGT-371 -- the filing door ranks every finding against the whole live board and refuses a filing group that has not ruled on the first candidate.
 // DeepBench v7.0.936 | scripts/audit-review.js | AGT-528 -- the dedup list ships ticket HEADS
 // (backlog_id, title, status): the title is the key the ticket measured, and a body is read on
 // demand through TICKET_BODY_DOOR (--ticket=<ID>[,<ID>...], a read-only mode of this same script,
@@ -125,6 +126,27 @@
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
+import { buildIndex, candidatesFor, findingText, BOARD_STATUSES } from "./lib/board-match.mjs";
+
+// AGT-371 -- THE FILING DOOR LOOKS AT THE WHOLE BOARD. Each worklist finding carries the live rows
+// (any source) that read most like it, and a group that FILES a ticket rules on the first of each.
+export const BOARD_CANDIDATES_NOTE = "per finding: the live board rows (open, partial or delivered, ANY source) that read most like it -- a lexical ranking, a pointer and never a verdict. A group that files a ticket rules on the FIRST candidate of each of its findings: reuse it (reuse_backlog_id), or name its id in prior_art with why it is a different ask; otherwise the review is refused (AGT-371)";
+export function namesTicket(text, id) {
+  return String(text ?? "").split(String(id)).slice(1).some(rest => !/^[0-9a-z]/.test(rest));
+}
+export function firstCandidatesOf(group, worklist) {
+  const list = Array.isArray(worklist) ? worklist : [];
+  const ids = Array.isArray(group && group.finding_ids) ? group.finding_ids.map(String) : [];
+  const out = [];
+  for (const id of ids) {
+    const first = list.find(x => String(x.id) === id)?.board_candidates?.[0]?.backlog_id;
+    if (first && !out.includes(first)) out.push(first);
+  }
+  return out;
+}
+export function unruledCandidatesRefusal(kind, ids) {
+  return `a ${kind} group files a ticket without ruling on board candidate(s) ${ids.join(", ")} -- reuse one (reuse_backlog_id) or name each in prior_art with why it is a different ask (AGT-371)`;
+}
 
 // --- pure half (imported by tests/regression/agt-86b-audit-review.test.mjs; no network) --------------
 
@@ -329,7 +351,8 @@ export function promotableOthers(allRows) {
   return out.sort((x, y) => String(x.fingerprint).localeCompare(String(y.fingerprint)));
 }
 
-export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope = "outcomes", fullTickets = false }) {
+export function buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope = "outcomes", fullTickets = false, board }) {
+  const boardIndex = Array.isArray(board) ? buildIndex(board.filter(r => BOARD_STATUSES.includes(r?.status))) : null;
   // AGT-239 D3: the per-run scope leaves paperwork for the weekly review.
   const inScope = (Array.isArray(findings) ? findings : [])
     .filter(f => scope === "weekly" || f.family !== "paperwork");
@@ -356,6 +379,7 @@ export function buildTaskContext({ week, findings, allRows, tickets, scorecardRo
       governing_fact: f.governing_fact ?? null,
       confidence: f.confidence ?? null,
       proposed_resolution: f.proposed_resolution ?? null,
+      ...(boardIndex ? { board_candidates: candidatesFor(findingText(f), boardIndex).map(c => ({ backlog_id: c.backlog_id, title: String(c.title ?? "").slice(0, 90), status: c.status })) } : {}),
       weeks_seen: new Set(same.map(r => r.iso_week)).size,
       prior_rulings: same
         .filter(r => r.ruled_by !== null && r.ruled_by !== undefined)
@@ -376,6 +400,7 @@ export function buildTaskContext({ week, findings, allRows, tickets, scorecardRo
     open_audit_ticket_count: (Array.isArray(tickets) ? tickets : []).length,
     open_audit_tickets_note: fullTickets ? "whole rows (--full-tickets)"
       : `backlog_id, title and status only (AGT-528); read a matching ticket's description with ${TICKET_BODY_DOOR} -- the few that match, never all`,
+    ...(boardIndex ? { board_candidates_note: BOARD_CANDIDATES_NOTE } : {}),
     john_calls: { ...JOHN_CALLS },
     scorecard: (() => {
       const checks = flagChecks(scorecardRows ?? []);
@@ -485,6 +510,12 @@ export function validateReview(review, worklist, week, checklist, routes, projec
     // 1a (AGT-132), the function's own condition: the two kinds that file a ticket need a route.
     const files = (kind === "root-cause" && (g.reuse_backlog_id === undefined || g.reuse_backlog_id === null)) ||
                   kind === "cleanup";
+
+    // 1a (AGT-371), this file's own rule (the function keeps none): a filing group has read the board.
+    if (files) {
+      const unruled = firstCandidatesOf(g, worklist).filter(id => !namesTicket(g.prior_art, id));
+      if (unruled.length > 0) refusals.push(unruledCandidatesRefusal(kind, unruled));
+    }
 
     // 1a (AGT-134), in the function's place and with the function's texts minus the
     // `apply_audit_review: ` prefix (the agt-86i arm R convention). needs_desktop asks for
@@ -686,9 +717,13 @@ async function prepare(args) {
   const profiles = await get("skill_profiles?slug=like.au-*&select=slug,objective,method&order=slug");
   const routes = await get("finding_routes?select=precedence,source,finding_type,project_slug&order=precedence,source");
   const projects = await get("projects?select=slug,name,status,accepts_findings&order=slug");
+  // AGT-371: every live row, any source, paged -- the board the candidates are ranked over.
+  const boardPage = offset => get(`backlog_items?status=in.(${BOARD_STATUSES.join(",")})&select=backlog_id,title,status,description&order=backlog_id&limit=1000&offset=${offset}`);
+  const board = [];
+  for (let page = await boardPage(0); page.length; page = await boardPage(board.length)) board.push(...page);
   const scope = args.weekly === true ? "weekly" : "outcomes";
   const fullTickets = args["full-tickets"] === true;
-  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope, fullTickets });
+  const ctx = buildTaskContext({ week, findings, allRows, tickets, scorecardRows, profiles, routes, projects, scope, fullTickets, board });
   if (ctx === null) die(3, NOTHING_TO_REVIEW);
   const out = JSON.stringify(ctx, null, 2) + "\n";
   if (typeof args.out === "string" && args.out) {
