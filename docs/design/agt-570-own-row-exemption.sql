@@ -1,3 +1,4 @@
+-- DeepBench v7.0.1117 | docs/design/agt-570-own-row-exemption.sql | AGT-570 -- re-pinned to the AGT-637 gate body; applied in an attended session (cycle c0d18fc8).
 -- DeepBench v7.0.1039 | docs/design/agt-570-own-row-exemption.sql | AGT-570 -- re-pinned; applied by cycle ff63d40d.
 -- DeepBench v7.0.1018 | docs/design/agt-570-own-row-exemption.sql | AGT-570 -- the asking cycle is not its own peer.
 -- Migration `agt570_own_row_exemption`.
@@ -34,7 +35,7 @@ declare
   hits int;
   t text; c uuid := gen_random_uuid(); own text; peer text; msg text;
 begin
-  if md5(boot) <> '4e2611ce347baf21db33753996efa463' then
+  if md5(boot) <> '269eba5a36ca5cde76fbc7462f3344e5' then
     raise exception 'AGT-570: runner_should_boot() is not the body this migration was written against (md5 %); re-read it before applying', md5(boot);
   end if;
   if md5(lev) <> '71bbcc5623ac4dd3efbd498d03380bb9' then

@@ -1,3 +1,4 @@
+// DeepBench v7.0.1117 | tests/regression/agt-570-own-row-exemption.test.mjs | AGT-570 -- re-pinned to the AGT-637 gate body; applied.
 // DeepBench v7.0.1039 | tests/regression/agt-570-own-row-exemption.test.mjs | AGT-570 -- applied; the live gate's md5 is no longer pinned.
 // DeepBench v7.0.1018 | tests/regression/agt-570-own-row-exemption.test.mjs | AGT-570 -- the asking
 // cycle is not its own peer, and this build ships only the half that says so.
@@ -35,7 +36,7 @@ const DRIVER = path.join(ROOT, "scripts/run-project.js");
 const STAGED = path.join(ROOT, "docs/design/agt-570-own-row-exemption.sql");
 
 // The gate body this ticket was written against (kickoff §2 / the staged SQL's own guard).
-const STAGED_GATE_MD5 = "4e2611ce347baf21db33753996efa463";
+const STAGED_GATE_MD5 = "269eba5a36ca5cde76fbc7462f3344e5";
 const LANES_FULL = "lanes_full";
 
 function armA() {
