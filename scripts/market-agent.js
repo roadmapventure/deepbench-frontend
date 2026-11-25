@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1120 | scripts/market-agent.js | AGT-805/806 -- store F reaches the product lane: every pmm
+// render carries `store_f` (personal-agent.js's readStoreF, the one copy -- never a second reader), placed
+// after `ask`; --write runs storeFWriteErrors (market_terms only on STORE_F_WRITERS) and the new pure
+// storeFLeakErrors (a records_to_write item quoting a Goals or Target roles line of the offering is refused --
+// store F is private and these records carry an audience) BEFORE any write, then writes the answer's
+// market_terms through writeMarketTerms after the records land. A refusal writes nothing.
 // DeepBench v7.0.935 | scripts/market-agent.js | AGT-550 -- record sections carry HEADS, not
 // bodies, and the render REFUSES a section over the byte ceiling instead of assembling it.
 // DeepBench v7.0.683 | scripts/market-agent.js | AGT-155 -- the competitor leads inbox, read side.
@@ -93,6 +99,8 @@ import { overBudget, recordHead } from './agent-prompt.js';
 // exactly-one-of-cycle-or-session rule is that file's, and a second copy of it here is a copy that
 // drifts (scripts/audit-cluster.js imports it on the same footing).
 import { ingestFindings, attribution } from './audit-ledger.js';
+// AGT-806: store F's reader, write guard and vocabulary writer are AGT-805's, imported -- one copy (pattern:14).
+import { readStoreF, storeFWriteErrors, writeMarketTerms } from './personal-agent.js';
 
 // Same tenant agent-prompt.js measured: every agent_configs / assignment row carries 'global'.
 const TENANT = 'global';
@@ -156,6 +164,46 @@ const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 function fail(message) {
   console.error(`market-agent: ${message}`);
   process.exit(2);
+}
+
+// --- AGT-806: the store F leak guard -------------------------------------------------------------
+// The offering sections whose lines must never reach a market record (private: goals, salary target).
+export const STORE_F_PRIVATE_SECTIONS = ['Goals', 'Target roles'];
+// A line shorter than this is too generic to call a quote.
+export const STORE_F_LEAK_MIN_CHARS = 20;
+const squash = t => String(t).replace(/\s+/g, ' ').trim().toLowerCase();
+// Pure. The private lines of the offering text: every line, trimmed and stripped of a leading "- ", of the
+// `## Goals` and `## Target roles` sections (a section ends at the next `## ` heading), >= the minimum length.
+export function storeFPrivateLines(offeringText) {
+  const lines = [];
+  let inside = false;
+  for (const raw of String(offeringText ?? '').replace(/\r\n/g, '\n').split('\n')) {
+    const head = raw.match(/^##\s+(.*)$/);
+    if (head) { inside = STORE_F_PRIVATE_SECTIONS.some(n => n.toLowerCase() === head[1].trim().toLowerCase()); continue; }
+    if (!inside) continue;
+    const line = raw.trim().replace(/^-\s+/, '').trim();
+    if (line.length >= STORE_F_LEAK_MIN_CHARS) lines.push(line);
+  }
+  return lines;
+}
+// Every string under a value (title, body, and each string leaf of data).
+const stringsOf = v => typeof v === 'string' ? [v]
+  : Array.isArray(v) ? v.flatMap(stringsOf)
+  : isObj(v) ? Object.values(v).flatMap(stringsOf) : [];
+// Pure. Every refusal, not just the first: a records_to_write item whose title, body or data text contains a
+// private line of the offering (whitespace and case folded). Runs before any write; a refusal writes nothing.
+export function storeFLeakErrors(records, offeringText) {
+  const privateLines = storeFPrivateLines(offeringText).map(l => ({ line: l, key: squash(l) }));
+  const errors = [];
+  if (!privateLines.length) return errors;
+  for (const [i, item] of (Array.isArray(records) ? records : []).entries()) {
+    if (!isObj(item)) continue;
+    const text = squash([item.title, item.body, item.data].flatMap(stringsOf).join('\n'));
+    for (const { line, key } of privateLines) {
+      if (text.includes(key)) errors.push(`records_to_write[${i}] quotes store F's private line "${line.slice(0, 60)}" -- goals and target roles never reach a market record`);
+    }
+  }
+  return errors;
 }
 
 // One copy test. Returns an error string or null.
@@ -482,7 +530,9 @@ async function render(args) {
   if (args.napkinFile) {
     try { napkin = loadNapkin(args.napkinFile); } catch (e) { fail(`--napkin-file: ${e.message}`); }
   }
-  const task_context = { ask: args.ask || null, since, records, corrections, platform, napkin, input };
+  // AGT-806: store F on EVERY pmm slug, right after `ask` (the offering whole, the terms under STORE_F_BYTES).
+  const store_f = await readStoreF(db);
+  const task_context = { ask: args.ask || null, store_f, since, records, corrections, platform, napkin, input };
   // Added, never defaulted: a capability that is not a lead reader renders with no `leads` key, so
   // its prompt carries no empty-inbox line to explain away (kickoff §6, "by construction").
   if (LEAD_READERS.includes(args.capability)) task_context.leads = await readLeads(db);
@@ -546,6 +596,23 @@ async function write(args) {
   try { answer = loadAnswer(args.answer); } catch (e) { fail(`--answer is not readable JSON: ${e.message}`); }
   const check = validateMarketAnswer(answer, args.capability);
   if (check.error) fail(`answer refused, nothing written: ${check.error}`);
+  // AGT-806: the store F write guard (market_terms only on STORE_F_WRITERS, each term complete) -- pure.
+  const storeF = storeFWriteErrors(answer, args.capability);
+  if (storeF.length) fail(`answer refused, nothing written: ${storeF.join('; ')}`);
+
+  const db = rest();
+  // AGT-806: the leak guard reads the live offering, so a refusal after this fetch sets exitCode and
+  // RETURNS -- process.exit() straight after a fetch aborts node on Windows (AGT-86).
+  let offering;
+  try { offering = (await readStoreF(db))?.offering ?? null; } catch (e) {
+    console.error(`market-agent: ${e.message}`); process.exitCode = 2; return;
+  }
+  const leaks = storeFLeakErrors(answer.records_to_write, offering?.text ?? '');
+  if (leaks.length) {
+    console.error(`market-agent: answer refused, nothing written: ${leaks.join('; ')}`);
+    process.exitCode = 2;
+    return;
+  }
 
   const source = `${args.capability} ${new Date().toISOString().slice(0, 10)}`;
   const session_name = args.sessionName || null;
@@ -561,7 +628,6 @@ async function write(args) {
     session_name,
   }));
 
-  const db = rest();
   let inserted = [];
   if (rows.length) {
     try { inserted = await db.insert('market_records', rows); } catch (e) { fail(e.message); }
@@ -610,6 +676,8 @@ async function write(args) {
     },
     leads_reviewed: leadsReviewed,
   }) + '\n');
+  // AGT-806: the vocabulary follows the records, never precedes them (AGT-805's writer, agent = --agent).
+  await writeMarketTerms(args, answer);
 }
 
 // --raise-findings: the backfill and re-run door over the rows already in the table. It reads the

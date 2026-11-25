@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1120 | scripts/personal-agent.js | AGT-805/806 -- readStoreF and writeMarketTerms exported for market-agent.js (no behaviour change here); the four pmm writer slugs (pmm-competitors, pmm-feature-signals, pmm-customer-profile, pmm-feature-benefits) join STORE_F_WRITERS.
 // DeepBench v7.0.1118 | scripts/personal-agent.js | AGT-805 -- store F: a fixed read `store_f` (readStoreF) listed FIRST on every strategy, writing, career and humor slug -- the current career_offering in full, never cut, and the current market_term rows by sightings inside STORE_F_BYTES -- with STORE_F_KINDS dropped from the Library text plan and the humor personal_sources read so nothing travels twice (catalog unchanged); `market_terms` answers written as versioned market_term Library items on STORE_F_WRITERS only; storeFWriteErrors refuses a records_to_write item of a store F kind (a change to the record is a `store_f` proposal).
 // Kickoff: docs/kickoffs/v7.0.1118-AGT-805-store-f-reads-and-writes.md.
 // DeepBench v7.0.1107 | scripts/personal-agent.js | AGT-783 -- a per-capability read-first rule (LIBRARY_READ_FIRST, libraryFirst): the Library items a capability names by section and trust are read ahead of the search hits, inside the same LIBRARY_BYTES; a capability absent from the map reads exactly as before.
@@ -366,7 +367,9 @@ export const STORE_F_STRENGTHS = ['strong', 'partial'];
 // The slugs whose answer may carry market_terms (data; a reader-only slug such as the humor ones is absent).
 export const STORE_F_WRITERS = ['strategy-weekly-review', 'strategy-weekly-study', 'strategy-advise',
   'writing-tailor', 'writing-predraft', 'writing-watch',
-  'career-posting-review', 'career-match-finder', 'career-market-watch', 'career-linkedin-alerts'];
+  'career-posting-review', 'career-match-finder', 'career-market-watch', 'career-linkedin-alerts',
+  // AGT-806: the product lane's market and competitor work feeds the vocabulary map too (market-agent.js).
+  'pmm-competitors', 'pmm-feature-signals', 'pmm-customer-profile', 'pmm-feature-benefits'];
 // Kinds that reach the catalog as one count line each, never row by row (141 voice samples on 2026-11-11).
 export const LIBRARY_COUNT_ONLY_KINDS = ['linkedin_post', 'linkedin_comment'];
 // The research verdict an idea-board read keeps per entry when the agent has no note column (AGT-647).
@@ -1516,7 +1519,7 @@ export function storeFBlock(offering, terms, bytes = STORE_F_BYTES) {
 }
 // `store_f`: the current career_offering item (its sections joined in ord order, in full) and the current
 // market_term items. Reads kinds, never an agent (the grants decide what the Library catalog lists).
-async function readStoreF(db) {
+export async function readStoreF(db) {
   const rows = await db.get(`personal_sources?status=eq.current&kind=in.(${STORE_F_KINDS.join(',')})&select=id,kind,title,body,data,doc_date,version&order=id.asc`);
   const offerRow = newestFirst(rows.filter(r => r.kind === 'career_offering'))[0] ?? null;
   let offering = null;
@@ -1574,7 +1577,7 @@ const marketTermText = d => [`${d.term}`, d.meaning && `Meaning: ${d.meaning}`, 
   `Strength: ${d.strength}${d.shortfall ? ` (shortfall: ${d.shortfall})` : ''}`, `Sightings: ${d.sightings}`].filter(Boolean).join('\n');
 // --write: each market_terms item becomes a new current market_term version (one item row + one section
 // row); the previous current version, if any, is superseded by it. Never a DELETE.
-async function writeMarketTerms(args, answer) {
+export async function writeMarketTerms(args, answer) {
   const terms = Array.isArray(answer?.market_terms) ? answer.market_terms : [];
   if (!terms.length) return;
   const stop = message => { console.error(`personal-agent: ${message}`); process.exitCode = 2; };
