@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1123 | scripts/personal-agent.js | AGT-810 -- a sixth record store (sales_records): SALES_READ_MAP over the sales-scan, sales-rate and sales-ask slugs (never the agency rows), each record read with its data; the scan and ask also read reminders_due (salesRemindersDue, computed: 10 and 3 days before an Interested solicitation's due date, each once); validateSalesAnswer() and writeSales() (one insert, never a DELETE or PATCH; stdout push = a new strong rating or a due reminder); --principal becomes a store flag; and --crawl[=<n>] on sales-scan (renderCrawl, the pure planCrawl, writeCrawl -- the store's only PATCH, one agency row at a time). No model call anywhere.
+// Kickoff: docs/kickoffs/v7.0.1123-AGT-810-bill-call-path.md.
 // DeepBench v7.0.1120 | scripts/personal-agent.js | AGT-805/806 -- readStoreF and writeMarketTerms exported for market-agent.js (no behaviour change here); the four pmm writer slugs (pmm-competitors, pmm-feature-signals, pmm-customer-profile, pmm-feature-benefits) join STORE_F_WRITERS.
 // DeepBench v7.0.1118 | scripts/personal-agent.js | AGT-805 -- store F: a fixed read `store_f` (readStoreF) listed FIRST on every strategy, writing, career and humor slug -- the current career_offering in full, never cut, and the current market_term rows by sightings inside STORE_F_BYTES -- with STORE_F_KINDS dropped from the Library text plan and the humor personal_sources read so nothing travels twice (catalog unchanged); `market_terms` answers written as versioned market_term Library items on STORE_F_WRITERS only; storeFWriteErrors refuses a records_to_write item of a store F kind (a change to the record is a `store_f` proposal).
 // Kickoff: docs/kickoffs/v7.0.1118-AGT-805-store-f-reads-and-writes.md.
@@ -280,6 +282,21 @@ const WRITING_SLUGS = Object.keys(WRITING_READ_MAP);
 // session with --principal) and never `rule` (the principal's, written only over the Supabase MCP).
 export const WRITING_MODEL_KINDS = WRITING_KINDS.filter(k => !['correction', 'grade', 'rule'].includes(k));
 export const WRITING_PRINCIPAL_KINDS = ['correction', 'grade'];
+// AGT-810. The sales store's kinds and its OWN read map. A model answer writes only SALES_MODEL_KINDS; a
+// --principal write only SALES_PRINCIPAL_KINDS (a status, a correction, a grade, a keyword call). The
+// `agency` rows (the crawl's work list, ~92k) are in no list: only --crawl reads them, a batch at a time.
+export const SALES_MODEL_KINDS = ['solicitation', 'rating', 'source', 'vocabulary', 'reminder'];
+export const SALES_PRINCIPAL_KINDS = ['status', 'correction', 'grade', 'keyword'];
+const SALES_SCAN_KINDS = ['source', 'keyword', 'solicitation', 'rating', 'status', 'vocabulary', 'reminder'];
+export const SALES_READ_MAP = {
+  'sales-scan': SALES_SCAN_KINDS,
+  'sales-rate': SALES_SCAN_KINDS.filter(k => !['source', 'reminder'].includes(k)),
+  'sales-ask': SALES_SCAN_KINDS,
+};
+export const SALES_STATUSES = ['New', 'Interested', 'Pass', 'Bidding', 'Won', 'Lost'];
+export const SALES_REMINDER_DAYS = [10, 3];
+export const CRAWL_DEFAULT = 40;
+export const CRAWL_MAX = 200;
 // AGT-805: `store_f` -- a change to the career offering is a proposal (data.size small|big), never a direct write.
 export const PROPOSAL_TARGETS = ['linkedin', 'resume', 'store_f'];
 export const STORE_F_PROPOSAL_SIZES = ['small', 'big'];
@@ -444,6 +461,8 @@ export const KIND_FILTERS = {
   // AGT-543: both humor capabilities drop a posted or out-of-window draft.
   'humor-weekly-draft': LIVE_DRAFTS,
   'humor-topic-scout': LIVE_DRAFTS,
+  // AGT-810: the scan leaves out a source that refuses automated reading; `partly` and `unknown` are tried.
+  'sales-scan': { source: rec => rec?.data?.readable !== 'no' },
 };
 
 // Extra, capability-specific reads that are not the capability's own record store. The value names
@@ -501,11 +520,14 @@ export const EXTRA_READS = {
   'writing-watch': WRITING_BASE_READS,
   // Career/Library lock step: the same fixed reads the writing slugs carry, plus the writing notes.
   ...Object.fromEntries(CAREER_LIBRARY_SLUGS.map(c => [c, [...WRITING_FIXED_READS, 'writing_notes']])),
+  // AGT-810: the scan and the ask read the reminders due today, computed (salesRemindersDue), never judged.
+  'sales-scan': ['reminders_due'],
+  'sales-ask': ['reminders_due'],
 };
 // AGT-805: store F is read FIRST by every slug of the strategy, writing, career and humor maps -- by map
 // membership, data-only, never by agent; the security slugs are absent. (career-linkedin-alerts:
-// 'competitors' becomes ['store_f', 'competitors'].)
-export const STORE_F_SLUGS = [...new Set([STRATEGY_READ_MAP, WRITING_READ_MAP, READ_MAP, HUMOR_READ_MAP].flatMap(m => Object.keys(m)))];
+// 'competitors' becomes ['store_f', 'competitors'].) AGT-810: the sales map joins the list.
+export const STORE_F_SLUGS = [...new Set([STRATEGY_READ_MAP, WRITING_READ_MAP, READ_MAP, HUMOR_READ_MAP, SALES_READ_MAP].flatMap(m => Object.keys(m)))];
 for (const s of STORE_F_SLUGS) EXTRA_READS[s] = ['store_f', ...[].concat(EXTRA_READS[s] ?? [])];
 // AGT-650: the team reads a strategy render carries are cut to these byte budgets, the rows that share
 // the most stems with the query kept first (newest first on a tie, and with no query), so the memory,
@@ -547,7 +569,12 @@ const STORES = [
   // AGT-655: the security store, the same shape as the strategy one.
   { table: 'security_records', fields: SECURITY_FIELDS, map: SECURITY_READ_MAP, targeted: false, allCorrections: true, correctionKinds: ['correction', 'grade'], repos: null, write: writeSecurity },
   // AGT-722: the writing store, the same shape again.
-  { table: 'writing_records', fields: 'id,kind,title,body,data,source,created_at', map: WRITING_READ_MAP, targeted: false, allCorrections: true, correctionKinds: ['correction', 'grade'], repos: null, write: writeWriting },
+  // AGT-810: `principal: true` -- the store takes the principal's own words through --write --principal.
+  { table: 'writing_records', fields: 'id,kind,title,body,data,source,created_at', map: WRITING_READ_MAP, targeted: false, allCorrections: true, correctionKinds: ['correction', 'grade'], repos: null, write: writeWriting, principal: true },
+  // AGT-810: the sales store, the writing shape plus each record's data (the facts sit there, which
+  // recordHead drops) and the crawl, a flag on its scan slug that hands render and write to the crawl.
+  { table: 'sales_records', fields: 'id,kind,title,body,data,source,created_at', map: SALES_READ_MAP, targeted: false, allCorrections: true, correctionKinds: ['correction', 'grade'], repos: null, write: writeSales,
+    withData: true, principal: true, crawl: { slug: 'sales-scan', render: renderCrawl, write: writeCrawl } },
 ];
 
 export function storeFor(capability) {
@@ -877,6 +904,8 @@ export function parseArgs(argv) {
       case 'findings-out': out.findingsOut = value; break;
       // AGT-722: the session writes the principal's own words (a grade, a correction) -- never a model answer.
       case 'principal': out.principal = true; break;
+      // AGT-810: a batch of the crawl, on the slug its store names (store.crawl.slug).
+      case 'crawl': out.crawl = value === undefined ? String(CRAWL_DEFAULT) : value; break;
       default: return { error: `unrecognized flag "--${key}"` };
     }
   }
@@ -907,7 +936,13 @@ export function parseArgs(argv) {
   }
   if (out.mode === 'write' && !out.answer) return { error: '--answer=<json | path> is required with --write' };
   if (out.findingsOut !== undefined && (out.mode !== 'write' || !out.findingsOut)) return { error: '--findings-out=<path> is used only with --write' };
-  if (out.principal && (out.mode !== 'write' || storeFor(out.capability)?.write !== writeWriting)) return { error: '--principal is used only with --write on a writing slug' };
+  if (out.principal && (out.mode !== 'write' || !storeFor(out.capability)?.principal)) return { error: "--principal is used only with --write on a slug whose store takes the principal's words" };
+  if (out.crawl !== undefined) {
+    if (!/^\d+$/.test(out.crawl) || Number(out.crawl) < 1 || Number(out.crawl) > CRAWL_MAX) return { error: `--crawl=<n> must be a whole number 1 to ${CRAWL_MAX}` };
+    if (out.mode !== 'render' && out.mode !== 'write') return { error: '--crawl is used only with --render or --write' };
+    if (storeFor(out.capability)?.crawl?.slug !== out.capability) return { error: `--crawl is used only on a store's crawl slug, not "${out.capability}"` };
+    out.crawl = Number(out.crawl);
+  }
   if (out.findingsOut && !out.sessionName) return { error: '--findings-out needs --session-name=<name> (the ingest file is found_by session:<name>)' };
   return out;
 }
@@ -982,7 +1017,7 @@ async function readRecords(db, capability, target) {
   for (const r of rows) {
     if (filters?.[r.kind] && !filters[r.kind](r)) continue;
     if (!store.targeted) {
-      records[r.kind].push(recordHead(r));
+      records[r.kind].push(store.withData ? { ...recordHead(r), data: r.data ?? {} } : recordHead(r));
       continue;
     }
     const rec = { ...recordHead(r), target_row: r.target_row, has_text: Boolean(r.data?.text) };
@@ -1848,9 +1883,13 @@ const EXTRA_READERS = {
   profile_facts: readProfileFacts,
   // AGT-805
   store_f: readStoreF,
+  // AGT-810
+  reminders_due: async db => salesRemindersDue(await readSalesStored(db), new Date().toISOString().slice(0, 10)),
 };
 
 async function render(args) {
+  // AGT-810: a crawl batch is plain JSON -- nothing assembled, no model named.
+  if (args.crawl !== undefined) return storeFor(args.capability).crawl.render(args);
   const db = rest();
   const caps = await db.get(`capabilities?slug=eq.${encodeURIComponent(args.capability)}&tenant_id=eq.${TENANT}&select=default_intent_slug&limit=1`);
   const intentSlug = caps[0]?.default_intent_slug;
@@ -1937,6 +1976,7 @@ function loadAnswer(raw) {
 }
 
 async function write(args) {
+  if (args.crawl !== undefined) return storeFor(args.capability).crawl.write(args);
   let answer;
   try { answer = loadAnswer(args.answer); } catch (e) { fail(`--answer is not readable JSON: ${e.message}`); }
   // AGT-805: the store F guard runs before any store's own check; nothing is written on a refusal.
@@ -2543,6 +2583,255 @@ async function writeWriting(args, answer) {
     try { inserted = await db.insert('writing_records', rows); } catch (e) { return stop(e.message); }
   }
   process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id) }) + '\n');
+}
+
+// --- AGT-810: the sales store's write checks, reminders and crawl -------------------------------
+//
+// Every rule is a property of this code path, never an instruction the model is asked to obey
+// (pattern:10). The store is insert-only but for the crawl's one PATCH per agency row; no DELETE.
+const strOk = v => typeof v === 'string' && v.trim() !== '';
+const dayOk = v => typeof v === 'string' && DAY.test(v);
+const dayNum = d => Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10))) / 86400000;
+const keyOf = r => (r?.data?.key == null ? null : String(r.data.key));
+const todayUtc = () => new Date().toISOString().slice(0, 10);
+
+export async function readSalesStored(db) {
+  const rows = await db.get('sales_records?kind=in.(solicitation,rating,status,reminder,source)&select=kind,data,created_at&order=created_at.asc,id.asc');
+  const of = k => rows.filter(r => r.kind === k);
+  return {
+    solicitations: of('solicitation'), ratings: of('rating'), statuses: of('status'), reminders: of('reminder'),
+    sourceUrls: new Set(of('source').map(r => r.data?.url).filter(strOk).map(u => u.trim())),
+  };
+}
+
+// Pure. Which Interested solicitations are inside a reminder window today, each window fired once:
+// 3 < n <= 10 days out is the 10-day reminder, 0 <= n <= 3 the 3-day one (runs are twice a week).
+export function salesRemindersDue(stored, today) {
+  const newest = new Map();
+  const statuses = [...(stored?.statuses ?? [])].map((r, i) => [r, i])
+    .sort(([a, i], [b, j]) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')) || i - j);
+  for (const [r] of statuses) if (keyOf(r) !== null) newest.set(keyOf(r), r.data?.status);
+  const fired = new Set((stored?.reminders ?? []).map(r => `${keyOf(r)}|${Number(r.data?.days_out)}`));
+  const due = [];
+  const seen = new Set();
+  for (const s of stored?.solicitations ?? []) {
+    const key = keyOf(s);
+    if (key === null || seen.has(key)) continue;
+    seen.add(key);
+    if (newest.get(key) !== 'Interested' || !dayOk(s.data?.due) || !dayOk(today)) continue;
+    const n = dayNum(s.data.due) - dayNum(today);
+    const days_out = n >= 0 && n <= SALES_REMINDER_DAYS[1] ? SALES_REMINDER_DAYS[1] : n > SALES_REMINDER_DAYS[1] && n <= SALES_REMINDER_DAYS[0] ? SALES_REMINDER_DAYS[0] : null;
+    if (days_out !== null && !fired.has(`${key}|${days_out}`)) due.push({ key, days_out, due: s.data.due });
+  }
+  return due;
+}
+
+// Pure. H1 of docs/harvests/AGT-810.md: every refusal listed, not the first.
+export function validateSalesAnswer(capability, answer, stored, { principal = false, today } = {}) {
+  const errors = [];
+  if (!isPlainObject(answer)) return { ok: false, errors: ['the answer must be a JSON object'] };
+  if (capability !== undefined && !Object.prototype.hasOwnProperty.call(SALES_READ_MAP, capability)) errors.push(`capability "${capability}" is not in SALES_READ_MAP`);
+  const items = Array.isArray(answer.records_to_write) ? answer.records_to_write : null;
+  if (!items) errors.push('the answer carries no records_to_write array');
+  const allowed = principal ? SALES_PRINCIPAL_KINDS : SALES_MODEL_KINDS;
+  const st = stored ?? {};
+  const storedSol = new Map((st.solicitations ?? []).filter(r => keyOf(r) !== null).map(r => [keyOf(r), r.data ?? {}]));
+  const answerSol = new Map();
+  for (const item of items ?? []) if (isPlainObject(item) && item.kind === 'solicitation' && isPlainObject(item.data) && strOk(item.data.key) && !answerSol.has(item.data.key)) answerSol.set(item.data.key, item.data);
+  const sourceUrls = new Set(st.sourceUrls ?? []);
+  const due = salesRemindersDue(st, today ?? todayUtc());
+  const solKeys = new Set();
+  const ratedKeys = new Set();
+  const urls = new Set();
+  for (const [i, item] of (items ?? []).entries()) {
+    const at = `records_to_write[${i}]`;
+    if (!isPlainObject(item)) { errors.push(`${at} is not an object`); continue; }
+    if (!allowed.includes(item.kind)) {
+      if (!principal && item.kind === 'status') errors.push(`${at} is a status: only the principal marks a status`);
+      else if (SALES_MODEL_KINDS.includes(item.kind) || SALES_PRINCIPAL_KINDS.includes(item.kind)) errors.push(`${at} is a ${item.kind}: ${principal ? `a --principal write carries only ${SALES_PRINCIPAL_KINDS.join(', ')}` : "that kind is the principal's word, never a model answer"}`);
+      else errors.push(`${at} has unknown kind "${item.kind}"`);
+      continue;
+    }
+    if (!strOk(item.title)) errors.push(`${at} (${item.kind}) has no title`);
+    if (!isPlainObject(item.data)) { errors.push(`${at} (${item.kind}) data must be an object`); continue; }
+    const d = item.data;
+    const e = m => errors.push(`${at} (${item.kind}) ${m}`);
+    switch (item.kind) {
+      case 'solicitation':
+        if (!strOk(d.key)) e('needs data.key');
+        if (!strOk(d.agency)) e('needs data.agency');
+        if (!dayOk(d.due)) e('needs data.due as YYYY-MM-DD');
+        if (!httpUrl(d.url)) e('needs data.url, an http(s) link');
+        if (strOk(d.key) && (storedSol.has(d.key) || solKeys.has(d.key))) e(`key "${d.key}" already stored: write the rating alone with data.amended`);
+        if (strOk(d.key)) solKeys.add(d.key);
+        break;
+      case 'rating': {
+        if (!strOk(d.key)) e('needs data.key');
+        if (!['strong', 'weak'].includes(d.fit)) e('data.fit must be strong or weak');
+        if (!strOk(d.why)) e('needs data.why');
+        if (!['company', 'principal'].includes(d.profile)) e('data.profile must be company or principal');
+        if (!strOk(d.key)) break;
+        const sol = answerSol.get(d.key) ?? storedSol.get(d.key);
+        if (!sol) e(`key "${d.key}" names no solicitation in this answer or stored`);
+        else if (!dayOk(sol.due) || !httpUrl(sol.url)) e(`key "${d.key}": its solicitation carries no YYYY-MM-DD due date and http(s) url`);
+        if (ratedKeys.has(d.key)) e(`key "${d.key}" is rated twice in this answer`);
+        ratedKeys.add(d.key);
+        const prior = (st.ratings ?? []).filter(r => keyOf(r) === d.key).map(r => (dayOk(r.data?.amended) ? r.data.amended : String(r.created_at ?? '').slice(0, 10)));
+        if (prior.length && !(dayOk(d.amended) && prior.every(p => d.amended > p))) e(`key "${d.key}" is already rated: a second rating needs data.amended (YYYY-MM-DD) later than every stored rating of it`);
+        break;
+      }
+      case 'source': {
+        if (!httpUrl(d.url)) { e('needs data.url, an http(s) link'); break; }
+        const u = d.url.trim();
+        if (sourceUrls.has(u)) e(`url ${u} is already a stored source`);
+        else if (urls.has(u)) e(`url ${u} is named twice`);
+        urls.add(u);
+        break;
+      }
+      case 'vocabulary':
+        if (!strOk(d.their_term)) e('needs data.their_term');
+        if (!strOk(d.our_term)) e('needs data.our_term');
+        if (!['store_f', 'keyword', 'both'].includes(d.add_to)) e('data.add_to must be store_f, keyword or both');
+        break;
+      case 'reminder':
+        if (!due.some(r => r.key === String(d.key) && r.days_out === d.days_out)) e(`{key: ${JSON.stringify(d.key)}, days_out: ${JSON.stringify(d.days_out)}} is not a reminder due today (${JSON.stringify(due.map(r => ({ key: r.key, days_out: r.days_out })))})`);
+        break;
+      case 'status':
+        if (!strOk(d.key) || !storedSol.has(d.key)) e(`key ${JSON.stringify(d.key)} is not a stored solicitation`);
+        if (!SALES_STATUSES.includes(d.status)) e(`data.status must be one of ${SALES_STATUSES.join(', ')}`);
+        if (d.status === 'Pass' && !strOk(d.reason)) e('a Pass needs data.reason');
+        break;
+      case 'grade':
+        if (!Number.isInteger(d.score) || d.score < 1 || d.score > 10) e('data.score must be a whole number 1 to 10');
+        if (!strOk(d.phrase)) e('needs data.phrase');
+        break;
+      case 'keyword':
+        if (!['approved', 'dropped'].includes(d.status)) e('data.status must be approved or dropped');
+        break;
+      case 'correction':
+        if (!strOk(d.body)) e('needs a non-empty data.body');
+        break;
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+// --write on a sales slug: read what is stored, check the whole answer (exit 2, nothing written), then
+// ONE sales_records insert. Never a PATCH, never a DELETE.
+async function writeSales(args, answer) {
+  const stop = message => { console.error(`personal-agent: ${message}`); process.exitCode = 2; };
+  const db = rest();
+  const today = todayUtc();
+  let stored;
+  try { stored = await readSalesStored(db); } catch (e) { return stop(e.message); }
+  const check = validateSalesAnswer(args.capability, answer, stored, { principal: Boolean(args.principal), today });
+  if (!check.ok) return stop(`answer refused, nothing written: ${check.errors.join('; ')}`);
+  const source = `${args.capability} ${today}`;
+  const session_name = args.sessionName || null;
+  const rows = answer.records_to_write.map(item => ({ kind: item.kind, title: item.title, body: item.body ?? null, data: item.data ?? {}, source, session_name }));
+  let inserted = [];
+  if (rows.length) {
+    try { inserted = await db.insert('sales_records', rows); } catch (e) { return stop(e.message); }
+  }
+  const strong = rows.filter(r => r.kind === 'rating' && r.data.fit === 'strong').length;
+  const reminders = rows.filter(r => r.kind === 'reminder').length;
+  process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), strong, reminders, push: strong + reminders > 0 }) + '\n');
+}
+
+// The crawl's batch read (H2): never-searched agencies, a known website first, smallest first; a row
+// whose website is `no` is never selected -- it waits for the principal's call.
+const CRAWL_ORDERS = [
+  '&data->>website_found=eq.yes&data->>size=not.is.null&order=data->size.asc,id.asc',
+  '&data->>website_found=eq.yes&data->>size=is.null&order=id.asc',
+  '&data->>website_found=eq.not-yet&data->>size=not.is.null&order=data->size.asc,id.asc',
+  '&data->>website_found=eq.not-yet&data->>size=is.null&order=id.asc',
+];
+async function renderCrawl(args) {
+  const db = rest();
+  const n = Number(args.crawl);
+  const rows = [];
+  try {
+    for (const order of CRAWL_ORDERS) {
+      const left = n - rows.length;
+      if (left <= 0) break;
+      rows.push(...await db.get(`sales_records?kind=eq.agency&data->>solicitations_searched=eq.not-yet&select=id,title,data&limit=${left}${order}`));
+    }
+  } catch (e) { fail(e.message); }
+  const agencies = rows.map(r => ({ id: r.id, title: r.title, type: r.data?.type ?? null, state: r.data?.state ?? null, city: r.data?.city ?? null,
+    county: r.data?.county ?? null, size: r.data?.size ?? null, website_url: r.data?.website_url ?? null }));
+  const text = JSON.stringify({ crawl: true, agencies }) + '\n';
+  if (args.out) { fs.writeFileSync(args.out, text, 'utf8'); process.stdout.write(JSON.stringify({ crawl: true, agencies: agencies.length, out: args.out }) + '\n'); }
+  else process.stdout.write(text);
+}
+
+// Pure. The crawl answer checked against the rows it names; a patch sets only the five crawl keys.
+export function planCrawl(answer, rows, sourceUrls, today) {
+  const errors = [];
+  const list = answer?.agencies;
+  if (!Array.isArray(list)) return { errors: ['the answer carries no agencies array'], patches: [], sources: [] };
+  const byId = new Map((rows ?? []).map(r => [r.id, r]));
+  const known = new Set(sourceUrls ?? []);
+  const seen = new Set();
+  const planned = new Set();
+  const patches = [];
+  const sources = [];
+  for (const [i, a] of list.entries()) {
+    const at = `agencies[${i}]`;
+    if (!isPlainObject(a)) { errors.push(`${at} is not an object`); continue; }
+    const row = byId.get(a.id);
+    if (!row) { errors.push(`${at} id ${JSON.stringify(a.id)} is not an agency row of this batch`); continue; }
+    if (seen.has(a.id)) { errors.push(`${at} id ${a.id} is named twice`); continue; }
+    seen.add(a.id);
+    const n0 = errors.length;
+    if (!['yes', 'no'].includes(a.website_found)) errors.push(`${at} website_found must be yes or no`);
+    if (a.website_found === 'yes') {
+      if (!httpUrl(a.website_url)) errors.push(`${at} website_found yes needs an http(s) website_url`);
+      if (!['yes', 'no'].includes(a.solicitations_searched)) errors.push(`${at} beside website_found yes, solicitations_searched must be yes or no`);
+    }
+    if (a.website_found === 'no' && a.solicitations_searched !== undefined) errors.push(`${at} beside website_found no, solicitations_searched is not written`);
+    if (a.solicitations_searched === 'yes' && !httpUrl(a.solicitations_page)) errors.push(`${at} solicitations_searched yes needs an http(s) solicitations_page`);
+    if (errors.length > n0) continue;
+    const base = isPlainObject(row.data) ? row.data : {};
+    if (a.website_found === 'no') { patches.push({ id: a.id, data: { ...base, website_found: 'no', checked_at: today } }); continue; }
+    const page = a.solicitations_searched === 'yes' ? a.solicitations_page.trim() : null;
+    patches.push({ id: a.id, data: { ...base, website_found: 'yes', website_url: a.website_url.trim(), solicitations_searched: a.solicitations_searched, solicitations_page: page, checked_at: today } });
+    if (page && !known.has(page) && !planned.has(page)) {
+      planned.add(page);
+      sources.push({ kind: 'source', title: row.title, data: { url: page, type: 'agency', state: base.state ?? null, agency_key: base.key ?? null, readable: 'yes', checked_at: today } });
+    }
+  }
+  return errors.length ? { errors, patches: [], sources: [] } : { errors, patches, sources };
+}
+
+async function writeCrawl(args) {
+  const stop = message => { console.error(`personal-agent: ${message}`); process.exitCode = 2; };
+  let answer;
+  try { answer = loadAnswer(args.answer); } catch (e) { return stop(`--answer is not readable JSON: ${e.message}`); }
+  const db = rest();
+  const today = todayUtc();
+  const ids = Array.isArray(answer?.agencies) ? [...new Set(answer.agencies.map(a => a?.id).filter(id => typeof id === 'string' && UUID.test(id)))] : [];
+  let rows;
+  let sourceUrls;
+  try {
+    rows = ids.length ? await getByIds(db, 'sales_records', 'kind=eq.agency&id', ids, 'id,title,data', 'id.asc') : [];
+    sourceUrls = new Set((await db.get('sales_records?kind=eq.source&select=data&order=id.asc')).map(r => r.data?.url).filter(strOk).map(u => u.trim()));
+  } catch (e) { return stop(e.message); }
+  const plan = planCrawl(answer, rows, sourceUrls, today);
+  if (plan.errors.length) return stop(`answer refused, nothing written: ${plan.errors.join('; ')}`);
+  const session_name = args.sessionName || null;
+  let sources = [];
+  if (plan.sources.length) {
+    try { sources = await db.insert('sales_records', plan.sources.map(s => ({ ...s, body: null, source: `agency crawl ${today}`, session_name }))); } catch (e) { return stop(e.message); }
+  }
+  let patched = 0;
+  for (const p of plan.patches) {
+    try {
+      const back = await db.patch(`sales_records?id=eq.${p.id}&kind=eq.agency`, { data: p.data, updated_at: new Date().toISOString() });
+      if (!Array.isArray(back) || back.length !== 1) throw new Error(`PATCH of ${p.id} matched ${Array.isArray(back) ? back.length : 0} rows`);
+    } catch (e) { return stop(`${e.message} -- ${patched} of ${plan.patches.length} agency rows landed (${sources.length} sources inserted); a re-run is safe`); }
+    patched += 1;
+  }
+  process.stdout.write(JSON.stringify({ patched, sources: sources.length }) + '\n');
 }
 
 // --- AGT-650: --tick / --untick, the attended confirm -------------------------------------------

@@ -743,7 +743,8 @@ async function partK() {
 
   const tie = countOf(src, "&order=created_at.asc,id.asc");
   // AGT-665: +1 for the market_leads inbox read (fileNewLeads)
-  assert.strictEqual(tie, 8, `${SCRIPT_REL} has ${tie} \`&order=created_at.asc,id.asc\` clauses, expected 8`);
+  // AGT-810: +1 for the sales store read (readSalesStored)
+  assert.strictEqual(tie, 9, `${SCRIPT_REL} has ${tie} \`&order=created_at.asc,id.asc\` clauses, expected 9`);
   const bare = countOf(src, "&order=created_at.asc") - tie;
   assert.strictEqual(bare, 0,
     `${SCRIPT_REL} still has ${bare} \`&order=created_at.asc\` clauses with no \`,id.asc\` tiebreak -- ` +
