@@ -71,7 +71,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const VERIFIER = path.join(ROOT, "scripts/verifier.js");
 const REGISTER_REL = "docs/runbooks/environment-facts.md";
 const REGISTER_PREFIX = "- 2026-11-20 | AGT-328 | ";
-const SHIP_CALL = "pinsShipFinding({ text: kickoffText, changedFiles })";
+const SHIP_CALL = "pinsShipFinding({ text: kickoffText, changedFiles, commitFiles })";
 
 const x = "x.test.mjs", y = "y.test.mjs", z = "z.test.mjs";
 const N = [x, y, z];

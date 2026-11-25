@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1116 | scripts/verifier.js | AGT-791 -- the pin check reads the graded commit's own file list.
 // DeepBench v7.0.1113 | scripts/verifier.js | AGT-541 -- 7a refuses a baseline measured on the tree it grades.
 // DeepBench v7.0.1103 | scripts/verifier.js | AGT-698 -- a suite that did not run is not-run, never red.
 // DeepBench v7.0.1101 | scripts/verifier.js | AGT-598 -- a cycle-measured BASELINE block is graded against the cycle's measurement.
@@ -2992,19 +2993,33 @@ export function kickoffCoupledFinding(text, out = {}) {
   return null;
 }
 
-// 7a. Every `repin` test must be among the delivery's changed files. No block, or no repin -> null.
-export function pinsShipFinding({ text, changedFiles } = {}) {
+// ---- FEATURE: AGT-791 -- the graded commit's own files; null = git could not answer.
+export function commitFilesFor(repoRoot, sha) {
+  if (!/^[0-9a-f]{40}$/.test(String(sha ?? ""))) return null;
+  const r = spawnSync("git", ["diff", "--name-only", `${sha}^`, sha], { cwd: repoRoot, encoding: "utf8" });
+  if (r.error || r.status !== 0) return null;
+  return String(r.stdout).split("\n").map(s => s.trim()).filter(Boolean);
+}
+
+// 7a. Every `repin` test is in the delivery's changed files or the graded commit's own list.
+export function pinsShipFinding({ text, changedFiles, commitFiles } = {}) {
   const repin = (pinsBlockLines(text) ?? []).filter(l => l.disposition === "repin" && l.test).map(l => l.test);
   if (!repin.length) return null;
-  const changed = Array.isArray(changedFiles) ? changedFiles.map(pinPath) : null;
-  const left = changed === null ? repin : repin.filter(t => !changed.includes(t));
+  const lists = [changedFiles, commitFiles].filter(Array.isArray);
+  if (!lists.length) {
+    return { kind: "pin-not-graded", tests: repin,
+      reason: `pin claim NOT GRADED (AGT-791): ${repin.length} declared repin and neither the delivery's changed-file list `
+        + `nor the graded commit's own could be read -- fail closed; no re-pin is shown missing: ${repin.join(", ")}.` };
+  }
+  const changed = lists.flat().map(pinPath);
+  const left = repin.filter(t => !changed.includes(t));
   if (!left.length) return null;
   return {
     kind: "pin-left-behind",
     tests: left,
     reason: `pin left behind (AGT-328): the kickoff declares ${repin.length} regression ${repin.length === 1 ? "test" : "tests"} `
       + `repin and ${left.length} ${left.length === 1 ? "is" : "are"} not in this delivery's changed files`
-      + `${changed === null ? " (the changed-file list could not be read -- fail closed)" : ""}: ${left.join(", ")}. `
+      + `: ${left.join(", ")}. `
       + "The re-pin rides the ship that changes the literal; it is never owed to a later one.",
   };
 }
@@ -4847,7 +4862,8 @@ async function main() {
   // this point into every lane. Both judged lanes read it back out of the context file rather than
   // calling this again: see recordJudgedVerdict()'s note on why a second read is a different fact.
   const gradedSha = gradedShaFor(repoRoot);
-  const pinLeft = kickoffText !== null ? pinsShipFinding({ text: kickoffText, changedFiles }) : null;
+  const commitFiles = kickoffText !== null ? commitFilesFor(repoRoot, gradedSha) : null;
+  const pinLeft = kickoffText !== null ? pinsShipFinding({ text: kickoffText, changedFiles, commitFiles }) : null;
   if (pinLeft) { verdict = "block"; reasoning = pinLeft.reason + " | " + reasoning; }
 
   // FEATURE: AGT-562 -- the two reads behind `shipOrphanFinding()`, taken ONCE here and carried from
@@ -4952,7 +4968,7 @@ async function main() {
 
   const elig = autoDoneEligibility({ verdict, epicName, epicProjectExecuting, priorityClass, changedFiles, projectExecuting, classAutonomy, skillRowEdit });
   const autoDoneReason = elig.reason + lookupNote + primeNote + ladderNote + skillNote +
-    ` (changed-file source: ${changedFileSource})`;
+    ` (changed-file source: ${changedFileSource}${kickoffText !== null ? `; graded commit's own files: ${commitFiles ? `${commitFiles.length} paths` : "UNREADABLE"}` : ""})`;
 
   const detailLine = GATES.map(g => `${g.label}=${gateResults[g.key]} [${gateDetail[g.key]}]`).join("\n  ");
   const prose =
