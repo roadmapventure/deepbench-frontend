@@ -1,10 +1,11 @@
+// DeepBench v7.0.1122 | tests/regression/agt-721-laura.test.mjs | AGT-807 -- laura holds 15 Library grant kinds since AGT-804 (store F: career_offering, market_term)
 // DeepBench v7.0.1106 | tests/regression/agt-721-laura.test.mjs | AGT-781 -- pin arm re-pointed off the live pin census
 // DeepBench v7.0.1053 | tests/regression/agt-721-laura.test.mjs | AGT-721 -- Laura (CW-01): rows, store, grants, denies, north-star pin; live arm no longer pins is_active (hired 2026-11-17)
 //
 // FEATURE: AGT-721 -- Laura (CW-01), the principal's Career Writer for LinkedIn and resumes, a personal-lane agent
 // (migration agt721_writing_store: public.writing_records and public.personal_source_denies, RLS on, zero anon/authenticated
 // grants). Agent rows applied verbatim from docs/design/agt-721-laura-seed.sql (1 agent, 5 writing-* Capabilities, 10 cw-
-// Skills, 30 links, 1 north-star pin, 13 personal_source_grants by kind -- never connections -- and a per-item deny list of
+// Skills, 30 links, 1 north-star pin, 15 personal_source_grants by kind -- never connections -- and a per-item deny list of
 // the engagement and partner-proposal documents). is_active is the principal's hire word alone (hired 2026-11-17).
 // Same arms as agt-653-trenton.test.mjs, re-prefixed, plus the grant and deny arm.
 // BASELINE: new file; on unchanged origin/dev (267c43b4) the live arm reads agents?id=eq.laura -> [] and cannot pass.
@@ -148,9 +149,9 @@ async function partE_live() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
-    notRun("the live arm (laura row, 5 assignments, 30 links, north-star pin, 13 grants, denies, stores anon-refused/service-200)",
+    notRun("the live arm (laura row, 5 assignments, 30 links, north-star pin, 15 grants, denies, stores anon-refused/service-200)",
       "SUPABASE_URL / SUPABASE_SERVICE_KEY absent. Measured over MCP when this shipped (2026-11-17): agents.laura " +
-      "is CW-01, lane='personal', is_active=false; 13 grants, 32 denies; both stores hold zero anon/authenticated grants, RLS on.");
+      "is CW-01, lane='personal', is_active=false; 15 grants (13 at ship; +career_offering, market_term via AGT-804), 32 denies; both stores hold zero anon/authenticated grants, RLS on.");
     return results;
   }
   const base = url.replace(/\/+$/, "");
@@ -183,9 +184,10 @@ async function partE_live() {
   results.push("live-laura-north-star-pin");
 
   const grants = (await rest(`personal_source_grants?agent_id=eq.${SELF_ID}&select=kind`)).map(r => r.kind).sort();
-  assert.strictEqual(grants.length, 13, `laura's Library grants: expected 13 kinds, got ${JSON.stringify(grants)}`);
+  assert.strictEqual(grants.length, 15, `laura's Library grants: expected 15 kinds, got ${JSON.stringify(grants)}`);
+  assert.ok(grants.includes("career_offering") && grants.includes("market_term"), `laura must hold career_offering and market_term (store F, AGT-804): ${JSON.stringify(grants)}`);
   assert.ok(!grants.includes("connections"), "laura must never be granted the connections list (Q2)");
-  results.push("live-laura-13-grants-no-connections");
+  results.push("live-laura-15-grants-no-connections");
 
   // The deny arm: every current client_private item in works/market/ideas is denied to her (Q2: never reads the
   // engagement or partner-proposal documents). Control: the deny list is non-empty and covers that whole set.
