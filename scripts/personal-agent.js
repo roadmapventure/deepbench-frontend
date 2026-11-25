@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1118 | scripts/personal-agent.js | AGT-805 -- store F: a fixed read `store_f` (readStoreF) listed FIRST on every strategy, writing, career and humor slug -- the current career_offering in full, never cut, and the current market_term rows by sightings inside STORE_F_BYTES -- with STORE_F_KINDS dropped from the Library text plan and the humor personal_sources read so nothing travels twice (catalog unchanged); `market_terms` answers written as versioned market_term Library items on STORE_F_WRITERS only; storeFWriteErrors refuses a records_to_write item of a store F kind (a change to the record is a `store_f` proposal).
+// Kickoff: docs/kickoffs/v7.0.1118-AGT-805-store-f-reads-and-writes.md.
 // DeepBench v7.0.1107 | scripts/personal-agent.js | AGT-783 -- a per-capability read-first rule (LIBRARY_READ_FIRST, libraryFirst): the Library items a capability names by section and trust are read ahead of the search hits, inside the same LIBRARY_BYTES; a capability absent from the map reads exactly as before.
 // Kickoff: docs/kickoffs/v7.0.1107-AGT-783-weekly-records-check.md.
 // DeepBench v7.0.1053 | scripts/personal-agent.js | AGT-725 -- a fixed read `profile_facts` (readProfileFacts) on four writing slugs: every current facts-section item in full, the newest LinkedIn profile's headline/About and current-role sections, and the current master resume, outside the ranked Library budget and capped at PROFILE_FACTS_BYTES (the master resume cut first, the facts never); readLibrary drops the same items from its text plan (libraryTextSkips) so nothing travels twice, catalog unchanged.
@@ -277,7 +279,9 @@ const WRITING_SLUGS = Object.keys(WRITING_READ_MAP);
 // session with --principal) and never `rule` (the principal's, written only over the Supabase MCP).
 export const WRITING_MODEL_KINDS = WRITING_KINDS.filter(k => !['correction', 'grade', 'rule'].includes(k));
 export const WRITING_PRINCIPAL_KINDS = ['correction', 'grade'];
-export const PROPOSAL_TARGETS = ['linkedin', 'resume'];
+// AGT-805: `store_f` -- a change to the career offering is a proposal (data.size small|big), never a direct write.
+export const PROPOSAL_TARGETS = ['linkedin', 'resume', 'store_f'];
+export const STORE_F_PROPOSAL_SIZES = ['small', 'big'];
 export const PUBLISHER_TYPES = ['recruiter', 'association', 'product_career', 'vendor'];
 // The writing team reads' byte cuts (kickoff section 4).
 export const WRITING_TEAM_BYTES = { career_writing: 8000, strategy_facts: 6000, market_messaging: 6000, napkin_direction: 5000 };
@@ -354,6 +358,15 @@ export const PROFILE_KIND = 'linkedin_profile';
 export const MASTER_RESUME_KIND = 'resume';
 export const MASTER_RESUME_TITLE = /current master/i;
 export const CURRENT_ROLE_DATES = /present/i;
+// AGT-805: store F -- the principal's career offering and the market vocabulary map. The fixed read's
+// own cap, outside LIBRARY_BYTES: the offering is never cut; past the cap the least-sighted terms drop.
+export const STORE_F_KINDS = ['career_offering', 'market_term'];
+export const STORE_F_BYTES = 30000;
+export const STORE_F_STRENGTHS = ['strong', 'partial'];
+// The slugs whose answer may carry market_terms (data; a reader-only slug such as the humor ones is absent).
+export const STORE_F_WRITERS = ['strategy-weekly-review', 'strategy-weekly-study', 'strategy-advise',
+  'writing-tailor', 'writing-predraft', 'writing-watch',
+  'career-posting-review', 'career-match-finder', 'career-market-watch', 'career-linkedin-alerts'];
 // Kinds that reach the catalog as one count line each, never row by row (141 voice samples on 2026-11-11).
 export const LIBRARY_COUNT_ONLY_KINDS = ['linkedin_post', 'linkedin_comment'];
 // The research verdict an idea-board read keeps per entry when the agent has no note column (AGT-647).
@@ -486,6 +499,11 @@ export const EXTRA_READS = {
   // Career/Library lock step: the same fixed reads the writing slugs carry, plus the writing notes.
   ...Object.fromEntries(CAREER_LIBRARY_SLUGS.map(c => [c, [...WRITING_FIXED_READS, 'writing_notes']])),
 };
+// AGT-805: store F is read FIRST by every slug of the strategy, writing, career and humor maps -- by map
+// membership, data-only, never by agent; the security slugs are absent. (career-linkedin-alerts:
+// 'competitors' becomes ['store_f', 'competitors'].)
+export const STORE_F_SLUGS = [...new Set([STRATEGY_READ_MAP, WRITING_READ_MAP, READ_MAP, HUMOR_READ_MAP].flatMap(m => Object.keys(m)))];
+for (const s of STORE_F_SLUGS) EXTRA_READS[s] = ['store_f', ...[].concat(EXTRA_READS[s] ?? [])];
 // AGT-650: the team reads a strategy render carries are cut to these byte budgets, the rows that share
 // the most stems with the query kept first (newest first on a tie, and with no query), so the memory,
 // product and goals blocks fit inside the 150,000-byte render without raising LIBRARY_BYTES. Measured
@@ -1113,10 +1131,10 @@ async function readLibrary(db, args) {
   // is section-level); hits come first by score, then the capability's sections in trust order. No
   // query, an RPC error or no hit: the trust order alone, as before. Goals-section items are left to
   // the `goals` block when the slug reads it, so their text never travels twice.
-  const skipKinds = new Set(LIBRARY_TEXT_SKIP_KINDS[args.capability] ?? []);
   // AGT-725: likewise the facts section, the profile and the master resume when the slug reads
-  // `profile_facts` (libraryTextSkips); they stay catalog lines.
-  const { skipSections, skipIds } = libraryTextSkips(args.capability, catalog);
+  // `profile_facts` (libraryTextSkips); they stay catalog lines. AGT-805: and STORE_F_KINDS on a store_f slug.
+  const { skipSections, skipIds, skipKinds: storeSkips } = libraryTextSkips(args.capability, catalog);
+  const skipKinds = new Set([...(LIBRARY_TEXT_SKIP_KINDS[args.capability] ?? []), ...storeSkips]);
   const query = strategyQuery(args);
   const search = query ? await libraryHits(db, query, { agentId: args.agent }) : { hits: [], method: 'trust' };
   // AGT-783: the capability's read-first items lead the plan (libraryFirst is [] for every other slug).
@@ -1350,8 +1368,11 @@ async function readProduct(db) {
 }
 
 // `goals`: the Library's goals section (text) and the latest kpi per data.metric.
-async function readGoals(db) {
-  const items = await db.get('personal_sources?section=eq.goals&status=eq.current&select=id,title,body,trust,doc_date&order=id.asc');
+async function readGoals(db, args) {
+  // AGT-805: the career offering (section goals) reaches a store_f slug through `store_f` only.
+  const { skipKinds } = libraryTextSkips(args?.capability, []);
+  const items = (await db.get('personal_sources?section=eq.goals&status=eq.current&select=id,kind,title,body,trust,doc_date&order=id.asc'))
+    .filter(r => !skipKinds.has(r.kind));
   const kpis = await db.get('strategy_records?kind=eq.kpi&select=id,title,data,created_at&order=created_at.desc,id.asc');
   const latest = new Map();
   for (const k of kpis) { const m = k.data?.metric; if (m != null && !latest.has(m)) latest.set(m, { id: k.id, title: k.title, ...k.data }); }
@@ -1381,6 +1402,8 @@ export function libraryTextSkips(capability, catalog) {
   const reads = [].concat(EXTRA_READS[capability] ?? []);
   const skipSections = new Set();
   const skipIds = new Set();
+  // AGT-805: a slug that reads `store_f` never reads the store F kinds again as Library text.
+  const skipKinds = new Set(reads.includes('store_f') ? STORE_F_KINDS : []);
   if (reads.includes('goals')) skipSections.add('goals');
   if (reads.includes('profile_facts')) {
     skipSections.add(PROFILE_FACTS_SECTION);
@@ -1388,7 +1411,7 @@ export function libraryTextSkips(capability, catalog) {
     if (profile) skipIds.add(profile.id);
     if (master) skipIds.add(master.id);
   }
-  return { skipSections, skipIds };
+  return { skipSections, skipIds, skipKinds };
 }
 // Pure. A profile section is the current role when it is a position (`<title> | <company> | <dates>`)
 // whose last `|` field matches CURRENT_ROLE_DATES.
@@ -1462,6 +1485,124 @@ async function readProfileFacts(db) {
   return block;
 }
 
+// --- AGT-805: store F, the fixed read of the career offering and the market vocabulary --------------
+//
+// Pure. One market_term row -> its read line. last_seen is the newest seen[].date (else doc_date).
+export function storeFTerm(row) {
+  const d = isPlainObject(row?.data) ? row.data : {};
+  const dates = (Array.isArray(d.seen) ? d.seen : []).map(s => s?.date).filter(x => typeof x === 'string');
+  const last = [...dates, row?.doc_date].filter(Boolean).sort().pop() ?? null;
+  return {
+    id: row.id, term: d.term ?? row.title ?? null, sightings: Number(d.sightings) || 0, meaning: d.meaning ?? null,
+    matches: d.matches ?? null, in_his_words: d.in_his_words ?? null, how_to_use: d.how_to_use ?? null,
+    strength: d.strength ?? null, shortfall: d.shortfall ?? null, last_seen: last,
+  };
+}
+// Pure. The store F block under `bytes`: the offering whole, never cut; the terms by sightings desc, then
+// last_seen desc, the least-sighted dropped first past the cap (terms_dropped counts them). `ids` (every
+// item named) is non-enumerable, as readProfileFacts.
+export function storeFBlock(offering, terms, bytes = STORE_F_BYTES) {
+  if (!offering && !(terms ?? []).length) return null;
+  const sorted = [...(terms ?? [])].sort((a, b) => b.sightings - a.sightings
+    || String(b.last_seen ?? '').localeCompare(String(a.last_seen ?? '')) || String(a.id).localeCompare(String(b.id)));
+  const block = { offering: offering ?? null, terms: sorted, terms_dropped: 0 };
+  while (block.terms.length && byteSize(block) > bytes) {
+    block.terms = block.terms.slice(0, -1);
+    block.terms_dropped += 1;
+  }
+  if (byteSize(block) > bytes) console.error(`personal-agent: store_f is ${byteSize(block)} bytes -- over ${bytes} by the offering alone, which is never cut`);
+  Object.defineProperty(block, 'ids', { value: [...(offering ? [offering.id] : []), ...block.terms.map(t => t.id)], enumerable: false });
+  return block;
+}
+// `store_f`: the current career_offering item (its sections joined in ord order, in full) and the current
+// market_term items. Reads kinds, never an agent (the grants decide what the Library catalog lists).
+async function readStoreF(db) {
+  const rows = await db.get(`personal_sources?status=eq.current&kind=in.(${STORE_F_KINDS.join(',')})&select=id,kind,title,body,data,doc_date,version&order=id.asc`);
+  const offerRow = newestFirst(rows.filter(r => r.kind === 'career_offering'))[0] ?? null;
+  let offering = null;
+  if (offerRow) {
+    const parts = await getByIds(db, 'personal_source_sections', 'source_id', [offerRow.id], 'id,source_id,ord,heading,body', 'source_id.asc,ord.asc');
+    const s = parts.sort((a, b) => a.ord - b.ord);
+    offering = { id: offerRow.id, title: offerRow.title, text: s.length ? joinSections(s) : String(offerRow.body ?? '') };
+  }
+  return storeFBlock(offering, rows.filter(r => r.kind === 'market_term').map(storeFTerm));
+}
+
+// Pure. The store F write guard: every refusal, not just the first. A market_terms item needs term,
+// matches, in_his_words and strength (partial names its shortfall); market_terms only on STORE_F_WRITERS;
+// a records_to_write item of a store F kind is refused anywhere (a change to the record is a proposal).
+export function storeFWriteErrors(answer, capability) {
+  const errors = [];
+  if (!isPlainObject(answer)) return errors;
+  const terms = answer.market_terms;
+  if (terms !== undefined && terms !== null) {
+    if (!Array.isArray(terms)) errors.push('market_terms must be an array');
+    else if (terms.length && !STORE_F_WRITERS.includes(capability)) {
+      errors.push(`market_terms are written only by ${STORE_F_WRITERS.join(', ')} -- "${capability}" reads store F only`);
+    } else {
+      for (const [i, t] of terms.entries()) {
+        if (!isPlainObject(t)) { errors.push(`market_terms[${i}] is not an object`); continue; }
+        for (const k of ['term', 'matches', 'in_his_words', 'strength']) if (!hasValue(t[k])) errors.push(`market_terms[${i}] needs ${k}`);
+        if (hasValue(t.strength) && !STORE_F_STRENGTHS.includes(t.strength)) errors.push(`market_terms[${i}].strength must be one of ${STORE_F_STRENGTHS.join('|')} (got ${JSON.stringify(t.strength)})`);
+        if (t.strength === 'partial' && !hasValue(t.shortfall)) errors.push(`market_terms[${i}] is partial and needs shortfall`);
+      }
+    }
+  }
+  for (const [i, item] of (Array.isArray(answer.records_to_write) ? answer.records_to_write : []).entries()) {
+    if (isPlainObject(item) && STORE_F_KINDS.includes(item.kind)) {
+      errors.push(`records_to_write[${i}] is a ${item.kind}: store F is never written directly -- a change to the record is a proposal (target store_f)`);
+    }
+  }
+  return errors;
+}
+// The Library origin of a market term: one item per term, its versions sharing the origin.
+export const marketTermOrigin = term => `market-term:${String(term).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
+// Pure. The new version of a term: the previous data overlaid with the sighting's fields, seen appended,
+// sightings + 1 (sightings 1 and seen of one entry when there is no previous).
+export function marketTermData(prev, item, { agent, capability, today }) {
+  const fields = Object.fromEntries(['term', 'meaning', 'matches', 'in_his_words', 'how_to_use', 'strength', 'shortfall']
+    .filter(k => hasValue(item[k])).map(k => [k, item[k]]));
+  const before = isPlainObject(prev?.data) ? prev.data : {};
+  const seen = [...(Array.isArray(before.seen) ? before.seen : []),
+    { agent: agent ?? null, source: hasValue(item.source) ? item.source : capability, date: hasValue(item.seen_date) ? item.seen_date : today }];
+  const data = { ...before, ...fields, seen, sightings: (Number(before.sightings) || 0) + 1 };
+  if (data.strength === 'strong') delete data.shortfall;
+  return data;
+}
+const marketTermText = d => [`${d.term}`, d.meaning && `Meaning: ${d.meaning}`, d.matches && `Matches: ${d.matches}`,
+  d.in_his_words && `In his words: ${d.in_his_words}`, d.how_to_use && `How to use: ${d.how_to_use}`,
+  `Strength: ${d.strength}${d.shortfall ? ` (shortfall: ${d.shortfall})` : ''}`, `Sightings: ${d.sightings}`].filter(Boolean).join('\n');
+// --write: each market_terms item becomes a new current market_term version (one item row + one section
+// row); the previous current version, if any, is superseded by it. Never a DELETE.
+async function writeMarketTerms(args, answer) {
+  const terms = Array.isArray(answer?.market_terms) ? answer.market_terms : [];
+  if (!terms.length) return;
+  const stop = message => { console.error(`personal-agent: ${message}`); process.exitCode = 2; };
+  const db = rest();
+  const today = new Date().toISOString().slice(0, 10);
+  const out = [];
+  for (const item of terms) {
+    const origin = marketTermOrigin(item.term);
+    let prev;
+    try {
+      prev = (await db.get(`personal_sources?kind=eq.market_term&status=eq.current&origin=eq.${encodeURIComponent(origin)}&select=id,version,data&order=version.desc&limit=1`))[0] ?? null;
+    } catch (e) { return stop(e.message); }
+    const data = marketTermData(prev, item, { agent: args.agent, capability: args.capability, today });
+    let row;
+    try {
+      [row] = await db.insert('personal_sources', [{
+        kind: 'market_term', title: `Market term: ${data.term}`, body: null, data, origin, section: 'market',
+        trust: 'extracted', sensitivity: 'personal_private', doc_date: data.seen[data.seen.length - 1].date,
+        version: prev ? (Number(prev.version) || 1) + 1 : 1, status: 'current',
+      }]);
+      await db.insert('personal_source_sections', [{ source_id: row.id, ord: 0, heading: data.term, body: marketTermText(data) }]);
+      if (prev) await db.patch(`personal_sources?id=eq.${encodeURIComponent(prev.id)}`, { status: 'superseded', superseded_by: row.id, updated_at: new Date().toISOString() });
+    } catch (e) { return stop(e.message); }
+    out.push({ id: row.id, term: data.term, version: row.version, sightings: data.sightings, superseded: prev?.id ?? null });
+  }
+  process.stdout.write(JSON.stringify({ market_terms: out }) + '\n');
+}
+
 // AGT-722. Pure. The catalog rows a capability may see: never a denied id; and, for a capability in
 // LIBRARY_PRIVATE_SECTIONS, never a client_private item outside its named sections.
 export function libraryAllowed(rows, deniedIds = [], capability = null) {
@@ -1523,7 +1664,9 @@ function readVision() {
 // The principal's own material, only the kinds this agent holds a grant row for.
 async function readPersonalSources(db, args) {
   const grants = await db.get(`personal_source_grants?agent_id=eq.${encodeURIComponent(args.agent)}&select=kind`);
-  const kinds = [...new Set(grants.map(g => g.kind).filter(Boolean))];
+  // AGT-805: a store_f slug reads the store F kinds through `store_f` only (libraryTextSkips).
+  const { skipKinds } = libraryTextSkips(args.capability, []);
+  const kinds = [...new Set(grants.map(g => g.kind).filter(Boolean))].filter(k => !skipKinds.has(k));
   if (!kinds.length) return null;
   return (await db.get(`personal_sources?kind=in.(${kinds.map(k => encodeURIComponent(k)).join(',')})` +
     '&select=id,kind,title,body,data,origin,voice,created_at&order=created_at.asc,id.asc')).map(r => ({ ...recordHead(r), origin: r.origin, voice: r.voice }));
@@ -1700,6 +1843,8 @@ const EXTRA_READERS = {
   goals: readGoals,
   // AGT-725
   profile_facts: readProfileFacts,
+  // AGT-805
+  store_f: readStoreF,
 };
 
 async function render(args) {
@@ -1791,8 +1936,16 @@ function loadAnswer(raw) {
 async function write(args) {
   let answer;
   try { answer = loadAnswer(args.answer); } catch (e) { fail(`--answer is not readable JSON: ${e.message}`); }
+  // AGT-805: the store F guard runs before any store's own check; nothing is written on a refusal.
+  const storeF = storeFWriteErrors(answer, args.capability);
+  if (storeF.length) fail(`answer refused, nothing written: ${storeF.join('; ')}`);
   const store = storeFor(args.capability);
-  if (store.write) return store.write(args, answer);
+  if (store.write) {
+    await store.write(args, answer);
+    // The vocabulary follows the store's own records, never precedes them (a refused answer writes neither).
+    if (!process.exitCode) await writeMarketTerms(args, answer);
+    return;
+  }
   const check = validateAnswer(answer);
   if (check.error) fail(`answer refused, nothing written: ${check.error}`);
 
@@ -1824,6 +1977,7 @@ async function write(args) {
     try { filed = await db.insert('market_leads', leads); } catch (e) { fail(e.message); }
   }
   process.stdout.write(JSON.stringify({ inserted: inserted.length, ids: inserted.map(r => r.id), leads: filed.length }) + '\n');
+  await writeMarketTerms(args, answer);
 }
 
 // AGT-543. The humor store's --write: the deny list is every phrase_set row's data.deny_list, read
@@ -2289,6 +2443,7 @@ export function writingRecordErrors(kind, data, { vendorUrls = new Set() } = {})
   switch (kind) {
     case 'proposal':
       oneOf('target', PROPOSAL_TARGETS);
+      if (d.target === 'store_f') oneOf('size', STORE_F_PROPOSAL_SIZES);
       for (const k of ['section', 'current', 'proposed', 'reason', 'source']) need(k);
       break;
     case 'practice':

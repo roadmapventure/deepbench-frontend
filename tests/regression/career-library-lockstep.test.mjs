@@ -44,7 +44,8 @@ async function run() {
     assert.deepEqual(fixed, ["profile_facts", "library", "goals"], "control: the writing slug's fixed reads");
     for (const s of CAREER_LIBRARY_SLUGS) {
       assert.ok(Object.prototype.hasOwnProperty.call(READ_MAP, s), `${s} is a career slug`);
-      assert.deepEqual(reads(s), [...fixed, "writing_notes"], `${s} reads the fixed reads then writing_notes`);
+      // AGT-805: store_f leads every career slug's reads (pin moved, not weakened).
+      assert.deepEqual(reads(s), ["store_f", ...fixed, "writing_notes"], `${s} reads store_f, the fixed reads, then writing_notes`);
       assert.deepEqual(CAREER_LIBRARY_SECTIONS[s], WRITING_LIBRARY_SECTIONS[WRITER], `${s} reads the writing slugs' sections`);
       assert.deepEqual(LIBRARY_PRIVATE_SECTIONS[s], LIBRARY_PRIVATE_SECTIONS[WRITER], `${s} carries the client_private line`);
       const { skipSections } = libraryTextSkips(s, []);
@@ -53,7 +54,7 @@ async function run() {
     for (const s of ["career-match-finder", "career-market-watch", "career-growth-review", "career-evidence-mining", "career-outreach-plan"]) {
       assert.ok(!reads(s).includes("library") && !reads(s).includes("writing_notes"), `control: ${s} is unchanged`);
     }
-    assert.deepEqual(reads("career-linkedin-alerts"), ["competitors"], "control: the alert review reads competitors only");
+    assert.deepEqual(reads("career-linkedin-alerts"), ["store_f", "competitors"], "control: the alert review reads store_f and competitors only (AGT-805)");
   });
 
   arm("B denies", () => {
@@ -102,11 +103,13 @@ async function run() {
 
   arm("E central", () => {
     assert.deepEqual([...CENTRAL_FACTS_SLUGS].sort(), ["humor-weekly-draft", "strategy-advise", "strategy-readiness-check"]);
-    const had = { "humor-weekly-draft": reads("humor-topic-scout"), "strategy-advise": ["library", "market", "napkin", "memory", "product", "goals", "security"],
+    // AGT-805: store_f leads every one of these slugs' reads; the facts and the notes come next (pin moved, not weakened).
+    assert.equal(reads("humor-topic-scout")[0], "store_f", "the topic scout reads store_f first");
+    const had = { "humor-weekly-draft": reads("humor-topic-scout").slice(1), "strategy-advise": ["library", "market", "napkin", "memory", "product", "goals", "security"],
       "strategy-readiness-check": ["library", "market", "memory", "product", "security"] };
     for (const s of CENTRAL_FACTS_SLUGS) {
-      assert.deepEqual(reads(s).slice(0, 2), ["central_facts", "writing_notes"], `${s} reads the facts and the notes first`);
-      assert.deepEqual(reads(s).slice(2), had[s], `${s} keeps the reads it had`);
+      assert.deepEqual(reads(s).slice(0, 3), ["store_f", "central_facts", "writing_notes"], `${s} reads store_f, then the facts and the notes, first`);
+      assert.deepEqual(reads(s).slice(3), had[s], `${s} keeps the reads it had`);
       assert.ok(!reads(s).includes("profile_facts"), `${s} carries the facts alone, not the profile or the resume`);
     }
     for (const s of ["humor-topic-scout", "strategy-daily-brief", "strategy-weekly-review", "writing-draft", ...CAREER_LIBRARY_SLUGS]) {
