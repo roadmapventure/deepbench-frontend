@@ -1,3 +1,4 @@
+// DeepBench v7.0.1129 | tests/regression/agt-642-blocked-first.test.mjs | AGT-681 -- default-exports run, so run-all.js can call it.
 // DeepBench v7.0.1004 | tests/regression/agt-642-blocked-first.test.mjs | AGT-642 -- a blocked ticket stops the line.
 //
 // John's standing decision f8e2a234 (2026-11-11): no new pick while the team can still work a
@@ -122,3 +123,4 @@ async function run() {
 }
 
 selfRun(import.meta.url, run);
+export default run;
