@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1126 | scripts/verifier.js | AGT-790 -- a red gate's detail keeps both counts; the CI gate cannot take the auto-done bar.
 // DeepBench v7.0.1116 | scripts/verifier.js | AGT-791 -- the pin check reads the graded commit's own file list.
 // DeepBench v7.0.1113 | scripts/verifier.js | AGT-541 -- 7a refuses a baseline measured on the tree it grades.
 // DeepBench v7.0.1103 | scripts/verifier.js | AGT-698 -- a suite that did not run is not-run, never red.
@@ -651,6 +652,9 @@ export const SELF_CERTIFYING_PATHS = Object.freeze([
 // scripts/verifier.js, scripts/check-session-docs.js, tests/regression/run-all.js **or the
 // Verifier's own Skill rows**" -- and until this ticket the code held only the first three. The
 // Skill was telling the agent a rule the code did not have.
+// AGT-790: the CI gate IS the verification too -- steps 4a and 8a read its conclusion. A second
+// constant: agt-67-verifier.test.mjs binds every SELF_CERTIFYING_PATHS entry to vf-guardrails.
+export const SELF_CERTIFYING_CI_FILES = Object.freeze([".github/workflows/ci.yml", "scripts/ci-new-reds.js"]);
 export const SELF_CERTIFYING_SKILL_PREFIX = "vf-";
 // The repo-side home of those rows. A change to the seed is a change to the Skills it seeds, and it
 // IS a path -- but it belongs here rather than in SELF_CERTIFYING_PATHS, because `vf-guardrails`
@@ -762,14 +766,16 @@ export function summarizeGateOutput({ stdout, stderr }) {
   const lines = `${stdout || ""}\n${stderr || ""}`
     .split("\n").map(l => l.trim()).filter(Boolean);
   const fails = lines.filter(l => l.startsWith("[FAIL]"));
-  // The pass count anchors the verdict, so it is preferred over the not-run notice when both are
-  // present -- "96/97 passed" tells a reader how much of the suite the failure represents.
-  const summary = lines.filter(l => /^regression suite:/.test(l))
-    .concat(lines.filter(l => /^NOT A FULL RUN:/.test(l)));
-  // No [FAIL] vocabulary (npm build, the hygiene tripwire) falls back to the last three lines of the
-  // COMBINED output -- stderr is concatenated last, so an npm failure still ends on its own error.
-  const chosen = fails.length ? [...fails.slice(0, 4), ...summary.slice(0, 1)] : lines.slice(-3);
-  return chosen.join(" | ");
+  // AGT-790: BOTH summary lines stay beside the failures; the cap is spent on [FAIL] text, never
+  // on them. The notice is cut at its name list: the count reaches the ledger.
+  const summary = [
+    ...lines.filter(l => /^regression suite:/.test(l)).slice(0, 1),
+    ...lines.filter(l => /^NOT A FULL RUN:/.test(l)).slice(0, 1).map(l => l.split(" (")[0]),
+  ].join(" | ");
+  // No [FAIL] vocabulary (npm build, the hygiene tripwire): the last three COMBINED lines.
+  if (!fails.length) return lines.slice(-3).join(" | ");
+  const room = Math.max(0, DETAIL_CAP - summary.length - (summary ? 3 : 0));
+  return [fails.slice(0, 4).join(" | ").slice(0, room), summary].filter(Boolean).join(" | ");
 }
 
 // ---------------------------------------------------------------------------
@@ -1736,7 +1742,7 @@ export function selfCertificationBlock(changedFiles) {
     return { blocked: true, reason: `the delivery's changed-file list could not be read, so whether this change grades itself is unknown -- fails closed (charter premise 3, "no change certifies itself").` };
   }
   const norm = changedFiles.map(f => String(f).replace(/\\/g, "/").replace(/^\.\//, ""));
-  const hits = SELF_CERTIFYING_PATHS.filter(p => norm.includes(p));
+  const hits = [...SELF_CERTIFYING_PATHS, ...SELF_CERTIFYING_CI_FILES].filter(p => norm.includes(p));
   if (hits.length) {
     return { blocked: true, reason: `this delivery changes ${hits.join(", ")} -- the verification itself. Charter premise 3: "no change certifies itself; a fresh-context verifier must pass it." The verdict stands; the auto-done bar does not apply.` };
   }
@@ -1839,14 +1845,14 @@ export function autoDoneEligibility({ verdict, epicName, epicProjectExecuting, p
   if (ladderGranted) {
     return {
       eligible: true,
-      reason: `all three gates green, and the diff touches none of ${SELF_CERTIFYING_PATHS.join(", ")} -- class '${priorityClass ?? "(none)"}' is work class '${classAutonomy.work_class ?? "(unnamed)"}' at rung ${classAutonomy.rung ?? "(unread)"} >= auto_done_rung ${classAutonomy.auto_done_rung ?? "(unread)"}, so the ladder granted this class the bar (M6, SES-122). Epic '${epicName ?? "(none)"}'; a rung is a fact about the class, not about the epic. Reverse stays one tap away.`,
+      reason: `all three gates green, and the diff touches none of ${[...SELF_CERTIFYING_PATHS, ...SELF_CERTIFYING_CI_FILES].join(", ")} -- class '${priorityClass ?? "(none)"}' is work class '${classAutonomy.work_class ?? "(unnamed)"}' at rung ${classAutonomy.rung ?? "(unread)"} >= auto_done_rung ${classAutonomy.auto_done_rung ?? "(unread)"}, so the ladder granted this class the bar (M6, SES-122). Epic '${epicName ?? "(none)"}'; a rung is a fact about the class, not about the epic. Reverse stays one tap away.`,
     };
   }
   return {
     eligible: true,
     reason: widened
-      ? `all three gates green on a delivery in an ${AUTO_DONE_SCOPE} (epic '${epicName ?? "(none)"}') in class '${priorityClass ?? "(none)"}', and the diff touches none of ${SELF_CERTIFYING_PATHS.join(", ")} -- a project is executing, so the ${AUTO_DONE_CLASS_PREFIX} - Tooling restriction of charter decision 2 is suspended for its duration. Reverse stays one tap away.`
-      : `all three gates green on a ${AUTO_DONE_CLASS_PREFIX} - Tooling delivery in an ${AUTO_DONE_SCOPE} (epic '${epicName ?? "(none)"}'), and the diff touches none of ${SELF_CERTIFYING_PATHS.join(", ")} -- the interim bar of charter decision 2 is met. Reverse stays one tap away.`,
+      ? `all three gates green on a delivery in an ${AUTO_DONE_SCOPE} (epic '${epicName ?? "(none)"}') in class '${priorityClass ?? "(none)"}', and the diff touches none of ${[...SELF_CERTIFYING_PATHS, ...SELF_CERTIFYING_CI_FILES].join(", ")} -- a project is executing, so the ${AUTO_DONE_CLASS_PREFIX} - Tooling restriction of charter decision 2 is suspended for its duration. Reverse stays one tap away.`
+      : `all three gates green on a ${AUTO_DONE_CLASS_PREFIX} - Tooling delivery in an ${AUTO_DONE_SCOPE} (epic '${epicName ?? "(none)"}'), and the diff touches none of ${[...SELF_CERTIFYING_PATHS, ...SELF_CERTIFYING_CI_FILES].join(", ")} -- the interim bar of charter decision 2 is met. Reverse stays one tap away.`,
   };
 }
 
