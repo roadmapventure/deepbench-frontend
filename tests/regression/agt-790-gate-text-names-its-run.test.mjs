@@ -1,3 +1,4 @@
+// DeepBench v7.0.1128 | tests/regression/agt-790-gate-text-names-its-run.test.mjs | AGT-790 -- arms E-H: the green arm.
 // DeepBench v7.0.1126 | tests/regression/agt-790-gate-text-names-its-run.test.mjs | AGT-790
 //
 // A RED GATE'S DETAIL NAMES ITS NOT-RUN COUNT, AND THE CI GATE CANNOT CERTIFY ITSELF.
@@ -90,6 +91,53 @@ async function run() {
   assert.equal(sum({ stdout: "a\nb\nc\nd", stderr: "npm ERR! build broke" }), "c | d | npm ERR! build broke",
     "output with no [FAIL] vocabulary (npm build, the hygiene tripwire) still falls back to the last three COMBINED lines");
 
+  // --- (E)-(H) THE GREEN ARM: the counts LEAD, and the cap is cut from the tail ----------------
+  //
+  // The retired green arm was `lines.slice(-3)` -- position, not evidence, which is the same defect
+  // clause (A) caught on the red arm wearing its other hat. A green run whose last lines are one
+  // long [NOT RUN] line or three stderr warnings reached the ledger carrying NEITHER count, which
+  // is 8 of the 16 countless green texts live (and both of the two newest ships). So each arm below
+  // REPLAYS the retired expression on the same lines as its own negative control: if the old form
+  // would have kept the counts, the arm proves nothing.
+  const GP = "regression suite: 4/4 passed";
+  const LONG = "[NOT RUN] z.test.mjs part W -- " + "y".repeat(700);
+  const P1 = "  [PASS] a.test.mjs";
+  const P2 = "  [PASS] b.test.mjs";
+  const names = Array.from({ length: 30 }, (_, i) => "agt-" + (100 + i) + "-some-long-test-name.test.mjs").join(", ");
+  const BIGHEAD = "NOT A FULL RUN: 40 parts declared not-run across 30 tests";
+  const BIG = BIGHEAD + " (" + names + "). Those parts are UNVERIFIED -- a green suite does not cover them.";
+  const retiredGreen = ls => ls.map(l => l.trim()).filter(Boolean).slice(-3).join(" | ").slice(0, DETAIL_CAP);
+
+  // (E) one 700-byte [NOT RUN] line used to spend the whole cap. The counts lead; the cap bites the tail.
+  const eIn = [P1, "  " + LONG, "", GP, NOTICE];
+  const eOut = sum({ stdout: eIn.join("\n"), stderr: "" });
+  assert.equal(eOut.length, DETAIL_CAP,
+    `an over-cap green detail must land exactly on DETAIL_CAP (${DETAIL_CAP}), got ${eOut.length}`);
+  assert.ok(eOut.startsWith(GP + " | " + NOTICE + " | [PASS] a.test.mjs | [NOT RUN] z.test."),
+    "a green detail opens on the pass count and the WHOLE notice, then the run's own lines -- the " +
+    "700-byte [NOT RUN] line is what the cap cuts, never the counts");
+  const eControl = retiredGreen(eIn);
+  assert.ok(!/regression suite:/.test(eControl) && !/NOT A FULL RUN/.test(eControl),
+    "negative control is broken: the retired last-three form must carry NEITHER count on these same " +
+    "lines -- if it carries one, this arm no longer discriminates the fix from the pre-change code");
+
+  // (F) stderr warnings came last, so they were the whole detail. Now they are the tail, not the head.
+  assert.equal(sum({ stdout: [P1, GP, NOTICE].join("\n"), stderr: "w1\nw2\nw3" }),
+    [GP, NOTICE, "w1", "w2", "w3"].join(" | "),
+    "both counts lead a green detail even when three stderr lines came last");
+  assert.equal(retiredGreen([P1, GP, NOTICE, "w1", "w2", "w3"]), "w1 | w2 | w3",
+    "negative control is broken: the retired form must return the three warnings ALONE here");
+
+  // (G) a notice too long to keep whole falls back to its count clause -- never to no clause at all.
+  assert.equal(sum({ stdout: [P1, P2, GP, BIG].join("\n"), stderr: "" }),
+    [GP, BIGHEAD, "[PASS] a.test.mjs", "[PASS] b.test.mjs"].join(" | "),
+    "when pass line + whole notice exceed the cap the notice is cut at its name list (D2/D5): the " +
+    "count clause is what is guaranteed, and the detail still names the run's own lines");
+
+  // (H) a green run with no notice at all: the pass count and nothing invented.
+  assert.equal(sum({ stdout: [P1, GP].join("\n"), stderr: "" }), GP + " | [PASS] a.test.mjs",
+    "a green run that declared nothing not-run leads with its pass count and adds no stray separator");
+
   // --- (D) the CI gate is in its own constant, and it cannot take the auto-done bar --------------
   assert.deepEqual(SELF_CERTIFYING_CI_FILES, [".github/workflows/ci.yml", "scripts/ci-new-reds.js"],
     "the CI half of the verification is these two files");
@@ -113,7 +161,10 @@ async function run() {
     "not-run notice; (B) the 600-byte cap is spent on [FAIL] text, landing exactly on DETAIL_CAP with " +
     "both counts still at the tail; (C) no-notice / no-summary / no-[FAIL] shapes unchanged; (D) the " +
     "two CI files block the auto-done bar by name from their own constant, SELF_CERTIFYING_PATHS is " +
-    "untouched, and three near-miss paths stay unblocked.");
+    "untouched, and three near-miss paths stay unblocked; (E)-(H) a green detail LEADS with its " +
+    "pass count and not-run notice -- the cap cuts the tail (E), stderr lines follow rather than " +
+    "replace the counts (F), an over-long notice falls back to its count clause (G), a notice-less " +
+    "run adds nothing (H), each against the retired last-three form as its control.");
 }
 
 export default run;

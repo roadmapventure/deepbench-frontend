@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1128 | scripts/verifier.js | AGT-790 -- a green gate's detail leads with its pass count and not-run notice.
 // DeepBench v7.0.1127 | scripts/verifier.js | AGT-822 -- a re-graded gate line states the count of tests its CI job ran, or its absence.
 // DeepBench v7.0.1126 | scripts/verifier.js | AGT-790 -- a red gate's detail keeps both counts; the CI gate cannot take the auto-done bar.
 // DeepBench v7.0.1116 | scripts/verifier.js | AGT-791 -- the pin check reads the graded commit's own file list.
@@ -773,8 +774,16 @@ export function summarizeGateOutput({ stdout, stderr }) {
     ...lines.filter(l => /^regression suite:/.test(l)).slice(0, 1),
     ...lines.filter(l => /^NOT A FULL RUN:/.test(l)).slice(0, 1).map(l => l.split(" (")[0]),
   ].join(" | ");
-  // No [FAIL] vocabulary (npm build, the hygiene tripwire): the last three COMBINED lines.
-  if (!fails.length) return lines.slice(-3).join(" | ");
+  // No [FAIL] and no summary line (npm build, the hygiene tripwire): the last three COMBINED lines.
+  if (!fails.length && !summary) return lines.slice(-3).join(" | ");
+  if (!fails.length) {
+    // AGT-790 green arm: the counts LEAD and the cap is cut from the tail, never from them. The
+    // notice keeps its name list when the whole of it fits; otherwise its count clause.
+    const whole = [/^regression suite:/, /^NOT A FULL RUN:/]
+      .flatMap(re => lines.filter(l => re.test(l)).slice(0, 1)).join(" | ");
+    const rest = lines.filter(l => !/^(regression suite|NOT A FULL RUN):/.test(l)).slice(-3);
+    return [whole.length <= DETAIL_CAP ? whole : summary, ...rest].join(" | ").slice(0, DETAIL_CAP);
+  }
   const room = Math.max(0, DETAIL_CAP - summary.length - (summary ? 3 : 0));
   return [fails.slice(0, 4).join(" | ").slice(0, room), summary].filter(Boolean).join(" | ");
 }
