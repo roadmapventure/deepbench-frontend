@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DeepBench v7.0.1127 | scripts/verifier.js | AGT-822 -- a re-graded gate line states the count of tests its CI job ran, or its absence.
 // DeepBench v7.0.1126 | scripts/verifier.js | AGT-790 -- a red gate's detail keeps both counts; the CI gate cannot take the auto-done bar.
 // DeepBench v7.0.1116 | scripts/verifier.js | AGT-791 -- the pin check reads the graded commit's own file list.
 // DeepBench v7.0.1113 | scripts/verifier.js | AGT-541 -- 7a refuses a baseline measured on the tree it grades.
@@ -1665,6 +1666,15 @@ export function ciJobsForGates(gateKeys) {
   return out;
 }
 
+// AGT-822: a re-graded gate names its run. `tests_run` is read off the CI job entry; a conclusion
+// carrying none says so. Cut to DETAIL_CAP from the conclusion, never from the count.
+export function regradeSourceLine(job, entry) {
+  const n = entry?.tests_run;
+  const count = Number.isInteger(n) && n >= 0 ? String(n) : "not published by CI";
+  const tail = `; tests run: ${count}`;
+  return `CI job "${job}" = ${String(entry?.conclusion ?? "null")}`.slice(0, DETAIL_CAP - tail.length) + tail;
+}
+
 // FEATURE: SES-403 -- the verdict a CI conclusion supports, or the named reason there is none.
 //
 //   gates  the PRIOR verdict's stored gate statuses ({ build, regression, hygiene }).
@@ -1707,7 +1717,7 @@ export function regradeGateResults({ gates, jobs } = {}) {
       reason: `there is no CI conclusion to re-grade against (${Array.isArray(jobs) ? "the conclusion carries an empty job list" : "none could be read"}) -- the absence of evidence about dev head is never evidence that dev head is green.` };
   }
   const byName = new Map(jobs.filter(j => j && j.name !== undefined && j.name !== null)
-    .map(j => [String(j.name), j.conclusion ?? null]));
+    .map(j => [String(j.name), j]));
   const gateResults = {};
   const source = {};
   const absent = [];
@@ -1719,9 +1729,9 @@ export function regradeGateResults({ gates, jobs } = {}) {
     }
     const [job] = ciJobsForGates([g.key]);
     if (!byName.has(job)) { absent.push(`${g.label} -> "${job}"`); continue; }
-    const conclusion = byName.get(job);
+    const conclusion = byName.get(job).conclusion ?? null;
     gateResults[g.key] = conclusion === "success" ? "green" : "red";
-    source[g.key] = `CI job "${job}" = ${conclusion ?? "null"}`;
+    source[g.key] = regradeSourceLine(job, byName.get(job));
   }
   if (absent.length) {
     return { ok: false, gateResults: null, source: null,
