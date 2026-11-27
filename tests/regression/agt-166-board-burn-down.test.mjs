@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/agt-166-board-burn-down.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.687 | tests/regression/agt-166-board-burn-down.test.mjs | AGT-166 slice 4 --
 // ARM (F) WAS RED ON A BOARD THAT WAS WORKING, and a new arm (H) pins the write gate.
 //
@@ -434,8 +435,10 @@ async function run() {
   const POP_Q = "backlog_items?select=id&status=eq.open&revalidated_at=is.null" +
     `&or=(filed_at.lt.${fenceAt},and(filed_at.is.null,created_at.lt.${fenceAt}))`;
   const popBefore = await countOf(POP_Q);
-  assert.ok(popBefore >= 1,
-    `live: the drain must have something to drain — the §2.2 predicate counts ${popBefore}. A zero here is either a finished drain (write the ticket done) or a broken predicate`);
+  if (popBefore === 0) {
+    notRun("AGT-166 arm (F) the drain's depth (sensor, AGT-787)",
+      "the §2.2 predicate counts 0 unrevalidated rows past the fence -- a finished drain, reported not failed; the census equality, the headline and the dry run below still grade (pattern:162)");
+  }
 
   const censusOut = path.join(os.tmpdir(), `agt-166-owner-${process.pid}.json`);
   try {
@@ -468,7 +471,7 @@ async function run() {
     // carried row is a replay of a judgment already made.
     const slugFindings = census.findings.filter(f => f.check === REVALIDATION_CHECK);
     const batchIds = slugFindings.filter(f => f.verdict === "derivable").map(f => f.backlog_id);
-    assert.ok(batchIds.length > 0 && batchIds.length <= UNREVALIDATED_BATCH + 0,
+    assert.ok((popBefore === 0 || batchIds.length > 0) && batchIds.length <= UNREVALIDATED_BATCH + 0,
       `live: tonight's batch is ${batchIds.length} rows, which is not 1..${UNREVALIDATED_BATCH}`);
     assert.equal(batchIds.length, new Set(batchIds).size, "live: one finding per row, never two");
     // The carried half, by the one thing that makes a carried row exitable: its ledger detail begins

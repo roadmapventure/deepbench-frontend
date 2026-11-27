@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.1084 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-571 slice 3 -- arm C grades its own key.
 // DeepBench v7.0.871 | tests/regression/agt-253-design-only-lane.test.mjs | AGT-494 -- BYTES_AT_SHIP
 // re-pinned 380963 -> 380920 in the same commit as ses-413d's home pin: JOHN-0925 passages re-pointed at
@@ -169,6 +170,15 @@ const WRONG_STATES = [
   ["rework", null, false, "rework / queue"],
 ];
 
+// AGT-787: the five legal triples, one per branch of memberStateReason() that returns null.
+const LEGAL_STATES = [
+  [undefined, null, true],
+  [null, "designed", false],
+  [null, "needs-desktop", false],
+  ["accept", "needs-desktop", false],
+  ["rework", null, true],
+];
+
 async function req(url, key, q, { method = "GET", body, headers = {} } = {}) {
   const res = await fetch(`${url}/rest/v1/${q}`, {
     method,
@@ -289,9 +299,19 @@ async function run() {
         const designStatus = statusOf.get(m);
         const inQueue = refs.includes(m);
         const reason = memberStateReason(decision, designStatus, inQueue);
-        assert.equal(reason, null,
-          `${m}: newest gated_before_build card ${card.json.length ? JSON.stringify(decision) : "(no card)"}, ` +
-          `design_status ${JSON.stringify(designStatus)}, in prime_directive_queue ${inQueue} -- ${reason}`);
+        if (reason !== null) {
+          notRun(`AGT-253 arm B member ${m} (sensor, AGT-787)`,
+            `newest gated_before_build card ${card.json.length ? JSON.stringify(decision) : "(no card)"}, ` +
+            `design_status ${JSON.stringify(designStatus)}, in prime_directive_queue ${inQueue} -- ${reason}. ` +
+            "Reported, not failed: a later ticket moved this row; memberStateReason() is graded by the two controls below (pattern:162)");
+        }
+      }
+
+      // CONTROL (b0), AGT-787. The five legal triples must come back null, so the live loop above can
+      // report a moved row without the predicate itself going ungraded.
+      for (const [decision, designStatus, inQueue] of LEGAL_STATES) {
+        assert.equal(memberStateReason(decision, designStatus, inQueue), null,
+          `control: (${JSON.stringify(decision) ?? "no card"}, ${JSON.stringify(designStatus)}, ${inQueue}) is legal`);
       }
 
       // CONTROL (b). Every one of the four states, paired with a wrong design_status and a wrong

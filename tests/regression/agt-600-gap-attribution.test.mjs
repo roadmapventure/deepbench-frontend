@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/agt-600-gap-attribution.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.995 | tests/regression/agt-600-gap-attribution.test.mjs | AGT-600 — THE GAP
 // ATTRIBUTION DECLINES A CENSUS COUNT, AND IT STILL CANNOT BLOCK THE FINDING IT ATTRIBUTES.
 //
@@ -181,12 +182,11 @@ async function theMigrationLandedAndNoCensusCountFollowed() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ p_from: PREV_VERSION, p_to: FAR_FUTURE }),
   });
-  assert.equal(applied.length, 1,
-    `exactly ONE migration must be applied after ${PREV_VERSION}, got ${applied.length}: ` +
-    `${JSON.stringify(applied.map(m => m?.name))}`);
-  assert.equal(String(applied[0]?.name), UP_NAME,
-    `that migration must be '${UP_NAME}', got '${applied[0]?.name}'`);
-  const version = versionToIso(applied[0]?.version);
+  const mine = applied.filter(m => String(m?.name) === UP_NAME);
+  assert.equal(mine.length, 1,
+    `exactly ONE migration named '${UP_NAME}' must be applied after ${PREV_VERSION}, got ${mine.length} ` +
+    `of ${applied.length} applied since`);
+  const version = versionToIso(mine[0]?.version);
 
   // (b) The down was captured BEFORE the up (runner-cycle.md step 6), which is exactly why it must
   // carry the PRIOR body: a down that mentions the census literal is a down captured AFTER the

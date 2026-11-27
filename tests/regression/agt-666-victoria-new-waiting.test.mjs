@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/agt-666-victoria-new-waiting.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.1020 | tests/regression/agt-666-victoria-new-waiting.test.mjs | AGT-666 -- Victoria's daily check reaches a NEW waiting ticket nobody has graded.
 //
 // John's rule (decision 572d2b06, 2026-11-13): build it, but she only grades waiting tickets filed
@@ -200,15 +201,23 @@ async function run() {
   }
 
   const hdr = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+  // AGT-787: PAGED. PostgREST answers at most 1,000 rows whatever `limit` says, so a read that can
+  // outgrow one page walks `offset` until it holds the count the server reports; a query that can
+  // span pages carries its own `order`.
   const get = async q => {
-    const r = await fetch(`${base}/rest/v1/${q}`, { headers: { ...hdr, Prefer: "count=exact" } });
-    if (!r.ok) assert.fail(`GET ${q} -> HTTP ${r.status}: ${await r.text().catch(() => "")}`);
-    const out = await r.json();
-    const total = Number(String(r.headers.get("content-range") ?? "").split("/")[1]);
-    if (Number.isInteger(total)) {
-      assert.strictEqual(out.length, total, `GET ${q} returned ${out.length} of ${total} rows -- raise the limit.`);
+    const out = [];
+    for (;;) {
+      const r = await fetch(`${base}/rest/v1/${q}&offset=${out.length}`, { headers: { ...hdr, Prefer: "count=exact" } });
+      if (!r.ok) assert.fail(`GET ${q} -> HTTP ${r.status}: ${await r.text().catch(() => "")}`);
+      const page = await r.json();
+      out.push(...page);
+      const total = Number(String(r.headers.get("content-range") ?? "").split("/")[1]);
+      if (!Number.isInteger(total)) return out;
+      if (out.length >= total || page.length === 0) {
+        assert.strictEqual(out.length, total, `GET ${q} returned ${out.length} of ${total} rows after paging.`);
+        return out;
+      }
     }
-    return out;
   };
   const rpc = async (fn, body = {}) => {
     const r = await fetch(`${base}/rest/v1/rpc/${fn}`, { method: "POST", headers: hdr, body: JSON.stringify(body) });
@@ -255,7 +264,7 @@ async function run() {
   const open = await get("backlog_items?status=in.(open,partial)&epic_id=not.is.null"
     + "&select=backlog_id,epic_id,filed_at&limit=10000");
   const graded = new Set((await get("runner_decisions?kind=eq.requirement-check&reversed_at=is.null"
-    + "&backlog_id=not.is.null&select=backlog_id&limit=100000")).map(r => r.backlog_id));
+    + "&backlog_id=not.is.null&select=backlog_id&order=id")).map(r => r.backlog_id));
   const stamped = new Set(only(await rpc("victoria_charter_state")).stamped ?? []);
   const raw = open.filter(b => slugOfEpic.has(b.epic_id) && !graded.has(b.backlog_id) && !stamped.has(b.backlog_id));
   const rawById = new Map(raw.map(b => [b.backlog_id, b]));

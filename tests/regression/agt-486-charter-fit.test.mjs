@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/agt-486-charter-fit.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.861 | tests/regression/agt-486-charter-fit.test.mjs | AGT-486 -- THE GUARD ON
 // "CHARTERS REACH VICTORIA, AND A NO-FIT TICKET IS READ ONCE".
 //
@@ -164,9 +165,9 @@ async function run() {
         "fingerprint) -- no LIKE, no stamp from a charter set that has moved");
       const stale = all.filter(d => d.backlog_id &&
         d.summary !== fitStampSummary(String(d.backlog_id), state.fingerprint));
-      for (const d of stale) {
+      for (const d of stale.filter(s => !expected.includes(String(s.backlog_id)))) {
         assert.ok(!state.stamped.includes(String(d.backlog_id)),
-          `${d.backlog_id} holds a fit-stamp from ANOTHER fingerprint and must not be in stamped`);
+          `${d.backlog_id} holds ONLY fit-stamps from ANOTHER fingerprint and must not be in stamped`);
       }
 
       liveCharters = want;

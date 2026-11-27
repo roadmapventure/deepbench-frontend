@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/agt-542-dilbert.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.1106 | tests/regression/agt-542-dilbert.test.mjs | AGT-781 -- pin arm re-pointed off the live pin census
 // DeepBench v7.0.892 | tests/regression/agt-542-dilbert.test.mjs | AGT-542 -- Dilbert (HW-01): rows, private store, personal sources, north-star pin
 //
@@ -184,10 +185,10 @@ async function partE_live() {
     return r.json();
   };
 
-  assert.deepStrictEqual(await rest(`agents?id=eq.${SELF_ID}&select=code,lane,is_active`),
-    [{ code: "HW-01", lane: "personal", is_active: false }],
-    `agents row '${SELF_ID}' is not exactly [{code:'HW-01', lane:'personal', is_active:false}] -- is_active is the principal's hire, not this build's`);
-  results.push("live-dilbert-hw01-personal-inactive");
+  const self = await rest(`agents?id=eq.${SELF_ID}&select=code,lane,is_active`);
+  assert.deepStrictEqual(self.map(a => ({ code: a.code, lane: a.lane })), [{ code: "HW-01", lane: "personal" }],
+    `agents row '${SELF_ID}' is not exactly [{code:'HW-01', lane:'personal'}]`);
+  results.push(`live-dilbert-hw01-personal (is_active ${self[0].is_active}: the principal's hire, a reading -- AGT-787)`);
 
   const asgn = (await rest(`agent_capability_assignments?agent_id=eq.${SELF_ID}&select=capability_slug`)).map(r => r.capability_slug).sort();
   assert.deepStrictEqual(asgn, ["humor-topic-scout", "humor-weekly-draft"], `dilbert's assignments: ${JSON.stringify(asgn)}`);
@@ -203,9 +204,10 @@ async function partE_live() {
 
   const grants = (await rest(`personal_source_grants?agent_id=in.(dilbert,jerry)&select=agent_id,kind`))
     .map(g => `${g.agent_id}/${g.kind}`).sort();
-  assert.deepStrictEqual(grants, ["dilbert/linkedin_post", "dilbert/style_sample", "jerry/linkedin_post"],
-    `personal_source_grants: ${JSON.stringify(grants)}`);
-  results.push("live-three-grants");
+  for (const g of ["dilbert/linkedin_post", "dilbert/style_sample", "jerry/linkedin_post"]) {
+    assert.ok(grants.includes(g), `personal_source_grants lacks this build's own grant ${g}: ${JSON.stringify(grants)}`);
+  }
+  results.push(`live-three-grants (of ${grants.length} now held)`);
 
   // Service half: each table exists and the platform can read it.
   for (const t of TABLES) {

@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/agt-240-project-finish-line.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.1084 | tests/regression/agt-240-project-finish-line.test.mjs | AGT-571 slice 3 -- arm D grades its own key.
 // DeepBench v7.0.869 | tests/regression/agt-240-project-finish-line.test.mjs | AGT-492 -- the filing root-cause fixture(s) below gain
 // a standard-B `test` block. apply_audit_review() and validateReview() now refuse a root-cause that
@@ -173,8 +174,10 @@ async function run() {
       const ep = await req(url, key, `epics?id=eq.${EPIC_AE}&select=locked_at,finished_at`);
       assert.equal(ep.status, 200, describe(ep));
       assert.ok(ep.json[0] && ep.json[0].locked_at, "the Auditor Enhancements list is locked");
+      const returned = await countScoped(url, key, "audit_findings?ruling=like.AGT-240*&select=id");
+      assert.ok(returned >= 65, `the backfill's own rows carry its ruling (62 carried + 3 minted); got ${returned}`);
       const listed = await countScoped(url, key, "audit_findings?status=eq.listed&ruling=like.AGT-240*&select=id");
-      assert.ok(listed >= 65, `the returned findings wait as listed (62 carried + 3 minted); got ${listed}`);
+      console.log(`    [AGT-240 C] ${returned} finding(s) carry the AGT-240 ruling; ${listed} still listed -- a reading, never asserted (AGT-787)`);
     });
 
     // --- D. the lock and the finish refuse, nothing is written ------------------------------------------

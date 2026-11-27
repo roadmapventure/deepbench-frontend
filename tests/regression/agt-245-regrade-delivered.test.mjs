@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.962 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-586 -- the charge clause REFUSES a delivery's own standing reds; clause (a)'s third case and its two controls.
 // DeepBench v7.0.930 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-555 -- `--next` has a BOARD leg, so exit 3 is a fact about the board; clause (j) and the live clause's fall-through.
 // DeepBench v7.0.799 | tests/regression/agt-245-regrade-delivered.test.mjs | AGT-304 slice 10 -- the live clause's pair must still be `delivered`, or no leg runs.
@@ -244,10 +245,10 @@ export async function theRowIsInTheLedger(base, key) {
     `${TICKET} must carry at least TWO runner_verdicts rows -- the ${pair.version} block and AGT-245's delta ` +
       `re-grade of it -- and it carries ${rows.length}. A slice that ran both legs and recorded nothing leaves ` +
       "this at 1, which is exactly what this arm exists to catch");
-  const row = rows[0];
-  assert.ok(String(row.reasoning || "").startsWith(prefix),
-    `${TICKET}'s newest verdict does not open with ${JSON.stringify(prefix)} -- so it was not written by this ` +
-      `lane about this pair. It reads: ${JSON.stringify(String(row.reasoning || "").slice(0, 160))}`);
+  const row = rows.find(r => String(r.reasoning || "").startsWith(prefix));
+  assert.ok(row,
+    `none of ${TICKET}'s ${rows.length} verdicts opens with ${JSON.stringify(prefix)} -- so this lane wrote no row ` +
+      `about this pair. The newest reads: ${JSON.stringify(String(rows[0].reasoning || "").slice(0, 160))}`);
   assert.equal(row.graded_sha, pair.ship_sha,
     `the re-grade must be filed against the pair's SHIP tree ${String(pair.ship_sha).slice(0, 8)}, never dev HEAD -- ` +
       "a row from the ordinary verifier carries whatever was pushed last, which is a peer's tree");
@@ -483,10 +484,10 @@ export async function theSecondRowIsInTheLedger(base, key) {
   assert.ok(rows.length >= 2,
     `${NEXT_TICKET} must carry at least TWO runner_verdicts rows -- the ${pair.version} block and AGT-245's delta ` +
       `re-grade of it -- and it carries ${rows.length}. A --next that graded both legs and recorded nothing leaves this at 1`);
-  const row = rows[0];
-  assert.ok(String(row.reasoning || "").startsWith(prefix),
-    `${NEXT_TICKET}'s newest verdict does not open with ${JSON.stringify(prefix)} -- so it was not written by this lane ` +
-      `about this pair. It reads: ${JSON.stringify(String(row.reasoning || "").slice(0, 160))}`);
+  const row = rows.find(r => String(r.reasoning || "").startsWith(prefix));
+  assert.ok(row,
+    `none of ${NEXT_TICKET}'s ${rows.length} verdicts opens with ${JSON.stringify(prefix)} -- so this lane wrote no row ` +
+      `about this pair. The newest reads: ${JSON.stringify(String(rows[0].reasoning || "").slice(0, 160))}`);
   assert.equal(row.graded_sha, pair.ship_sha,
     `the re-grade must be filed against the pair's SHIP tree ${String(pair.ship_sha).slice(0, 8)}, never dev HEAD`);
 

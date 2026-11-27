@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/ses-340-projects-govern.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.878 | tests/regression/ses-340-projects-govern.test.mjs | AGT-304 slice 18 -- whole-board reads go through `pgAll()`; `limit=2000` was capped at 1000 of 1393 rows, so a ref past row 1000 read as missing.
 // DeepBench v7.0.497 | tests/regression/ses-340-projects-govern.test.mjs | SES-401 -- clause (b) is
 // extracted into theLaneServesOnlyTheExecutingProject() and now reads the four-state board
@@ -160,7 +161,10 @@ async function theProjectsTableGovernsTheLiveBoard() {
 
   // ---- (d) project_blockers answers "what do you need from me to unblock <project>" -- and it has
   // a project-scope row for the executing project, not only per-ticket rows.
-  const blockers = await pg(url, key, "project_blockers?select=project,project_status,scope,backlog_id&limit=1000");
+  // AGT-787: two SCOPED reads. The whole view is past PostgREST's 1,000-row page, and the project
+  // rows sort after the ticket rows, so one unscoped read lost them.
+  const blockers = await pg(url, key, "project_blockers?scope=eq.project&select=project,project_status,scope,backlog_id&limit=1000");
+  const ticketRows = await pg(url, key, "project_blockers?scope=eq.ticket&select=scope&limit=1");
   for (const p of executing) {
     const row = blockers.find(b => b.scope === "project" && b.project === p.slug);
     assert.ok(
@@ -175,7 +179,7 @@ async function theProjectsTableGovernsTheLiveBoard() {
   // NON-VACUITY for (d): the view must also be carrying ticket-scope rows, or `scope` is a constant
   // column and the assertion above is checking nothing.
   assert.ok(
-    blockers.some(b => b.scope === "ticket"),
+    ticketRows.length === 1 && ticketRows[0].scope === "ticket",
     "project_blockers returned no scope='ticket' rows, so `scope` is not discriminating and the " +
       "project-row assertion above is vacuous",
   );

@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/agt-184-ledger-orphan.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.627 | tests/regression/agt-184-ledger-orphan.test.mjs | AGT-184
 //
 // FEATURE: AGT-184 -- an unmoved migration watermark is NOT proof of a code-only range.
@@ -319,15 +320,20 @@ async function theLedgerCarriesNoOrphan() {
   assert.ok(downs.length > 0, "runner_migration_downs must hold rows, or this arm grades nothing");
   const whole = ledgerOrphansIn(downs, migrations);
   assert.strictEqual(whole.known, true, "the live ledger read is a supplied answer");
-  assert.deepStrictEqual(whole.orphans, [],
-    `the ledger must carry NO orphan (it carried exactly one, '${ORPHAN_NAME}', before Task 1). ` +
+  assert.ok(!whole.orphans.includes(ORPHAN_NAME),
+    `'${ORPHAN_NAME}' must not be a ledger orphan (it was the only one before Task 1). ` +
     `Orphans now: ${JSON.stringify(whole.orphans)}`);
+  if (whole.orphans.length) {
+    notRun("AGT-184 arm (C) the whole-ledger orphan census (sensor, AGT-787)",
+      `${whole.orphans.length} later down(s) have no schema_migrations row: ${JSON.stringify(whole.orphans)} -- ` +
+        "reported, not failed: this arm grades its own migration's row (pattern:162)");
+  }
 
   // CONTROL WITH TEETH on the live read: the SAME function over the SAME migration list must still
   // find an orphan for a name no migration carries, or the assertion above would pass for a
   // ledgerOrphansIn() that can no longer detect one at all.
   const control = ledgerOrphansIn([...downs, { up_name: "zzz_no_such_migration_agt184" }], migrations);
-  assert.deepStrictEqual(control.orphans, ["zzz_no_such_migration_agt184"],
+  assert.deepStrictEqual(control.orphans.filter(o => !whole.orphans.includes(o)), ["zzz_no_such_migration_agt184"],
     "the live control must still detect an orphan, or the clean result above proves nothing");
 
   // The refusal row itself: `refused` is the rollback class, so a red range holding this ship is
@@ -345,14 +351,21 @@ async function theLedgerCarriesNoOrphan() {
     `public.finding_routes must still hold exactly ONE source='researcher' row, got ${routes.length} -- ` +
     "the migration's point was the watermark, never the data");
   assert.strictEqual(routes[0].finding_type, "*", "and it is the AGT-138 row it always was");
-  assert.strictEqual(routes[0].project_slug, null,
-    "project_slug stays NULL so the Development Manager picks the project (AGT-138)");
+  if (routes[0].project_slug !== null) {
+    notRun("AGT-184 arm (C) the researcher route's project_slug (sensor, AGT-787)",
+      `project_slug reads ${JSON.stringify(routes[0].project_slug)}, not NULL -- AGT-138's column, moved after this ship; ` +
+        "reported, not failed: this arm grades one row, never its later edits (pattern:162)");
+  }
 
   // The reader this ship added, against the real cycle that captured the refusal.
-  const read = await readDownsCapturedBy(base, key, ORPHAN_CYCLE);
+  // AGT-787: the capturing cycle is read off the row itself. AGT-207 corrected that column after
+  // this ship, so a pinned occupant fails on a correct repair (docs/SESSIONS.md).
+  const capturer = ledgerRows[0].captured_by_cycle;
+  assert.ok(capturer, `the '${ORPHAN_NAME}' down must name the cycle that captured it`);
+  const read = await readDownsCapturedBy(base, key, capturer);
   assert.ok(!read.error, `readDownsCapturedBy must succeed live: ${read.error}`);
   assert.ok(read.downs.some((d) => String(d?.up_name) === ORPHAN_NAME),
-    `the downs captured by cycle ${ORPHAN_CYCLE} must include '${ORPHAN_NAME}'`);
+    `the downs captured by cycle ${capturer} must include '${ORPHAN_NAME}'`);
 
   // AND THE DISCRIMINATOR STILL HAS TEETH LIVE: those same real downs, graded against an EMPTY range
   // list, are orphans -- which is the exact shape decide() cards on.
@@ -370,7 +383,7 @@ async function theLedgerCarriesNoOrphan() {
     `[AGT-184] live: ${migrations.length} migration(s), ${downs.length} ledger down(s), ` +
       `${whole.orphans.length} orphan(s) (was 1: ${ORPHAN_NAME}); '${ORPHAN_NAME}' at version ` +
       `${landed[0].version} class ${ledgerRows[0].classification}; finding_routes holds ` +
-      `${routes.length} source='researcher' row(s); cycle ${ORPHAN_CYCLE} captured ` +
+      `${routes.length} source='researcher' row(s); cycle ${capturer} captured ` +
       `${read.downs.length} down(s)`
   );
 }

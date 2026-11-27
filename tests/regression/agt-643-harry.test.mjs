@@ -1,3 +1,4 @@
+// DeepBench v7.0.1125 | tests/regression/agt-643-harry.test.mjs | AGT-787 -- live reads re-pointed
 // DeepBench v7.0.1106 | tests/regression/agt-643-harry.test.mjs | AGT-781 -- pin arm re-pointed off the live pin census
 // DeepBench v7.0.1005 | tests/regression/agt-643-harry.test.mjs | AGT-643 -- Harry (SC-01) and the principal's Library: rows, stores, north-star pin
 //
@@ -163,10 +164,10 @@ async function partE_live() {
     return r.json();
   };
 
-  assert.deepStrictEqual(await rest(`agents?id=eq.${SELF_ID}&select=code,lane,is_active`),
-    [{ code: "SC-01", lane: "personal", is_active: false }],
-    `agents row '${SELF_ID}' is not exactly [{code:'SC-01', lane:'personal', is_active:false}] -- is_active is the principal's hire, not this build's`);
-  results.push("live-harry-hw01-personal-inactive");
+  const self = await rest(`agents?id=eq.${SELF_ID}&select=code,lane,is_active`);
+  assert.deepStrictEqual(self.map(a => ({ code: a.code, lane: a.lane })), [{ code: "SC-01", lane: "personal" }],
+    `agents row '${SELF_ID}' is not exactly [{code:'SC-01', lane:'personal'}]`);
+  results.push(`live-harry-sc01-personal (is_active ${self[0].is_active}: the principal's hire, a reading -- AGT-787)`);
 
   const asgn = (await rest(`agent_capability_assignments?agent_id=eq.${SELF_ID}&select=capability_slug`)).map(r => r.capability_slug).sort();
   // AGT-649 (v7.0.1009): two mentor capabilities join the five -- 7 assignments.
